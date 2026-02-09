@@ -1,0 +1,67 @@
+# =============================================================================
+# VAES .gitignore
+# =============================================================================
+
+# Abhängigkeiten
+/vendor/
+/node_modules/
+
+# Konfiguration mit sensiblen Daten
+/src/config/config.php
+/src/config/config.local.php
+/src/config/.env
+.env
+.env.local
+.env.*.local
+
+# Logs und Cache
+/src/storage/logs/*
+/src/storage/cache/*
+/src/storage/uploads/*
+!.gitkeep
+
+# IDE und Editoren
+.vscode/
+.idea/
+*.swp
+*.swo
+*.sublime-project
+*.sublime-workspace
+.project
+.settings/
+
+# Betriebssystem
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# Backups
+*.bak
+*.backup
+*.old
+*~
+
+# Temporäre Dateien
+*.tmp
+*.temp
+*.log
+
+# Build-Artefakte
+/dist/
+/build/
+/coverage/
+
+# PHPUnit
+.phpunit.result.cache
+phpunit.xml
+
+# Composer
+composer.lock
+
+# Test-Coverage
+/tests/coverage/
