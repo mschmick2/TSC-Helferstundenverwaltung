@@ -1,6 +1,6 @@
 # =============================================================================
 # VAES Backup Script
-# Sichert E:\TSC-Arbeitsstundenverwaltung auf Y:\software_mondial\TSC-Arbeitsstundenverwaltung
+# Sichert E:\TSC-Helferstundenverwaltung auf Y:\software_mondial\TSC-Helferstundenverwaltung
 # =============================================================================
 
 param(
@@ -8,8 +8,8 @@ param(
 )
 
 # Konfiguration
-$SourcePath = "E:\TSC-Arbeitsstundenverwaltung"
-$BackupBasePath = "Y:\software_mondial\TSC-Arbeitsstundenverwaltung"
+$SourcePath = "E:\TSC-Helferstundenverwaltung"
+$BackupBasePath = "Y:\software_mondial\TSC-Helferstundenverwaltung"
 $CurrentBackupPath = "$BackupBasePath\current"
 $DailyBackupPath = "$BackupBasePath\daily"
 $LogPath = "$BackupBasePath\logs"

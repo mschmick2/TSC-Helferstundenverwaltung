@@ -1,10 +1,13 @@
 # VAES - Vereins-Arbeitsstunden-Erfassungssystem
+## (TSC-Helferstundenverwaltung)
 
-![Version](https://img.shields.io/badge/version-1.1.0-blue)
+![Version](https://img.shields.io/badge/version-1.3.0-blue)
 ![PHP](https://img.shields.io/badge/PHP-8.x-purple)
 ![MySQL](https://img.shields.io/badge/MySQL-8.4-orange)
 
 Web-basiertes System zur Erfassung und Verwaltung von ehrenamtlichen Arbeitsstunden für Vereinsmitglieder.
+
+**Repository:** https://github.com/mschmick2/TSC-Helferstundenverwaltung.git
 
 ## Features
 
@@ -32,8 +35,8 @@ Web-basiertes System zur Erfassung und Verwaltung von ehrenamtlichen Arbeitsstun
 ### 1. Repository klonen
 
 ```bash
-git clone https://github.com/DEIN-USERNAME/TSC-Arbeitsstundenverwaltung.git
-cd TSC-Arbeitsstundenverwaltung
+git clone https://github.com/mschmick2/TSC-Helferstundenverwaltung.git
+cd TSC-Helferstundenverwaltung
 ```
 
 ### 2. Abhängigkeiten installieren
@@ -107,7 +110,7 @@ Entwurf → Eingereicht → In Klärung → Freigegeben
 Automatisches stündliches Backup auf NAS:
 
 ```
-E:\TSC-Arbeitsstundenverwaltung\  →  Y:\software_mondial\TSC-Arbeitsstundenverwaltung\
+E:\TSC-Helferstundenverwaltung\  →  Y:\software_mondial\TSC-Helferstundenverwaltung\
 ```
 
 Siehe `scripts/backup.ps1` und `scripts/backup.bat`.

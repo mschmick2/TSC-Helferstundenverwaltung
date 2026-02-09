@@ -34,14 +34,14 @@
 
 ```powershell
 # PowerShell als Administrator öffnen
-New-Item -ItemType Directory -Path "E:\TSC-Arbeitsstundenverwaltung" -Force
-cd E:\TSC-Arbeitsstundenverwaltung
+New-Item -ItemType Directory -Path "E:\TSC-Helferstundenverwaltung" -Force
+cd E:\TSC-Helferstundenverwaltung
 ```
 
 ### VSCode öffnen
 
 ```powershell
-code E:\TSC-Arbeitsstundenverwaltung
+code E:\TSC-Helferstundenverwaltung
 ```
 
 ---
@@ -51,7 +51,7 @@ code E:\TSC-Arbeitsstundenverwaltung
 ### Lokales Repository
 
 ```bash
-cd E:\TSC-Arbeitsstundenverwaltung
+cd E:\TSC-Helferstundenverwaltung
 git init
 git config user.name "Dein Name"
 git config user.email "deine@email.de"
@@ -101,11 +101,11 @@ git add .
 git commit -m "Initial commit: Projektstruktur und Pflichtenheft"
 ```
 
-### Remote Repository (GitHub/GitLab)
+### Remote Repository verbinden
 
 ```bash
-# GitHub Repository hinzufügen (URL anpassen!)
-git remote add origin https://github.com/DEIN-USERNAME/TSC-Arbeitsstundenverwaltung.git
+# Repository ist bereits eingerichtet:
+git remote add origin https://github.com/mschmick2/TSC-Helferstundenverwaltung.git
 git branch -M main
 git push -u origin main
 ```
@@ -120,13 +120,13 @@ Stellen Sie sicher, dass das Laufwerk Y: verbunden ist und der Pfad erreichbar i
 
 ```powershell
 # Testen der Verbindung
-Test-Path "Y:\software_mondial\TSC-Arbeitsstundenverwaltung"
+Test-Path "Y:\software_mondial\TSC-Helferstundenverwaltung"
 
 # Falls nicht vorhanden, Verzeichnis erstellen (benötigt Schreibrechte)
-New-Item -ItemType Directory -Path "Y:\software_mondial\TSC-Arbeitsstundenverwaltung" -Force
-New-Item -ItemType Directory -Path "Y:\software_mondial\TSC-Arbeitsstundenverwaltung\current" -Force
-New-Item -ItemType Directory -Path "Y:\software_mondial\TSC-Arbeitsstundenverwaltung\daily" -Force
-New-Item -ItemType Directory -Path "Y:\software_mondial\TSC-Arbeitsstundenverwaltung\logs" -Force
+New-Item -ItemType Directory -Path "Y:\software_mondial\TSC-Helferstundenverwaltung" -Force
+New-Item -ItemType Directory -Path "Y:\software_mondial\TSC-Helferstundenverwaltung\current" -Force
+New-Item -ItemType Directory -Path "Y:\software_mondial\TSC-Helferstundenverwaltung\daily" -Force
+New-Item -ItemType Directory -Path "Y:\software_mondial\TSC-Helferstundenverwaltung\logs" -Force
 ```
 
 **Hinweis:** Falls Laufwerk Y: nicht gemappt ist:
@@ -159,8 +159,8 @@ net use Y: \\NAS-NAME\software_mondial /persistent:yes
 
 5. **Registerkarte "Aktionen":**
    - "Neu..." klicken
-   - Programm/Skript: `E:\TSC-Arbeitsstundenverwaltung\scripts\backup.bat`
-   - Starten in: `E:\TSC-Arbeitsstundenverwaltung\scripts`
+   - Programm/Skript: `E:\TSC-Helferstundenverwaltung\scripts\backup.bat`
+   - Starten in: `E:\TSC-Helferstundenverwaltung\scripts`
 
 6. **Registerkarte "Bedingungen":**
    - "Nur starten, wenn Netzwerkverbindung verfügbar" aktivieren
@@ -174,10 +174,10 @@ net use Y: \\NAS-NAME\software_mondial /persistent:yes
 
 ```powershell
 # PowerShell als Administrator
-E:\TSC-Arbeitsstundenverwaltung\scripts\backup.bat
+E:\TSC-Helferstundenverwaltung\scripts\backup.bat
 
 # Oder direkt PowerShell-Script
-powershell -ExecutionPolicy Bypass -File "E:\TSC-Arbeitsstundenverwaltung\scripts\backup.ps1"
+powershell -ExecutionPolicy Bypass -File "E:\TSC-Helferstundenverwaltung\scripts\backup.ps1"
 ```
 
 ---
@@ -331,7 +331,7 @@ return [
 ### Komplette Projektstruktur
 
 ```
-E:\TSC-Arbeitsstundenverwaltung\
+E:\TSC-Helferstundenverwaltung\
 │
 ├── .git/                       # Git-Repository
 ├── .gitignore                  # Git-Ignore-Regeln
@@ -422,7 +422,7 @@ Bei neuen Releases:
 
 ```powershell
 # Prüfen
-Test-Path "Y:\software_mondial\TSC-Arbeitsstundenverwaltung"
+Test-Path "Y:\software_mondial\TSC-Helferstundenverwaltung"
 
 # Falls Laufwerk Y: nicht verbunden:
 net use Y: \\NAS-NAME\software_mondial /persistent:yes
