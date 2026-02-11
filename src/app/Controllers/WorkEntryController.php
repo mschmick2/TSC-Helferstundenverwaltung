@@ -78,6 +78,10 @@ class WorkEntryController extends BaseController
             'categories' => $categories,
             'filters' => $params,
             'user' => $user,
+            'breadcrumbs' => [
+                ['label' => 'Dashboard', 'url' => '/'],
+                ['label' => 'Arbeitsstunden'],
+            ],
         ]);
     }
 
@@ -94,6 +98,11 @@ class WorkEntryController extends BaseController
             'categories' => $categories,
             'user' => $user,
             'fieldConfig' => $this->settingsService->getFieldConfig(),
+            'breadcrumbs' => [
+                ['label' => 'Dashboard', 'url' => '/'],
+                ['label' => 'Arbeitsstunden', 'url' => '/entries'],
+                ['label' => 'Neuer Eintrag'],
+            ],
         ]);
     }
 
@@ -187,11 +196,29 @@ class WorkEntryController extends BaseController
         // Dialog-Nachrichten als gelesen markieren
         $this->dialogReadStatusRepo->markAsRead($user->getId(), $entry->getId());
 
+        // Breadcrumbs: von Review oder von Arbeitsstunden
+        $params = $request->getQueryParams();
+        $fromReview = ($params['from'] ?? '') === 'review';
+        if ($fromReview) {
+            $breadcrumbs = [
+                ['label' => 'Dashboard', 'url' => '/'],
+                ['label' => 'Prüfung', 'url' => '/review'],
+                ['label' => 'Eintrag ' . $entry->getEntryNumber()],
+            ];
+        } else {
+            $breadcrumbs = [
+                ['label' => 'Dashboard', 'url' => '/'],
+                ['label' => 'Arbeitsstunden', 'url' => '/entries'],
+                ['label' => 'Eintrag ' . $entry->getEntryNumber()],
+            ];
+        }
+
         return $this->render($response, 'entries/show', [
             'title' => 'Antrag ' . $entry->getEntryNumber(),
             'entry' => $entry,
             'dialogs' => $dialogs,
             'user' => $user,
+            'breadcrumbs' => $breadcrumbs,
         ]);
     }
 
@@ -227,6 +254,12 @@ class WorkEntryController extends BaseController
             'categories' => $categories,
             'user' => $user,
             'fieldConfig' => $this->settingsService->getFieldConfig(),
+            'breadcrumbs' => [
+                ['label' => 'Dashboard', 'url' => '/'],
+                ['label' => 'Arbeitsstunden', 'url' => '/entries'],
+                ['label' => 'Eintrag ' . $entry->getEntryNumber(), 'url' => '/entries/' . $entry->getId()],
+                ['label' => 'Bearbeiten'],
+            ],
         ]);
     }
 
@@ -535,6 +568,10 @@ class WorkEntryController extends BaseController
             'categories' => $categories,
             'filters' => $params,
             'user' => $user,
+            'breadcrumbs' => [
+                ['label' => 'Dashboard', 'url' => '/'],
+                ['label' => 'Prüfung'],
+            ],
         ]);
     }
 

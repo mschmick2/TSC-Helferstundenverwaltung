@@ -32,6 +32,12 @@ class TargetHoursController extends BaseController
         $user = $request->getAttribute('user');
         $params = $request->getQueryParams();
 
+        $breadcrumbs = [
+            ['label' => 'Dashboard', 'url' => '/'],
+            ['label' => 'Verwaltung', 'url' => '/admin/users'],
+            ['label' => 'Soll-Stunden'],
+        ];
+
         if (!$this->targetService->isEnabled()) {
             return $this->render($response, 'admin/targets/index', [
                 'title' => 'Soll-Stunden',
@@ -42,6 +48,7 @@ class TargetHoursController extends BaseController
                 'year' => (int) date('Y'),
                 'defaultTarget' => $this->targetService->getDefaultTarget(),
                 'onlyUnfulfilled' => false,
+                'breadcrumbs' => $breadcrumbs,
             ]);
         }
 
@@ -66,6 +73,7 @@ class TargetHoursController extends BaseController
             'year' => $year,
             'defaultTarget' => $this->targetService->getDefaultTarget(),
             'onlyUnfulfilled' => $onlyUnfulfilled,
+            'breadcrumbs' => $breadcrumbs,
         ]);
     }
 
@@ -96,6 +104,12 @@ class TargetHoursController extends BaseController
             'comparison' => $comparison,
             'year' => $year,
             'defaultTarget' => $this->targetService->getDefaultTarget(),
+            'breadcrumbs' => [
+                ['label' => 'Dashboard', 'url' => '/'],
+                ['label' => 'Verwaltung', 'url' => '/admin/users'],
+                ['label' => 'Soll-Stunden', 'url' => '/admin/targets'],
+                ['label' => $targetUser->getVollname()],
+            ],
         ]);
     }
 

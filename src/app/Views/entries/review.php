@@ -95,7 +95,7 @@ use App\Models\WorkEntry;
                 <?php foreach ($entries as $entry): ?>
                 <tr>
                     <td>
-                        <a href="<?= ViewHelper::url('/entries/' . $entry->getId()) ?>" class="text-decoration-none fw-semibold">
+                        <a href="<?= ViewHelper::url('/entries/' . $entry->getId() . '?from=review') ?>" class="text-decoration-none fw-semibold">
                             <?= ViewHelper::e($entry->getEntryNumber()) ?>
                         </a>
                     </td>
@@ -117,7 +117,7 @@ use App\Models\WorkEntry;
                         <?php endif; ?>
                     </td>
                     <td class="text-end">
-                        <a href="<?= ViewHelper::url('/entries/' . $entry->getId()) ?>" class="btn btn-sm btn-primary">
+                        <a href="<?= ViewHelper::url('/entries/' . $entry->getId() . '?from=review') ?>" class="btn btn-sm btn-primary">
                             <i class="bi bi-eye"></i> Prüfen
                         </a>
                     </td>

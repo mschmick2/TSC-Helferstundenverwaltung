@@ -65,6 +65,11 @@ main {
     }
 }
 
+/* Breadcrumbs */
+.breadcrumb {
+    font-size: 0.875rem;
+}
+
 /* Footer */
 .footer {
     margin-top: auto;

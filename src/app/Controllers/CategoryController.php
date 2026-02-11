@@ -42,6 +42,11 @@ class CategoryController extends BaseController
             'settings' => $this->settings,
             'categories' => $categories,
             'entryCounts' => $entryCounts,
+            'breadcrumbs' => [
+                ['label' => 'Dashboard', 'url' => '/'],
+                ['label' => 'Verwaltung', 'url' => '/admin/users'],
+                ['label' => 'Kategorien'],
+            ],
         ]);
     }
 

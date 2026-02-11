@@ -34,6 +34,9 @@ $vereinsname = $settings['verein']['name'] ?? 'VAES';
             <!-- Flash-Messages -->
             <?php require __DIR__ . '/../components/_flash.php'; ?>
 
+            <!-- Breadcrumbs -->
+            <?php require __DIR__ . '/../components/_breadcrumbs.php'; ?>
+
             <?= $content ?>
         </div>
     </main>

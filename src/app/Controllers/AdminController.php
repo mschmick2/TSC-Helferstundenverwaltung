@@ -43,6 +43,11 @@ class AdminController extends BaseController
             'settings' => $this->settings,
             'allSettings' => $allSettings,
             'groups' => $groups,
+            'breadcrumbs' => [
+                ['label' => 'Dashboard', 'url' => '/'],
+                ['label' => 'Verwaltung', 'url' => '/admin/users'],
+                ['label' => 'Einstellungen'],
+            ],
         ]);
     }
 

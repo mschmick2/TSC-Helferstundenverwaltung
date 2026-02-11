@@ -47,6 +47,20 @@ class AuditController extends BaseController
         $actions = $this->auditRepo->getDistinctActions();
         $tableNames = $this->auditRepo->getDistinctTableNames();
 
+        // Breadcrumbs: Admin vs. Auditor
+        if ($user->isAdmin()) {
+            $breadcrumbs = [
+                ['label' => 'Dashboard', 'url' => '/'],
+                ['label' => 'Verwaltung', 'url' => '/admin/users'],
+                ['label' => 'Audit-Trail'],
+            ];
+        } else {
+            $breadcrumbs = [
+                ['label' => 'Dashboard', 'url' => '/'],
+                ['label' => 'Audit-Trail'],
+            ];
+        }
+
         return $this->render($response, 'admin/audit/index', [
             'title' => 'Audit-Trail',
             'user' => $user,
@@ -65,6 +79,7 @@ class AuditController extends BaseController
                 'date_to' => $params['date_to'] ?? '',
                 'entry_number' => $params['entry_number'] ?? '',
             ],
+            'breadcrumbs' => $breadcrumbs,
         ]);
     }
 
@@ -88,6 +103,23 @@ class AuditController extends BaseController
         $newValues = $entry['new_values'] ? json_decode($entry['new_values'], true) : null;
         $metadata = $entry['metadata'] ? json_decode($entry['metadata'], true) : null;
 
+        // Breadcrumbs: Admin vs. Auditor
+        $auditBasePath = $user->isAdmin() ? '/admin/audit' : '/audit';
+        if ($user->isAdmin()) {
+            $breadcrumbs = [
+                ['label' => 'Dashboard', 'url' => '/'],
+                ['label' => 'Verwaltung', 'url' => '/admin/users'],
+                ['label' => 'Audit-Trail', 'url' => $auditBasePath],
+                ['label' => 'Audit #' . $id],
+            ];
+        } else {
+            $breadcrumbs = [
+                ['label' => 'Dashboard', 'url' => '/'],
+                ['label' => 'Audit-Trail', 'url' => $auditBasePath],
+                ['label' => 'Audit #' . $id],
+            ];
+        }
+
         return $this->render($response, 'admin/audit/show', [
             'title' => 'Audit-Detail #' . $id,
             'user' => $user,
@@ -96,6 +128,7 @@ class AuditController extends BaseController
             'oldValues' => $oldValues,
             'newValues' => $newValues,
             'metadata' => $metadata,
+            'breadcrumbs' => $breadcrumbs,
         ]);
     }
 }

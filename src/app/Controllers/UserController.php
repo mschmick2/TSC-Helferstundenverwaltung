@@ -60,6 +60,11 @@ class UserController extends BaseController
                 'role' => $role,
                 'inactive' => $includeInactive,
             ],
+            'breadcrumbs' => [
+                ['label' => 'Dashboard', 'url' => '/'],
+                ['label' => 'Verwaltung', 'url' => '/admin/users'],
+                ['label' => 'Mitglieder'],
+            ],
         ]);
     }
 
@@ -88,6 +93,12 @@ class UserController extends BaseController
             'targetUser' => $targetUser,
             'allRoles' => $roles,
             'invitation' => $invitation,
+            'breadcrumbs' => [
+                ['label' => 'Dashboard', 'url' => '/'],
+                ['label' => 'Verwaltung', 'url' => '/admin/users'],
+                ['label' => 'Mitglieder', 'url' => '/admin/users'],
+                ['label' => $targetUser->getVollname()],
+            ],
         ]);
     }
 
@@ -102,6 +113,12 @@ class UserController extends BaseController
             'title' => 'CSV-Import',
             'user' => $user,
             'settings' => $this->settings,
+            'breadcrumbs' => [
+                ['label' => 'Dashboard', 'url' => '/'],
+                ['label' => 'Verwaltung', 'url' => '/admin/users'],
+                ['label' => 'Mitglieder', 'url' => '/admin/users'],
+                ['label' => 'CSV-Import'],
+            ],
         ]);
     }
 
@@ -151,6 +168,12 @@ class UserController extends BaseController
             'user' => $user,
             'settings' => $this->settings,
             'result' => $result,
+            'breadcrumbs' => [
+                ['label' => 'Dashboard', 'url' => '/'],
+                ['label' => 'Verwaltung', 'url' => '/admin/users'],
+                ['label' => 'Mitglieder', 'url' => '/admin/users'],
+                ['label' => 'Import-Ergebnis'],
+            ],
         ]);
     }
 
@@ -306,6 +329,12 @@ class UserController extends BaseController
             'user' => $user,
             'settings' => $this->settings,
             'allRoles' => $roles,
+            'breadcrumbs' => [
+                ['label' => 'Dashboard', 'url' => '/'],
+                ['label' => 'Verwaltung', 'url' => '/admin/users'],
+                ['label' => 'Mitglieder', 'url' => '/admin/users'],
+                ['label' => 'Neues Mitglied'],
+            ],
         ]);
     }
 

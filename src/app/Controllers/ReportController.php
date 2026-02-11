@@ -59,6 +59,10 @@ class ReportController extends BaseController
             'filters' => $filters,
             'page' => $page,
             'perPage' => $perPage,
+            'breadcrumbs' => [
+                ['label' => 'Dashboard', 'url' => '/'],
+                ['label' => 'Reports'],
+            ],
         ]);
     }
 
