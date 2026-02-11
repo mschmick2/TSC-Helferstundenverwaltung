@@ -12,8 +12,9 @@ return [
     // ==========================================================================
     'app' => [
         'name' => 'VAES',
-        'version' => '1.1.0',
-        'url' => 'https://ihre-domain.de',
+        'version' => '1.3.0',
+        'url' => 'https://192.168.3.98/helferstunden',  // Volle URL inkl. Unterpfad (fuer E-Mail-Links)
+        'base_path' => '/helferstunden',  // Unterpfad fuer Unterverzeichnis-Installation, '' fuer Root
         'debug' => false,  // Auf Produktion: IMMER false!
         'timezone' => 'Europe/Berlin',
         'locale' => 'de_DE',
@@ -39,14 +40,16 @@ return [
     
     // ==========================================================================
     // Session
+    // HINWEIS: Das 'secure'-Flag wird in index.php automatisch an HTTPS/HTTP
+    // angepasst. Bei HTTP wird 'secure' automatisch auf false gesetzt.
     // ==========================================================================
     'session' => [
         'name' => 'VAES_SESSION',
         'lifetime' => 1800,  // 30 Minuten in Sekunden
         'path' => '/',
         'domain' => '',      // Leer = aktuelle Domain
-        'secure' => true,    // Nur über HTTPS
-        'httponly' => true,  // Nicht per JavaScript zugreifbar
+        'secure' => true,    // Nur ueber HTTPS (wird in index.php auto-erkannt)
+        'httponly' => true,   // Nicht per JavaScript zugreifbar
         'samesite' => 'Lax',
     ],
     
@@ -63,16 +66,31 @@ return [
     
     // ==========================================================================
     // E-Mail (SMTP)
+    //
+    // Telekom / T-Online:
+    //   host: securesmtp.t-online.de, port: 587, encryption: tls
+    //   username: Zugangsnummer (z.B. ***REMOVED***) ODER vollstaendige E-Mail
+    //   password: E-Mail-Passwort (NICHT das Telekom-Login-Passwort)
+    //   from.address: MUSS eine bei T-Online registrierte Adresse sein
+    //                 z.B. zugangsnummer@t-online.de
+    //
+    // Strato:
+    //   host: smtp.strato.de, port: 587, encryption: tls
+    //   username: Ihre Strato E-Mail-Adresse
+    //   password: Ihr Strato E-Mail-Passwort
+    //   from.address: Ihre Strato E-Mail-Adresse
+    //
+    // Alternativ (nur Telekom): Port 465 mit encryption: ssl
     // ==========================================================================
     'mail' => [
         'driver' => 'smtp',
-        'host' => 'smtp.strato.de',
+        'host' => 'securesmtp.t-online.de',  // Telekom SMTP (Port 587/TLS)
         'port' => 587,
-        'username' => '',      // Ihre E-Mail-Adresse
-        'password' => '',      // Ihr E-Mail-Passwort
-        'encryption' => 'tls', // tls oder ssl
+        'username' => '',                     // Telekom Zugangsnummer oder E-Mail
+        'password' => '',                     // E-Mail-Passwort
+        'encryption' => 'tls',               // TLS (STARTTLS) auf Port 587
         'from' => [
-            'address' => 'noreply@ihre-domain.de',
+            'address' => '',                  // MUSS bei T-Online registriert sein!
             'name' => 'VAES System',
         ],
     ],

@@ -142,9 +142,9 @@ REQ-RESET-004: Vorgang im Audit-Trail protokollieren
 ### 4.1 Import
 
 ```
-REQ-IMPORT-001: Mitglieder werden ausschließlich per CSV-Import angelegt
+REQ-IMPORT-001: Mitglieder werden per CSV-Import oder manuell angelegt
 REQ-IMPORT-002: Keine Selbstregistrierung
-REQ-IMPORT-003: Import nur durch Administrator
+REQ-IMPORT-003: Import und manuelle Anlage nur durch Administrator
 ```
 
 ### 4.2 CSV-Format
@@ -171,10 +171,26 @@ REQ-IMPORT-007: E-Mail-Validierung
 REQ-IMPORT-008: Import-Protokoll mit Erfolgen und Fehlern
 ```
 
-### 4.4 Einladungsprozess
+### 4.4 Manuelle Mitgliederanlage
 
 ```
-REQ-INVITE-001: Nach Import: System generiert Einladungslink (Token)
+REQ-MANUAL-001: Administrator kann einzelne Mitglieder manuell ueber ein Formular anlegen
+REQ-MANUAL-002: Pflichtfelder (Mitgliedsnummer, Nachname, Vorname, E-Mail) mit rotem Stern (*) gekennzeichnet
+REQ-MANUAL-003: Optionale Felder (Strasse, PLZ, Ort, Telefon, Eintrittsdatum) frei editierbar
+REQ-MANUAL-004: Hinweistext "* Pflichtfeld" in rot unter/ueber dem Formular
+REQ-MANUAL-005: Rollenzuweisung direkt bei Anlage moeglich (Checkboxen fuer alle Rollen)
+REQ-MANUAL-006: Rolle "Mitglied" ist standardmaessig vorausgewaehlt
+REQ-MANUAL-007: Dublettenerkennung auf Mitgliedsnummer und E-Mail bei Formularabsendung
+REQ-MANUAL-008: Einladungs-E-Mail wird automatisch nach Anlage gesendet
+REQ-MANUAL-009: Button "Neues Mitglied anlegen" auf der Mitglieder-Uebersichtsseite
+REQ-MANUAL-010: Validierung: E-Mail-Format, Pflichtfelder nicht leer, Eintrittsdatum im Format YYYY-MM-DD
+REQ-MANUAL-011: Erfolgreiche Anlage und Rollenzuweisung im Audit-Trail protokolliert
+```
+
+### 4.5 Einladungsprozess
+
+```
+REQ-INVITE-001: Nach Import/Anlage: System generiert Einladungslink (Token)
 REQ-INVITE-002: E-Mail mit Einladungslink automatisch senden
 REQ-INVITE-003: Token gültig für 7 Tage (konfigurierbar)
 REQ-INVITE-004: Mitglied setzt eigenes Passwort über Link
@@ -336,7 +352,7 @@ REQ-DLG-012: Erinnerungs-E-Mail nach X Tagen (Admin konfiguriert)
 
 | Ereignis | Empfänger | Trigger |
 |----------|-----------|---------|
-| Einladung | Neues Mitglied | Nach CSV-Import |
+| Einladung | Neues Mitglied | Nach CSV-Import oder manueller Anlage |
 | Neuer Antrag | Alle Prüfer | Nach Einreichung |
 | Freigabe | Mitglied | Nach Genehmigung |
 | Ablehnung | Mitglied | Nach Ablehnung (mit Begründung) |
@@ -574,6 +590,7 @@ Siehe: `scripts/database/create_database.sql`
 - [ ] Dialog bleibt bei Statusänderungen erhalten
 - [ ] Korrektur nach Freigabe möglich
 - [ ] CSV-Import funktioniert
+- [ ] Manuelle Mitgliederanlage mit Pflichtfeld-Kennzeichnung funktioniert
 - [ ] Einladungslink-Prozess funktioniert
 - [ ] Alle Reports verfügbar
 - [ ] PDF/CSV-Export funktioniert

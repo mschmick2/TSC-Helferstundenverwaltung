@@ -9,7 +9,7 @@ param(
 
 # Konfiguration
 $SourcePath = "E:\TSC-Helferstundenverwaltung"
-$BackupBasePath = "Y:\software_mondial\TSC-Helferstundenverwaltung"
+$BackupBasePath = "Y:\Software_Mondial\TSC-Helferstundenverwaltung"
 $CurrentBackupPath = "$BackupBasePath\current"
 $DailyBackupPath = "$BackupBasePath\daily"
 $LogPath = "$BackupBasePath\logs"
@@ -55,7 +55,7 @@ if (!(Test-Path $SourcePath)) {
 if (!(Test-Path $BackupBasePath)) {
     Write-Log "FEHLER: Backup-Ziel nicht erreichbar: $BackupBasePath"
     Write-Log "Bitte pruefen Sie, ob Laufwerk Y: verbunden ist."
-    Write-Log "Verbinden mit: net use Y: \\NAS-NAME\software_mondial /persistent:yes"
+    Write-Log "Verbinden mit: net use Y: \\NAS-DS918_01\software_mondial /persistent:yes"
     exit 1
 }
 

@@ -4,11 +4,15 @@
 
 # Abhängigkeiten
 /vendor/
+/src/vendor/
 /node_modules/
 
 # Konfiguration mit sensiblen Daten
 /src/config/config.php
 /src/config/config.local.php
+/src/config.php
+/docs/config.php
+/docs/version.json
 /src/config/.env
 .env
 .env.local
@@ -58,7 +62,14 @@ desktop.ini
 
 # PHPUnit
 .phpunit.result.cache
+.phpunit.cache/
 phpunit.xml
+
+# Claude Code lokale Einstellungen
+.claude/settings.local.json
+
+# Windows Artefakte
+nul
 
 # Composer
 composer.lock

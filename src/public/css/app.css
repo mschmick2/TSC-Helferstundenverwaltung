@@ -1,0 +1,71 @@
+/**
+ * VAES - Custom Styles
+ */
+
+/* Basis */
+body {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+main {
+    flex: 1;
+}
+
+/* Auth-Formulare */
+.min-vh-100 {
+    min-height: 100vh !important;
+}
+
+/* Navbar */
+.navbar-brand i {
+    font-size: 1.25rem;
+}
+
+/* Cards */
+.card {
+    transition: box-shadow 0.2s ease;
+}
+
+.card:hover {
+    box-shadow: 0 0.25rem 0.75rem rgba(0, 0, 0, 0.1);
+}
+
+/* 2FA-Code-Eingabe */
+#code {
+    font-size: 1.5rem;
+    letter-spacing: 0.5rem;
+    font-family: 'Courier New', monospace;
+}
+
+/* Flash-Messages auto-fade */
+.alert {
+    animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* Badge-Styles */
+.badge {
+    font-weight: 500;
+}
+
+/* Responsive Anpassungen */
+@media (max-width: 576px) {
+    .card-body {
+        padding: 1rem;
+    }
+
+    .navbar-brand {
+        font-size: 1rem;
+    }
+}
+
+/* Footer */
+.footer {
+    margin-top: auto;
+}

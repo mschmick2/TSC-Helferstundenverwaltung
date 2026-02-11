@@ -19,12 +19,23 @@ SET NAMES utf8mb4;
 SET CHARACTER SET utf8mb4;
 
 -- =============================================================================
+-- Datenbank erstellen
+-- =============================================================================
+
+CREATE DATABASE IF NOT EXISTS helferstunden
+    CHARACTER SET utf8mb4
+    COLLATE utf8mb4_unicode_ci;
+
+USE helferstunden;
+
+-- =============================================================================
 -- TABELLEN LÖSCHEN (falls vorhanden) - Reihenfolge beachten wegen Foreign Keys!
 -- =============================================================================
 
 SET FOREIGN_KEY_CHECKS = 0;
 
 DROP TABLE IF EXISTS audit_log;
+DROP TABLE IF EXISTS dialog_read_status;
 DROP TABLE IF EXISTS work_entry_dialogs;
 DROP TABLE IF EXISTS work_entries;
 DROP TABLE IF EXISTS user_roles;
@@ -38,6 +49,7 @@ DROP TABLE IF EXISTS roles;
 DROP TABLE IF EXISTS categories;
 DROP TABLE IF EXISTS settings;
 DROP TABLE IF EXISTS entry_locks;
+DROP TABLE IF EXISTS rate_limits;
 DROP TABLE IF EXISTS entry_number_sequence;
 
 SET FOREIGN_KEY_CHECKS = 1;
@@ -377,6 +389,21 @@ CREATE TABLE work_entry_dialogs (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- =============================================================================
+-- TABELLE: dialog_read_status (Lese-Status für Dialog-Nachrichten)
+-- =============================================================================
+
+CREATE TABLE dialog_read_status (
+    user_id INT UNSIGNED NOT NULL,
+    work_entry_id INT UNSIGNED NOT NULL,
+    last_read_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (user_id, work_entry_id),
+    CONSTRAINT fk_dialog_read_user FOREIGN KEY (user_id)
+        REFERENCES users(id) ON DELETE CASCADE,
+    CONSTRAINT fk_dialog_read_entry FOREIGN KEY (work_entry_id)
+        REFERENCES work_entries(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- =============================================================================
 -- TABELLE: audit_log (Vollständiger Audit-Trail)
 -- =============================================================================
 
@@ -422,6 +449,43 @@ CREATE TABLE audit_log (
     
     -- Kein Foreign Key auf users, da Audit-Einträge erhalten bleiben müssen
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- =============================================================================
+-- TABELLE: rate_limits (IP-basiertes Rate-Limiting)
+-- =============================================================================
+
+CREATE TABLE rate_limits (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    ip_address VARCHAR(45) NOT NULL,
+    endpoint VARCHAR(100) NOT NULL,
+    attempted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    INDEX idx_rate_limits_lookup (ip_address, endpoint, attempted_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- =============================================================================
+-- TRIGGER: Audit-Log vor Manipulation schützen (FINDING-006)
+-- =============================================================================
+
+DELIMITER //
+
+CREATE TRIGGER audit_log_no_update
+BEFORE UPDATE ON audit_log
+FOR EACH ROW
+BEGIN
+    SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'Audit-Log darf nicht verändert werden.';
+END //
+
+CREATE TRIGGER audit_log_no_delete
+BEFORE DELETE ON audit_log
+FOR EACH ROW
+BEGIN
+    SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'Audit-Log darf nicht gelöscht werden.';
+END //
+
+DELIMITER ;
 
 -- =============================================================================
 -- TABELLE: settings (Systemeinstellungen)
@@ -629,8 +693,8 @@ GROUP BY u.id, YEAR(we.work_date), yt.target_hours, yt.is_exempt;
 -- Passwort-Hash wurde mit bcrypt (cost 12) erstellt
 
 INSERT INTO users (mitgliedsnummer, email, vorname, nachname, password_hash, is_active, email_verified_at)
-VALUES ('ADMIN001', 'admin@example.com', 'System', 'Administrator', 
-        '$2y$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/X4P.nR5VhKqVwVqLe', 
+VALUES ('ADMIN001', 'admin@example.com', 'System', 'Administrator',
+        '$2y$12$Ec.63o6ig1eyjBs6Kh7bhO0e5P9gm8EC6EGVreegwZPpP0rDw3Db2',
         TRUE, CURRENT_TIMESTAMP);
 
 -- Admin alle Rollen zuweisen

@@ -3,6 +3,10 @@
 # Platzieren in: Web-Root (public_html oder htdocs)
 # =============================================================================
 
+# PHP-Version (NUR fuer Hosting-Provider aktivieren, die dies erfordern, z.B. Strato)
+# Bei Standard-Apache-Installationen NICHT aktivieren (verursacht 500 Error)
+# AddType application/x-httpd-php83 .php
+
 # Zeichensatz
 AddDefaultCharset UTF-8
 
@@ -30,8 +34,8 @@ AddDefaultCharset UTF-8
     # Referrer-Policy
     Header always set Referrer-Policy "strict-origin-when-cross-origin"
     
-    # Content Security Policy (anpassen nach Bedarf)
-    # Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; font-src 'self' https://cdn.jsdelivr.net;"
+    # Content Security Policy
+    Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; font-src 'self' https://cdn.jsdelivr.net; img-src 'self' data:; connect-src 'self';"
 </IfModule>
 
 # HTTPS-Umleitung (auf Strato normalerweise automatisch)
@@ -46,12 +50,19 @@ AddDefaultCharset UTF-8
     RewriteEngine On
     
     # Basis-Verzeichnis (anpassen falls in Unterverzeichnis)
-    # RewriteBase /
+    # Fuer Root-Installation: auskommentiert lassen oder RewriteBase /
+    # Fuer Unterverzeichnis: z.B. RewriteBase /helferstunden
+    RewriteBase /helferstunden
     
+    # Statische Dateien direkt ausliefern (fuer Apache Alias-Kompatibilitaet)
+    RewriteCond %{REQUEST_URI} \.(css|js|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot|map)$ [NC]
+    RewriteRule ^ - [L]
+
     # Existierende Dateien und Verzeichnisse direkt ausliefern
-    RewriteCond %{REQUEST_FILENAME} !-f
-    RewriteCond %{REQUEST_FILENAME} !-d
-    
+    RewriteCond %{REQUEST_FILENAME} -f [OR]
+    RewriteCond %{REQUEST_FILENAME} -d
+    RewriteRule ^ - [L]
+
     # Alles andere an index.php weiterleiten
     RewriteRule ^(.*)$ index.php [QSA,L]
 </IfModule>

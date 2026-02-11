@@ -1,9 +1,8 @@
 @echo off
-REM =============================================================================
-REM VAES Backup - Wrapper für Windows Task Scheduler
-REM =============================================================================
+REM VAES Backup Script Starter
+REM Startet das PowerShell Backup-Script
 
-REM PowerShell-Script mit Admin-Rechten ausführen
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0backup.ps1"
-
-exit /b %ERRORLEVEL%
+cd /d "%~dp0"
+@echo off
+"C:\Program Files\PowerShell\7\pwsh.exe" -ExecutionPolicy Bypass -File "%~dp0backup.ps1" %*
+pause

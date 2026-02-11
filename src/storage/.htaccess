@@ -1,15 +1,129 @@
 # =============================================================================
-# VAES - Schutz für /storage Verzeichnis
-# Enthält Logs, Cache und temporäre Dateien - nicht öffentlich zugänglich!
+# VAES - Haupt .htaccess
+# Platzieren in: Web-Root (public_html oder htdocs)
 # =============================================================================
 
-# Apache 2.4+
-<IfModule mod_authz_core.c>
-    Require all denied
+# PHP-Version (NUR fuer Hosting-Provider aktivieren, die dies erfordern, z.B. Strato)
+# Bei Standard-Apache-Installationen NICHT aktivieren (verursacht 500 Error)
+# AddType application/x-httpd-php83 .php
+
+# Zeichensatz
+AddDefaultCharset UTF-8
+
+# PHP-Einstellungen (falls vom Hosting erlaubt)
+<IfModule mod_php.c>
+    php_value upload_max_filesize 10M
+    php_value post_max_size 10M
+    php_value max_execution_time 60
+    php_value session.cookie_httponly 1
+    php_value session.cookie_secure 1
+    php_value session.use_strict_mode 1
 </IfModule>
 
-# Apache 2.2 (Fallback)
-<IfModule !mod_authz_core.c>
-    Order allow,deny
-    Deny from all
+# Sicherheits-Header
+<IfModule mod_headers.c>
+    # Verhindert Clickjacking
+    Header always set X-Frame-Options "SAMEORIGIN"
+    
+    # Verhindert MIME-Type-Sniffing
+    Header always set X-Content-Type-Options "nosniff"
+    
+    # XSS-Schutz
+    Header always set X-XSS-Protection "1; mode=block"
+    
+    # Referrer-Policy
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+    
+    # Content Security Policy
+    Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; font-src 'self' https://cdn.jsdelivr.net; img-src 'self' data:; connect-src 'self';"
 </IfModule>
+
+# HTTPS-Umleitung (auf Strato normalerweise automatisch)
+# <IfModule mod_rewrite.c>
+#     RewriteEngine On
+#     RewriteCond %{HTTPS} off
+#     RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+# </IfModule>
+
+# URL-Rewriting für Front Controller
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    
+    # Basis-Verzeichnis (anpassen falls in Unterverzeichnis)
+    # Fuer Root-Installation: auskommentiert lassen oder RewriteBase /
+    # Fuer Unterverzeichnis: z.B. RewriteBase /helferstunden
+    RewriteBase /helferstunden
+    
+    # Statische Dateien direkt ausliefern (fuer Apache Alias-Kompatibilitaet)
+    RewriteCond %{REQUEST_URI} \.(css|js|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot|map)$ [NC]
+    RewriteRule ^ - [L]
+
+    # Existierende Dateien und Verzeichnisse direkt ausliefern
+    RewriteCond %{REQUEST_FILENAME} -f [OR]
+    RewriteCond %{REQUEST_FILENAME} -d
+    RewriteRule ^ - [L]
+
+    # Alles andere an index.php weiterleiten
+    RewriteRule ^(.*)$ index.php [QSA,L]
+</IfModule>
+
+# Verzeichnisauflistung deaktivieren
+Options -Indexes
+
+# Zugriff auf sensible Dateien verbieten
+<FilesMatch "^\.">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order allow,deny
+        Deny from all
+    </IfModule>
+</FilesMatch>
+
+<FilesMatch "\.(htaccess|htpasswd|ini|log|sh|sql|bak|config|env)$">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order allow,deny
+        Deny from all
+    </IfModule>
+</FilesMatch>
+
+# composer.json und package.json blockieren
+<FilesMatch "^(composer|package)\.json$">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order allow,deny
+        Deny from all
+    </IfModule>
+</FilesMatch>
+
+# Komprimierung aktivieren
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/html text/plain text/css text/javascript
+    AddOutputFilterByType DEFLATE application/javascript application/json
+    AddOutputFilterByType DEFLATE application/xml text/xml
+</IfModule>
+
+# Browser-Caching für statische Ressourcen
+<IfModule mod_expires.c>
+    ExpiresActive On
+    ExpiresByType image/jpg "access plus 1 month"
+    ExpiresByType image/jpeg "access plus 1 month"
+    ExpiresByType image/gif "access plus 1 month"
+    ExpiresByType image/png "access plus 1 month"
+    ExpiresByType image/svg+xml "access plus 1 month"
+    ExpiresByType image/webp "access plus 1 month"
+    ExpiresByType text/css "access plus 1 week"
+    ExpiresByType application/javascript "access plus 1 week"
+    ExpiresByType application/pdf "access plus 1 month"
+    ExpiresByType font/woff2 "access plus 1 month"
+</IfModule>
+
+# Fehlerseiten (optional - eigene Fehlerseiten)
+# ErrorDocument 404 /error/404.php
+# ErrorDocument 500 /error/500.php
