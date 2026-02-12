@@ -1,9 +1,22 @@
 # VAES - Manuelle Testszenarien
 
-Dieses Dokument beschreibt manuelle Testszenarien, die nicht oder nur schwer automatisiert getestet werden können (Browser-basierte UI-Tests, E-Mail-Versand, Multi-Session etc.).
+Dieses Dokument beschreibt manuelle Testszenarien, die nicht oder nur schwer automatisiert getestet werden koennen (Browser-basierte UI-Tests, E-Mail-Versand, Multi-Session etc.).
 
 **Version:** 1.3
-**Stand:** 2026-02-10
+**Stand:** 2026-02-11
+
+---
+
+## Testserver
+
+| Eigenschaft | Wert |
+|-------------|------|
+| **URL** | `https://192.168.3.98/helferstunden` |
+| **Verzeichnis** | `/var/www/html/TSC-Helferstundenverwaltung` (Flat-Struktur) |
+| **SSL** | Selbstsigniertes Zertifikat (Browser-Warnung akzeptieren) |
+| **E-Mail (SMTP)** | Telekom: `securesmtp.t-online.de`, Port 587, TLS |
+
+**Hinweis:** Alle URLs in diesem Dokument (z.B. `/login`) sind relativ zum base_path. Vollstaendige URL: `https://192.168.3.98/helferstunden/login`
 
 ---
 
@@ -12,8 +25,8 @@ Dieses Dokument beschreibt manuelle Testszenarien, die nicht oder nur schwer aut
 | Rolle | E-Mail | Mitgliedsnr. | Passwort |
 |-------|--------|-------------|----------|
 | Administrator | admin@test.de | ADMIN001 | Test123! |
-| Prüfer 1 | pruefer1@test.de | M001 | Test123! |
-| Prüfer 2 | pruefer2@test.de | M002 | Test123! |
+| Pruefer 1 | pruefer1@test.de | M001 | Test123! |
+| Pruefer 2 | pruefer2@test.de | M002 | Test123! |
 | Mitglied | mitglied@test.de | M003 | Test123! |
 | Erfasser | erfasser@test.de | M004 | Test123! |
 | Auditor | auditor@test.de | M005 | Test123! |
@@ -477,7 +490,51 @@ Dieses Dokument beschreibt manuelle Testszenarien, die nicht oder nur schwer aut
 
 ---
 
-## 13. Multi-Session / Concurrent Access
+## 13. HTTPS & SSL (Testserver)
+
+### SSL-01: HTTPS erreichbar
+- **Schritte:**
+  1. `curl -k -I https://192.168.3.98/helferstunden/` ausfuehren
+- **Erwartet:** HTTP 200 oder 302, SSL-Verbindung erfolgreich
+- **Status:** [ ]
+
+### SSL-02: SSL-Zertifikat vorhanden
+- **Schritte:**
+  1. `openssl s_client -connect 192.168.3.98:443` ausfuehren
+- **Erwartet:** Zertifikat angezeigt, CN=192.168.3.98
+- **Status:** [ ]
+
+### SSL-03: Session-Cookie nur ueber HTTPS
+- **Schritte:**
+  1. Einloggen
+  2. Browser DevTools > Application > Cookies pruefen
+- **Erwartet:** `Secure`-Flag gesetzt auf dem Session-Cookie `VAES_SESSION`
+- **Status:** [ ]
+
+### SSL-04: Statische Dateien laden
+- **Schritte:**
+  1. Einloggen
+  2. Browser DevTools > Network-Tab pruefen
+- **Erwartet:** CSS und JS Dateien laden korrekt, kein 404, kein Mixed Content
+- **Status:** [ ]
+
+### SSL-05: Bootstrap CDN ueber HTTPS
+- **Schritte:**
+  1. Network-Tab pruefen
+- **Erwartet:** Bootstrap CSS/JS laden von `https://cdn.jsdelivr.net`, SRI-Hash korrekt (kein Blockieren)
+- **Status:** [ ]
+
+### SSL-06: Base-Path korrekt
+- **Schritte:**
+  1. `https://192.168.3.98/helferstunden/login` aufrufen
+  2. Einloggen
+  3. Interne Links pruefen (Arbeitsstunden, Berichte, etc.)
+- **Erwartet:** Alle Links enthalten `/helferstunden/` Prefix, keine 404-Fehler
+- **Status:** [ ]
+
+---
+
+## 14. Multi-Session / Concurrent Access
 
 ### MULTI-01: Gleicher Antrag in zwei Tabs
 - **Schritte:**
@@ -504,4 +561,4 @@ Dieses Dokument beschreibt manuelle Testszenarien, die nicht oder nur schwer aut
 
 ---
 
-*Zuletzt aktualisiert: 2026-02-10*
+*Zuletzt aktualisiert: 2026-02-11*

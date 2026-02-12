@@ -85,6 +85,21 @@ class WorkEntryRepository
     }
 
     /**
+     * Anzahl offener Prüfanträge für einen Prüfer
+     */
+    public function countForReview(int $reviewerUserId): int
+    {
+        $stmt = $this->pdo->prepare(
+            "SELECT COUNT(*) FROM work_entries we
+             WHERE we.deleted_at IS NULL
+               AND we.user_id != :reviewer_id
+               AND we.status IN ('eingereicht', 'in_klaerung')"
+        );
+        $stmt->execute(['reviewer_id' => $reviewerUserId]);
+        return (int) $stmt->fetchColumn();
+    }
+
+    /**
      * Einträge zur Prüfung (für Prüfer)
      *
      * @return array{entries: WorkEntry[], total: int}

@@ -53,8 +53,19 @@ use App\Helpers\ViewHelper;
         <div class="card h-100 border-warning">
             <div class="card-body text-center">
                 <i class="bi bi-clipboard-check text-warning" style="font-size: 2.5rem;"></i>
-                <h5 class="card-title mt-3">Anträge prüfen</h5>
-                <p class="card-text text-muted small">Eingereichte Anträge bearbeiten.</p>
+                <h5 class="card-title mt-3">
+                    Anträge prüfen
+                    <?php if ($pendingReviewCount > 0): ?>
+                        <span class="badge bg-warning text-dark"><?= (int) $pendingReviewCount ?></span>
+                    <?php endif; ?>
+                </h5>
+                <p class="card-text text-muted small">
+                    <?php if ($pendingReviewCount > 0): ?>
+                        <?= (int) $pendingReviewCount ?> <?= $pendingReviewCount === 1 ? 'Antrag wartet' : 'Anträge warten' ?> auf Prüfung.
+                    <?php else: ?>
+                        Keine offenen Anträge.
+                    <?php endif; ?>
+                </p>
                 <a href="<?= ViewHelper::url('/review') ?>" class="btn btn-outline-warning">
                     <i class="bi bi-clipboard"></i> Prüfliste
                 </a>

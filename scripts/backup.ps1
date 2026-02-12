@@ -145,12 +145,14 @@ if (!(Test-Path $TodaySnapshotPath)) {
 
 Write-Log "Prüfe alte Snapshots..."
 
+
+
 try {
     $Cutoff = (Get-Date).AddDays(-$RetentionDays)
     $OldSnapshots = Get-ChildItem -Path $DailyBackupPath -Directory | Where-Object {
         # Parse Verzeichnisname als Datum
-        $DirDate = $null
-        if ([DateTime]::TryParseExact($_.Name, "yyyy-MM-dd", $null, [System.Globalization.DateTimeStyles]::None, [ref]$DirDate)) {
+        $DirDate = [DateTime]::MinValue
+        if ([DateTime]::TryParseExact($_.Name, "yyyy-MM-dd", [System.Globalization.CultureInfo]::InvariantCulture, [System.Globalization.DateTimeStyles]::None, [ref]$DirDate)) {
             return $DirDate -lt $Cutoff
         }
         return $false

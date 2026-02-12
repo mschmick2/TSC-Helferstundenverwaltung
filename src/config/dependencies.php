@@ -252,6 +252,7 @@ return [
         return new DashboardController(
             $c->get(TargetHoursService::class),
             $c->get(DialogReadStatusRepository::class),
+            $c->get(WorkEntryRepository::class),
             $c->get('settings')
         );
     },
