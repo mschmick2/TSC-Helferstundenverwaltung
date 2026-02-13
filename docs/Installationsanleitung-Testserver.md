@@ -341,8 +341,8 @@ return [
         'host' => '127.0.0.1',                            // Lokaler MySQL-Server
         'port' => 3306,
         'name' => 'helferstunden',                         // Datenbankname
-        'user' => 'uhelferstunden',                        // DB-Benutzer
-        'password' => '***REMOVED***',                     // DB-Passwort
+        'user' => 'IHR_DB_BENUTZER',                        // DB-Benutzer
+        'password' => 'IHR_DB_PASSWORT',                    // DB-Passwort
         'charset' => 'utf8mb4',
         'collation' => 'utf8mb4_unicode_ci',
         'options' => [
@@ -377,11 +377,11 @@ return [
         'driver' => 'smtp',
         'host' => 'securesmtp.t-online.de',               // Telekom SMTP (Port 587/TLS)
         'port' => 587,
-        'username' => '***REMOVED***',                      // Telekom Zugangsnummer
-        'password' => '***REMOVED***',                          // E-Mail-Passwort
+        'username' => 'IHRE_ZUGANGSNUMMER',                  // Telekom Zugangsnummer
+        'password' => 'IHR_EMAIL_PASSWORT',                // E-Mail-Passwort
         'encryption' => 'tls',
         'from' => [
-            'address' => '***REMOVED***@t-online.de',       // Registrierte T-Online Adresse
+            'address' => 'ihre-adresse@t-online.de',       // Registrierte T-Online Adresse
             'name' => 'VAES System',
         ],
     ],
@@ -544,8 +544,8 @@ Dieses Script erstellt alle Tabellen und legt einen Standard-Admin an.
 | Host | `127.0.0.1` |
 | Port | `3306` |
 | Datenbank | `helferstunden` |
-| Benutzer | `uhelferstunden` |
-| Passwort | `***REMOVED***` |
+| Benutzer | `IHR_DB_BENUTZER` |
+| Passwort | `IHR_DB_PASSWORT` |
 
 ---
 
@@ -741,7 +741,7 @@ Wenn die Anwendung spaeter auf Strato Shared Webhosting migriert wird, muessen f
 | `database.name` | `helferstunden` | `DBxxxxxxxx` |
 | `database.user` | `uhelferstunden` | `Uxxxxxxxx` |
 | `mail.host` | `securesmtp.t-online.de` | `smtp.strato.de` |
-| `mail.from.address` | `***REMOVED***@t-online.de` | E-Mail-Postfach bei Strato |
+| `mail.from.address` | `ihre-adresse@t-online.de` | E-Mail-Postfach bei Strato |
 | `app.debug` | `true` | `false` |
 
 Die `.htaccess`-Datei muss ebenfalls angepasst werden:
@@ -803,7 +803,7 @@ Die `.htaccess`-Datei muss ebenfalls angepasst werden:
 
 1. SMTP-Daten in `config.php` pruefen
 2. SMTP: `securesmtp.t-online.de`, Port 587, TLS
-3. Benutzername: T-Online Kennung (`***REMOVED***`)
+3. Benutzername: Ihre T-Online Kennung (Zugangsnummer)
 4. Log-Dateien unter `/helferstunden/storage/logs/` pruefen
 
 ### Session-Cookie-Probleme (staendiger Logout)

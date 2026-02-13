@@ -69,7 +69,7 @@ return [
     //
     // Telekom / T-Online:
     //   host: securesmtp.t-online.de, port: 587, encryption: tls
-    //   username: Zugangsnummer (z.B. ***REMOVED***) ODER vollstaendige E-Mail
+    //   username: Zugangsnummer (z.B. 123456789012) ODER vollstaendige E-Mail
     //   password: E-Mail-Passwort (NICHT das Telekom-Login-Passwort)
     //   from.address: MUSS eine bei T-Online registrierte Adresse sein
     //                 z.B. zugangsnummer@t-online.de

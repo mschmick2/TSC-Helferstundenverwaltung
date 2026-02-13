@@ -18,6 +18,13 @@
 .env.local
 .env.*.local
 
+# Admin-Scripts mit Zugangsdaten
+/src/adminkorrekt.php
+
+# PDF-Dokumente (nicht in Git versionieren)
+/docs/*.pdf
+*.pdf
+
 # Logs und Cache
 /src/storage/logs/*
 /src/storage/cache/*
