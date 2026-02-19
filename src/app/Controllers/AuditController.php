@@ -9,6 +9,7 @@ use App\Repositories\AuditRepository;
 use App\Repositories\UserRepository;
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
+use Psr\Log\LoggerInterface;
 
 /**
  * Controller für Audit-Trail-Einsicht (Admin + Auditor)
@@ -18,7 +19,8 @@ class AuditController extends BaseController
     public function __construct(
         private AuditRepository $auditRepo,
         private UserRepository $userRepo,
-        private array $settings
+        private array $settings,
+        private LoggerInterface $logger
     ) {
     }
 
@@ -92,16 +94,58 @@ class AuditController extends BaseController
         $args = $this->routeArgs($request);
         $id = (int) $args['id'];
 
+        $this->logger->debug('Accessing audit detail', ['audit_id' => $id, 'user_id' => $user->getId()]);
+
         $entry = $this->auditRepo->findById($id);
         if ($entry === null) {
+            $this->logger->warning('Audit entry not found', ['audit_id' => $id]);
             ViewHelper::flash('danger', 'Audit-Eintrag nicht gefunden.');
             return $this->redirect($response, $user->isAdmin() ? '/admin/audit' : '/audit');
         }
 
-        // JSON-Felder dekodieren
-        $oldValues = $entry['old_values'] ? json_decode($entry['old_values'], true) : null;
-        $newValues = $entry['new_values'] ? json_decode($entry['new_values'], true) : null;
-        $metadata = $entry['metadata'] ? json_decode($entry['metadata'], true) : null;
+        // JSON-Felder dekodieren (mit error handling)
+        $oldValues = null;
+        $newValues = null;
+        $metadata = null;
+        
+        if (!empty($entry['old_values'])) {
+            $decoded = json_decode($entry['old_values'], true);
+            if ($decoded !== null || json_last_error() === JSON_ERROR_NONE) {
+                $oldValues = $decoded;
+            } else {
+                $this->logger->warning('Failed to decode old_values JSON', [
+                    'audit_id' => $id,
+                    'json_error' => json_last_error_msg(),
+                    'raw_value' => substr($entry['old_values'], 0, 100)
+                ]);
+            }
+        }
+        
+        if (!empty($entry['new_values'])) {
+            $decoded = json_decode($entry['new_values'], true);
+            if ($decoded !== null || json_last_error() === JSON_ERROR_NONE) {
+                $newValues = $decoded;
+            } else {
+                $this->logger->warning('Failed to decode new_values JSON', [
+                    'audit_id' => $id,
+                    'json_error' => json_last_error_msg(),
+                    'raw_value' => substr($entry['new_values'], 0, 100)
+                ]);
+            }
+        }
+        
+        if (!empty($entry['metadata'])) {
+            $decoded = json_decode($entry['metadata'], true);
+            if ($decoded !== null || json_last_error() === JSON_ERROR_NONE) {
+                $metadata = $decoded;
+            } else {
+                $this->logger->warning('Failed to decode metadata JSON', [
+                    'audit_id' => $id,
+                    'json_error' => json_last_error_msg(),
+                    'raw_value' => substr($entry['metadata'], 0, 100)
+                ]);
+            }
+        }
 
         // Breadcrumbs: Admin vs. Auditor
         $auditBasePath = $user->isAdmin() ? '/admin/audit' : '/audit';

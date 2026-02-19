@@ -8,7 +8,7 @@
 use App\Helpers\VersionHelper;
 use App\Helpers\ViewHelper;
 
-$appVersion = $settings['app']['version'] ?? '1.3.0';
+$appVersion = $settings['app']['version'] ?? '1.4.0';
 $vereinsname = $settings['verein']['name'] ?? 'VAES';
 ?>
 <!DOCTYPE html>

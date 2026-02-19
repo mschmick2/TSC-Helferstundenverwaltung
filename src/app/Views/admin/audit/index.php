@@ -37,7 +37,7 @@ $actionBadges = [
     'dialog_message' => 'bg-light text-dark',
 ];
 
-$basePath = $user->isAdmin() ? '/admin/audit' : '/audit';
+$basePath = ViewHelper::url($user->isAdmin() ? '/admin/audit' : '/audit');
 ?>
 
 <div class="d-flex justify-content-between align-items-center mb-4">
