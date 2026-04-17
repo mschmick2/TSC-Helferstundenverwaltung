@@ -63,19 +63,11 @@ abstract class FeatureTestCase extends IntegrationTestCase
 
         $app = SlimBridge::create($container);
 
-        $basePath = '';
-        try {
-            $settings = $container->get('settings');
-            $basePath = $settings['app']['base_path'] ?? '';
-        } catch (\Throwable) {
-            // Settings koennen in Testumgebung fehlen - fallback auf ''
-        }
-
-        if ($basePath !== '') {
-            $app->setBasePath($basePath);
-        }
-
-        \App\Helpers\ViewHelper::setBasePath($basePath);
+        // In Tests erzwingen wir leeren basePath, damit Spec-Pfade wie '/login'
+        // direkt matchen - unabhaengig von config.php (die auf Strato base_path
+        // '/helferstunden' setzt). Tests sind Implementation-orientiert und nicht
+        // an Deployment-URL-Struktur gebunden.
+        \App\Helpers\ViewHelper::setBasePath('');
 
         $app->addBodyParsingMiddleware();
         $app->addRoutingMiddleware();
