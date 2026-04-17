@@ -98,7 +98,14 @@ try {
     echo "[6/7] DB '$dbName' neu angelegt.\n";
 
     echo "[7/7] Import laeuft ... (das kann dauern)\n";
-    $rc = performImport($mysqlExe, $dumpPath, $dbName, $host, $port, $user, $pass);
+    $sanitizedDump = sanitizeDumpForImport($dumpPath);
+    try {
+        $rc = performImport($mysqlExe, $sanitizedDump, $dbName, $host, $port, $user, $pass);
+    } finally {
+        if ($sanitizedDump !== $dumpPath && is_file($sanitizedDump)) {
+            @unlink($sanitizedDump);
+        }
+    }
     if ($rc !== 0) {
         // Import fehlgeschlagen -> leeren Backup-Container entsorgen
         if ($backupCreated) {
@@ -323,6 +330,60 @@ function buildImportCommand(
         escapeshellarg($user), $passOpt, escapeshellarg($dbName),
         escapeshellarg($dumpPath)
     );
+}
+
+/**
+ * Bereitet den Dump fuer den MySQL-CLI-Import vor.
+ *
+ * Stato/phpMyAdmin-Exports enthalten:
+ *   - DEFINER=`o15312632`@`%`   (Strato-MySQL-User, existiert lokal nicht)
+ *   - Gelegentlich malformierte VIEW-Definitionen (ueberzaehlige Klammer -
+ *     phpMyAdmin-Bug bei verschachtelten JOINs)
+ *
+ * Strategie:
+ *   1. DEFINER-Clauses strippen (regex)
+ *   2. CREATE VIEW-Statements komplett entfernen (werden in Test-Env nicht
+ *      benoetigt - Views sind abgeleitet, Tests arbeiten direkt auf Tabellen)
+ *   3. Vorangehende "Struktur des Views"-Kommentarbloecke + DROP TABLE IF
+ *      EXISTS `v_*` mitentfernen
+ *
+ * Liefert Pfad zu sanitized Temp-File. Bei unveraenderter Datei: gleicher Pfad.
+ */
+function sanitizeDumpForImport(string $dumpPath): string
+{
+    $content = (string) file_get_contents($dumpPath);
+
+    // 1. DEFINER strippen
+    $beforeDefinerCount = preg_match_all('/DEFINER=`[^`]+`@`[^`]+`/', $content);
+    $content = (string) preg_replace('/DEFINER=`[^`]+`@`[^`]+`\s*/', '', $content);
+
+    // 2. CREATE VIEW-Statements entfernen (vom CREATE bis zum naechsten ;)
+    //    Views enden mit ";"; wir matchen non-greedy bis zum ersten standalone ";".
+    $beforeViewCount = preg_match_all('/^\s*CREATE\s+(ALGORITHM=\w+\s+)?(SQL SECURITY \w+\s+)?VIEW\s+`/im', $content);
+    $content = (string) preg_replace(
+        '/^\s*CREATE\s+(?:ALGORITHM=\w+\s+)?(?:SQL SECURITY \w+\s+)?VIEW\s+`[^`]+`.*?;\s*$/ism',
+        '-- VIEW removed by sanitize',
+        $content
+    );
+
+    // 3. DROP TABLE IF EXISTS `v_*` strippen (fuer removed Views)
+    $content = (string) preg_replace('/^DROP TABLE IF EXISTS `v_[^`]+`\s*;\s*$/im', '', $content);
+
+    if ($beforeDefinerCount > 0) {
+        echo "  - sanitize: $beforeDefinerCount DEFINER-Clauses entfernt\n";
+    }
+    if ($beforeViewCount > 0) {
+        echo "  - sanitize: $beforeViewCount CREATE VIEW-Statement(s) entfernt\n";
+    }
+
+    if ($beforeDefinerCount === 0 && $beforeViewCount === 0) {
+        return $dumpPath;  // nichts zu tun
+    }
+
+    $tmp = sys_get_temp_dir() . DIRECTORY_SEPARATOR
+         . 'vaes-import-' . bin2hex(random_bytes(4)) . '.sql';
+    file_put_contents($tmp, $content);
+    return $tmp;
 }
 
 function buildPasswordOption(string $pass): string

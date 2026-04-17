@@ -46,9 +46,13 @@ jobs:
             **/config/config.php
             **/storage/logs/**
             **/storage/cache/**
+            **/storage/strato-dumps/**
+            **/storage/uploads/**
+            **/storage/*.pids
             **/*.md
             **/phpunit.xml
-            **/scripts/setup-test-db.php
+            **/phpunit.xml.dist
+            **/scripts/**
 
       - name: Deploy-Bestaetigung
         run: echo "Deploy abgeschlossen. Manueller Smoke-Test empfohlen."

@@ -113,4 +113,48 @@ Script-Invarianten zusaetzlich strukturell ab.
 
 ---
 
+### 2026-04-17 — phpMyAdmin-Export: malformierte VIEWs + DEFINER blockieren Import
+
+**Kontext:**
+Erster Live-Lauf der Test-Environment-Pipeline (G8-Nachgang). Strato-Produktions-
+Dump wurde via phpMyAdmin exportiert und lokal importiert. Der Import via mysql-CLI
+brach mit SQL-Syntax-Fehler auf Zeile 670 ab.
+
+**Problem / Ueberraschung:**
+Zwei ineinandergreifende Issues im phpMyAdmin-Export:
+
+1. **DEFINER-Clauses auf Strato-User:**
+   `CREATE ... DEFINER=\`o15312632\`@\`%\` VIEW ...` — der User `o15312632` existiert
+   auf lokaler MySQL nicht. Views/Trigger mit unbekanntem DEFINER koennen nicht angelegt
+   werden.
+
+2. **Malformierte VIEW-Definitionen:**
+   Bei VIEWs mit verschachtelten JOINs exportiert phpMyAdmin teilweise ueberzaehlige
+   schliessende Klammern. Beispiel aus unserem Dump:
+   `... WHERE (\`we\`.\`deleted_at\` is null)) ;` — ein \`(\` offen, zwei \`)\` zu.
+
+**Loesung:**
+`scripts/import-strato-db.php` um `sanitizeDumpForImport()` erweitert:
+- Regex entfernt alle `DEFINER=\`user\`@\`host\``-Clauses
+- Regex entfernt komplette `CREATE VIEW`-Statements (inkl. vorheriger
+  `DROP TABLE IF EXISTS \`v_*\``)
+- Ausgabe beim Lauf: wie viele Clauses/Views entfernt wurden (Transparenz)
+
+Views sind fuer die Test-Env nicht essenziell (Tests arbeiten auf Tabellen,
+nicht auf Views). Falls Views in Tests spaeter gebraucht werden: nach Import
+manuell neu anlegen.
+
+**Praevention:**
+- phpMyAdmin-Export-Settings koennen DEFINER weglassen ("Keine DEFINER-Klausel",
+  je nach phpMyAdmin-Version), aber darauf sollte sich der Import-Flow nicht
+  verlassen — Sanitize laeuft jetzt immer.
+- Bei kuenftigen Dump-Anomalien: `sanitizeDumpForImport()` erweitern, nicht
+  User-Action verlangen.
+- Der Regressions-Test `tests/Unit/Scripts/ScriptInvariantsTest.php` wurde
+  NICHT um einen Sanitize-Check erweitert, weil es bislang nur zwei Verhaltens-
+  Invarianten gibt. Falls sich zukuenftig weitere phpMyAdmin-Quirks zeigen,
+  dann dort ergaenzen.
+
+---
+
 <!-- Neue Eintraege hier unten anfuegen, nicht oben. Append-Only. -->
