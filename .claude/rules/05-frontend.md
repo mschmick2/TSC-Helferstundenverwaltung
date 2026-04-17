@@ -1,0 +1,266 @@
+# 🎨 Rules: Frontend (Bootstrap 5 / Vanilla JS — VAES)
+
+Geladen von: `coder.md` (G2), bei Bedarf `reviewer.md` (G3) bei UI-Code.
+
+---
+
+## Stack
+
+- **Bootstrap 5** via CDN (oder lokal in `src/public/css/` / `src/public/js/`)
+- **Bootstrap Icons**
+- **Vanilla JavaScript** (ES6+) — keine jQuery, keine Frameworks
+- **Fetch API** fuer AJAX
+
+---
+
+## Layout-Struktur
+
+```
+src/app/Views/
+├── layouts/
+│   ├── main.php              # Haupt-Layout mit Navbar
+│   └── auth.php              # Login/Register-Layout ohne Navbar
+├── components/
+│   ├── _navbar.php
+│   ├── _breadcrumbs.php
+│   ├── _flash.php
+│   └── _pagination.php
+├── dashboard/index.php
+├── entries/
+│   ├── index.php             # Liste
+│   ├── show.php              # Detail
+│   ├── create.php
+│   ├── edit.php
+│   ├── review.php
+│   └── _dialog.php           # Dialog-Partial
+└── admin/
+    ├── users/
+    ├── categories/
+    ├── targets/
+    ├── settings/
+    └── audit/
+```
+
+---
+
+## Bootstrap 5 — Grid
+
+**DO:**
+```html
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12 col-md-8">Hauptinhalt</div>
+        <div class="col-12 col-md-4">Sidebar</div>
+    </div>
+</div>
+```
+
+**Mobile-First:** Default-Klassen sind mobil, `md:`/`lg:` skalieren nach oben.
+
+---
+
+## Formulare
+
+**Standard-Pattern:**
+```html
+<form method="POST" action="/entries" class="needs-validation" novalidate>
+    <input type="hidden" name="csrf_token" value="<?= ViewHelper::e($csrfToken) ?>">
+
+    <div class="mb-3">
+        <label for="hours" class="form-label">
+            Stunden <span class="text-danger">*</span>
+        </label>
+        <input type="number" step="0.25" min="0" max="24"
+               class="form-control" id="hours" name="hours"
+               required
+               value="<?= ViewHelper::e($entry->hours ?? '') ?>">
+        <div class="invalid-feedback">
+            Bitte Stunden zwischen 0 und 24 angeben.
+        </div>
+    </div>
+
+    <div class="mb-3">
+        <label for="category_id" class="form-label">
+            Kategorie <span class="text-danger">*</span>
+        </label>
+        <select class="form-select" id="category_id" name="category_id" required>
+            <option value="">-- bitte waehlen --</option>
+            <?php foreach ($categories as $cat): ?>
+                <option value="<?= (int)$cat->id ?>"
+                    <?= $selected === $cat->id ? 'selected' : '' ?>>
+                    <?= ViewHelper::e($cat->name) ?>
+                </option>
+            <?php endforeach; ?>
+        </select>
+    </div>
+
+    <button type="submit" class="btn btn-primary">Speichern</button>
+    <a href="/entries" class="btn btn-secondary">Abbrechen</a>
+</form>
+```
+
+**Pflichtfeld-Markierung:** Roter Stern `<span class="text-danger">*</span>` + Hinweistext unter dem Formular.
+
+---
+
+## Flash-Messages
+
+```php
+// Controller
+$this->flash($request, 'success', 'Antrag gespeichert.');
+$this->flash($request, 'danger', 'Fehler: ...');
+$this->flash($request, 'warning', 'Achtung: ...');
+$this->flash($request, 'info', 'Hinweis: ...');
+```
+
+```php
+// src/app/Views/components/_flash.php
+<?php foreach ($flashes ?? [] as $type => $msgs): ?>
+    <?php foreach ($msgs as $msg): ?>
+        <div class="alert alert-<?= ViewHelper::e($type) ?> alert-dismissible fade show" role="alert">
+            <?= ViewHelper::e($msg) ?>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Schliessen"></button>
+        </div>
+    <?php endforeach; ?>
+<?php endforeach; ?>
+```
+
+---
+
+## Buttons — Semantik
+
+| Aktion | Klasse | Icon |
+|--------|--------|------|
+| Primaere Aktion | `btn-primary` | je nach Kontext |
+| Sekundaer | `btn-secondary` | — |
+| Gefahr (Loeschen/Ablehnen) | `btn-danger` | `bi-trash` / `bi-x-circle` |
+| Erfolg (Freigeben) | `btn-success` | `bi-check-circle` |
+| Warnung (Rueckfrage) | `btn-warning` | `bi-question-circle` |
+| Link-Style | `btn-link` | — |
+
+**Pflicht:**
+```html
+<!-- type explizit, sonst submit in Form! -->
+<button type="submit" class="btn btn-primary">Speichern</button>
+<button type="button" class="btn btn-secondary">Abbrechen</button>
+```
+
+---
+
+## Modals
+
+```html
+<!-- Trigger -->
+<button type="button" class="btn btn-danger"
+        data-bs-toggle="modal"
+        data-bs-target="#confirmDelete<?= (int)$entry->id ?>">
+    Loeschen
+</button>
+
+<!-- Modal -->
+<div class="modal fade" id="confirmDelete<?= (int)$entry->id ?>" tabindex="-1"
+     aria-labelledby="confirmDeleteLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="confirmDeleteLabel">Wirklich loeschen?</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                Antrag <?= ViewHelper::e($entry->entry_number) ?> wird unwiderruflich geloescht.
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
+                <form method="POST" action="/entries/<?= (int)$entry->id ?>/delete">
+                    <input type="hidden" name="csrf_token" value="<?= ViewHelper::e($csrfToken) ?>">
+                    <button type="submit" class="btn btn-danger">Loeschen</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+```
+
+---
+
+## AJAX mit Fetch API
+
+```javascript
+// src/public/js/dashboard.js
+(async () => {
+    const token = document.querySelector('meta[name="csrf-token"]')?.content;
+
+    try {
+        const res = await fetch('/api/notifications/unread', {
+            method: 'GET',
+            headers: { 'Accept': 'application/json' },
+            credentials: 'same-origin'
+        });
+
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+        const data = await res.json();
+        updateBadge(data.count);
+    } catch (e) {
+        console.error('Polling-Fehler:', e);
+    }
+})();
+
+// Polling alle 60 Sekunden
+setInterval(pollNotifications, 60000);
+```
+
+**Pattern fuer POST-Requests:**
+```javascript
+const res = await fetch('/entries/' + id + '/approve', {
+    method: 'POST',
+    headers: {
+        'X-CSRF-Token': csrfToken,
+        'Accept': 'application/json'
+    },
+    credentials: 'same-origin'
+});
+```
+
+---
+
+## Navbar-Badge (Ungelesene Dialoge)
+
+```html
+<a class="nav-link position-relative" href="/dialogs">
+    <i class="bi bi-chat-dots"></i>
+    Dialoge
+    <?php if ($unreadCount > 0): ?>
+        <span class="position-absolute top-0 start-100 translate-middle
+                     badge rounded-pill bg-danger">
+            <?= (int)$unreadCount ?>
+            <span class="visually-hidden">ungelesene Nachrichten</span>
+        </span>
+    <?php endif; ?>
+</a>
+```
+
+---
+
+## Accessibility — Basics
+
+- `<label for="id">` fuer alle Inputs
+- `alt=""` auf Bildern (leer, wenn dekorativ)
+- `aria-label` / `aria-labelledby` fuer Icon-Buttons ohne Text
+- `visually-hidden`-Klasse fuer Screenreader-Hinweise
+- Fokus-Ring bleibt sichtbar (kein `outline: none` ohne Ersatz)
+- Kontrast mind. WCAG AA (4.5:1)
+
+---
+
+## Verbotenes
+
+- jQuery (Vanilla JS reicht)
+- Inline-Styles, wo Bootstrap-Klasse passt (Ausnahme: dynamische Werte via JS)
+- `!important` ohne Kommentar-Begruendung
+- `<table>` fuer Layout
+- `<button>` ohne `type`-Attribut (Default ist `submit`!)
+- `<a href="javascript:...">` (immer `<button type="button">`)
+- Formulare ohne CSRF-Token
+- `innerHTML = userInput` in JS (XSS) — `textContent` verwenden
+- Auto-Submit von Formularen bei Seitenaufruf
