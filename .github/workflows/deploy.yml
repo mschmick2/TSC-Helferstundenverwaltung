@@ -1,0 +1,54 @@
+name: Deploy to Strato (manual)
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: 'Tippe DEPLOY ein, um den Deploy zu bestaetigen'
+        required: true
+        type: string
+
+jobs:
+  deploy:
+    name: FTP-Deploy
+    runs-on: ubuntu-latest
+    if: ${{ github.event.inputs.confirmation == 'DEPLOY' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+
+      - name: Composer Install (ohne Dev-Abhaengigkeiten)
+        working-directory: src
+        run: composer install --no-dev --optimize-autoloader --no-progress
+
+      - name: FTP-Upload zu Strato
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.STRATO_FTP_HOST }}
+          username: ${{ secrets.STRATO_FTP_USER }}
+          password: ${{ secrets.STRATO_FTP_PASSWORD }}
+          protocol: ftps
+          local-dir: ./src/
+          server-dir: ${{ secrets.STRATO_FTP_TARGET }}   # z.B. /httpdocs/helferstunden/
+          exclude: |
+            **/.git*
+            **/.git*/**
+            **/tests/**
+            **/docs/**
+            **/.github/**
+            **/.claude/**
+            **/.env
+            **/.env.*
+            **/config/config.php
+            **/storage/logs/**
+            **/storage/cache/**
+            **/*.md
+            **/phpunit.xml
+            **/scripts/setup-test-db.php
+
+      - name: Deploy-Bestaetigung
+        run: echo "Deploy abgeschlossen. Manueller Smoke-Test empfohlen."

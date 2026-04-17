@@ -1,0 +1,9 @@
+venv/
+__pycache__/
+*.pyc
+*.pyo
+baseline_report.json
+test_report.json
+results/
+*.cache
+.hf-cache/
