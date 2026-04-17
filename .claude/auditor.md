@@ -51,7 +51,7 @@ Audit-Trail-Vollstaendigkeit pruefen. Jede Business-Schreibung muss einen Audit-
 
 ### Details
 
-- [ ] `details` JSON enthaelt relevante Kontextdaten (z.B. Dialog-Message bei `rueckfrage`)
+- [ ] `metadata` JSON enthaelt relevante Kontextdaten (z.B. Dialog-Message-ID bei `status_change` nach Rueckfrage)
 - [ ] Keine PII im Klartext, wo ID reicht
 - [ ] Kein `password` / `totp_secret` in `old_values`/`new_values` (Whitelist verwenden)
 
@@ -59,7 +59,7 @@ Audit-Trail-Vollstaendigkeit pruefen. Jede Business-Schreibung muss einen Audit-
 
 - Audit-Eintrag "vergessen" mit Hinweis "macht der Service" — Aufruf muss sichtbar sein
 - `audit_log` verändern oder löschen
-- `details` als String statt JSON
+- `metadata` als String statt JSON
 - Audit-Aufruf auskommentiert "fuer Tests"
 - Silent Failure: `try/catch { /* ignore */ }` um `AuditService::log()`
 

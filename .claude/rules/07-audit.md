@@ -9,7 +9,7 @@ Geladen von: `auditor.md` (G6), bei Bedarf `coder.md` (G2) bei Audit-Log-Aufrufe
 - **Append-only**: `audit_log` nie `UPDATE` oder `DELETE`. DB-Trigger blockt das.
 - **Vollstaendig**: jede Business-Aenderung hat einen Eintrag.
 - **Nachvollziehbar**: `user_id`, `ip_address`, `user_agent`, `created_at` immer gefuellt.
-- **Details**: `old_values`/`new_values` als JSON (nur geaenderte Felder), `details` fuer Kontext.
+- **Details**: `old_values`/`new_values` als JSON (nur geaenderte Felder), `metadata` fuer Kontext.
 
 ---
 
@@ -31,131 +31,116 @@ final class AuditService
         ?array $oldValues = null,
         ?array $newValues = null,
         ?string $description = null,
-        ?array $details = null,
-        ?int $userId = null,          // default: aktueller User aus Session
-        ?string $ipAddress = null,    // default: $_SERVER
-        ?string $userAgent = null,    // default: $_SERVER
+        ?string $entryNumber = null,
+        ?array $metadata = null,
     ): void {
         // INSERT in audit_log
+        // user_id, session_id, ip_address, user_agent werden aus
+        // Service-State (init()) gezogen, nicht pro log()-Aufruf.
     }
 }
 ```
 
 ---
 
-## Action-Katalog (VAES-spezifisch)
+## Action-Katalog (Schema-ENUM)
 
-### Auth
+Das Feld `audit_log.action` ist ein **MySQL-ENUM** mit 12 festen Werten:
 
-| `action` | Wann |
-|----------|------|
-| `login` | Erfolgreicher Login |
-| `login_failed` | Fehlversuch (auch in `login_attempts`) |
-| `logout` | Logout |
-| `password_change` | User aendert eigenes Passwort |
-| `password_reset_request` | "Passwort vergessen" ausgeloest |
-| `password_reset_complete` | Reset-Link genutzt |
-| `2fa_setup` | 2FA-Methode eingerichtet |
-| `2fa_reset` | Admin setzt 2FA zurueck |
-| `session_invalidate` | Alle Sessions eines Users beendet |
+```sql
+action ENUM(
+    'create', 'update', 'delete', 'restore',
+    'login', 'logout', 'login_failed',
+    'status_change', 'export', 'import',
+    'config_change', 'dialog_message'
+) NOT NULL
+```
 
-### Mitglieder
+**Konsequenz:** Neue Action-Kategorien erfordern eine Schema-Migration
+(`ALTER TABLE audit_log MODIFY action ENUM(...)`).
 
-| `action` | Wann |
-|----------|------|
-| `user_create` | Neuer User (manuell oder CSV) |
-| `user_update` | Stammdaten-Aenderung |
-| `user_delete` | Soft-Delete |
-| `user_restore` | Reaktivierung |
-| `user_anonymize` | Nach Loeschfrist |
-| `role_assign` | Rolle hinzugefuegt |
-| `role_revoke` | Rolle entzogen |
-| `invite_send` | Einladungs-E-Mail versandt |
+### Mapping Business-Aktion → action-Wert
 
-### Arbeitsstunden
+| Business-Aktion | `action` | Beispiel-Felder |
+|-----------------|----------|-----------------|
+| Antrag erstellen | `create` | `table_name='work_entries'`, `new_values={...}` |
+| Antrag editieren | `update` | `old_values`, `new_values` |
+| Antrag soft-deleten | `delete` | `description='Antrag geloescht'` |
+| Antrag wiederherstellen | `restore` | — |
+| Login erfolgreich | `login` | `user_id`, `ip_address` |
+| Login-Fehlversuch | `login_failed` | `user_id` (nullable), `metadata={email}` |
+| Logout | `logout` | `user_id` |
+| Status-Wechsel WorkEntry | `status_change` | `old_values={status}`, `new_values={status}` |
+| CSV/PDF-Export | `export` | `metadata={scope, filters, row_count}` |
+| CSV-Import | `import` | `metadata={file, rows_ok, rows_fail}` |
+| Settings-/Rollen-Aenderung | `config_change` | `table_name='settings'`/`user_roles` |
+| Dialog-Nachricht | `dialog_message` | `record_id=<dialog_id>` |
 
-| `action` | Wann |
-|----------|------|
-| `entry_create` | Neuer Antrag |
-| `entry_update` | Antrag editiert (im Entwurf) |
-| `entry_submit` | Eingereicht |
-| `entry_approve` | Pruefer gibt frei |
-| `entry_reject` | Pruefer lehnt ab |
-| `entry_ask_question` | Rueckfrage (→ `in_klaerung`) |
-| `entry_return_to_draft` | Zurueck zur Ueberarbeitung |
-| `entry_cancel` | Stornierung |
-| `entry_reactivate` | Aus Storniert wieder Entwurf |
-| `entry_correct` | Korrektur nach Freigabe (mit Begruendung) |
-| `entry_delete` | Soft-Delete |
-
-### Dialog
-
-| `action` | Wann |
-|----------|------|
-| `dialog_message` | Neue Nachricht im Dialog |
-| `dialog_read` | Nachricht als gelesen markiert (optional, wenn gewuenscht) |
-
-### Kategorien / Admin
-
-| `action` | Wann |
-|----------|------|
-| `category_create`, `category_update`, `category_deactivate`, `category_activate` | Kategorieverwaltung |
-| `settings_update` | Systemeinstellung geaendert |
-| `yearly_target_update` | Soll-Stunden-Ziel geaendert |
-| `export_csv` | CSV-Export (Scope in `details`) |
-| `export_pdf` | PDF-Export (Scope in `details`) |
+**Hinweis zur Granularitaet:** Feinere Unterscheidungen (z.B.
+`entry_approve` vs. `entry_reject`) landen in `description` und `metadata`,
+nicht als eigenes ENUM-Level.
 
 ---
 
-## Pflicht-Felder pro Eintrag
+## Pflicht-Felder pro Eintrag (Schema-konform)
 
 | Feld | Pflicht | Beispiel |
 |------|---------|----------|
-| `action` | ✅ | `entry_approve` |
-| `user_id` | ✅ (ausser Login-Failed ohne User) | 42 |
-| `created_at` | ✅ | NOW() (DB-Default) |
-| `ip_address` | ✅ | `$_SERVER['REMOTE_ADDR']` |
-| `user_agent` | ✅ | `$_SERVER['HTTP_USER_AGENT']` |
+| `action` | ✅ | `update` |
+| `user_id` | empfohlen (ausser `login_failed` ohne User) | 42 |
+| `created_at` | ✅ (DB-Default) | NOW() |
+| `ip_address` | empfohlen | `$_SERVER['REMOTE_ADDR']` |
+| `user_agent` | empfohlen | `$_SERVER['HTTP_USER_AGENT']` |
 | `table_name` | empfohlen | `work_entries` |
 | `record_id` | empfohlen | 1234 |
+| `entry_number` | empfohlen bei work_entries | `2026-00042` |
 | `old_values` | bei UPDATE | `{"status": "eingereicht"}` |
-| `new_values` | bei UPDATE/INSERT | `{"status": "freigegeben"}` |
-| `description` | empfohlen | "Antrag freigegeben" |
-| `details` | kontextabhaengig | `{"reason": "Begruendung Pruefer"}` |
+| `new_values` | bei INSERT/UPDATE | `{"status": "freigegeben"}` |
+| `description` | empfohlen | "Antrag freigegeben durch Pruefer" |
+| `metadata` | kontextabhaengig | `{"reason": "...", "dialog_id": 7}` |
+
+**HINWEIS:** Das Feld heisst im Schema **`metadata`**, nicht `details`.
+Frueher falsch dokumentiert; Rules v2 korrigiert.
 
 ---
 
 ## Beispiel-Aufrufe
 
 ```php
-// Entry-Approval
+// Entry-Approval (Status-Wechsel)
 $this->audit->log(
-    action: 'entry_approve',
+    action: 'status_change',
     tableName: 'work_entries',
     recordId: $entry->id,
     oldValues: ['status' => $entry->status],
     newValues: ['status' => 'freigegeben'],
-    description: 'Antrag freigegeben',
-    details: [
+    description: 'Antrag freigegeben durch Pruefer',
+    metadata: [
         'entry_number' => $entry->entryNumber,
-        'hours' => $entry->hours,
+        'hours'        => $entry->hours,
+        'reviewer_id'  => $reviewerId,
     ],
 );
 
-// Rueckfrage
+// Rueckfrage (Status-Wechsel + Dialog-Eintrag = ZWEI Audit-Zeilen)
 $this->audit->log(
-    action: 'entry_ask_question',
+    action: 'status_change',
     tableName: 'work_entries',
     recordId: $entry->id,
     oldValues: ['status' => 'eingereicht'],
     newValues: ['status' => 'in_klaerung'],
     description: 'Rueckfrage vom Pruefer',
-    details: ['dialog_message_id' => $msgId],
+);
+$this->audit->log(
+    action: 'dialog_message',
+    tableName: 'work_entry_dialogs',
+    recordId: $msgId,
+    description: 'Neue Dialog-Nachricht',
 );
 
-// Rollen-Aenderung
+// Rollen-Aenderung (config_change)
 $this->audit->log(
-    action: 'role_assign',
+    action: 'config_change',
     tableName: 'user_roles',
     recordId: $userId,
     newValues: ['role' => 'pruefer'],
@@ -164,12 +149,13 @@ $this->audit->log(
 
 // CSV-Export
 $this->audit->log(
-    action: 'export_csv',
+    action: 'export',
     description: 'CSV-Export durchgefuehrt',
-    details: [
-        'scope' => 'entries',
-        'filter' => ['year' => 2026, 'status' => 'freigegeben'],
+    metadata: [
+        'scope'     => 'entries',
+        'filter'    => ['year' => 2026, 'status' => 'freigegeben'],
         'row_count' => $count,
+        'format'    => 'csv',
     ],
 );
 ```
@@ -197,7 +183,7 @@ foreach ($changes as $field => $newValue) {
 
 if ($diff !== []) {
     $this->audit->log(
-        action: 'user_update',
+        action: 'update',
         tableName: 'users',
         recordId: $userId,
         oldValues: $diff,
@@ -221,6 +207,6 @@ if ($diff !== []) {
 - Aktion als Freitext schreiben, ohne sie ins Action-Katalog aufzunehmen
 - `old_values`/`new_values` als Strings statt JSON
 - `audit_log` mit `UPDATE` oder `DELETE` beruehren
-- Passwoerter/Secrets in `old_values`/`new_values`/`details`
+- Passwoerter/Secrets in `old_values`/`new_values`/`metadata`
 - Audit-Aufruf auskommentieren "fuer Debugging"
 - Audit-Eintrag schreiben BEVOR die Business-Aktion commited ist (falsche Reihenfolge)

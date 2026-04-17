@@ -71,6 +71,7 @@ Siehe `docs/Setup-Anleitung.md` für detaillierte Anweisungen.
 | [Setup-Anleitung](docs/Setup-Anleitung.md) | Entwicklungs- und Deployment-Guide |
 | [Deployment-Checkliste](deployment/deploy-checklist.md) | Checkliste für Releases |
 | [Test-Dokumentation](tests/README.md) | Test-Struktur und Anleitung |
+| [Testumgebung](docs/Testumgebung.md) | Komplette E2E-Testumgebung: DB-Import, Playwright, UX-Analyzer (RTX) |
 
 ## Verzeichnisstruktur
 

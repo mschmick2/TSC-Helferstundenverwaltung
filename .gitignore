@@ -83,3 +83,11 @@ composer.lock
 
 # Test-Coverage
 /tests/coverage/
+
+# Strato-DB-Dumps (PII-verdaechtig) und Backup-DBs
+/storage/strato-dumps/
+/src/storage/strato-dumps/
+vaes_backup_*
+/storage/*.pids
+/src/storage/*.pids
+
