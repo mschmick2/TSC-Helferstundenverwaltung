@@ -63,6 +63,23 @@ $vereinsname = $settings['verein']['name'] ?? 'VAES';
                 </li>
                 <?php endif; ?>
 
+                <!-- Events-Menü (event_admin + admin) -->
+                <?php if ($user->hasRole('event_admin') || $user->isAdmin()): ?>
+                <li class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                        <i class="bi bi-calendar-event"></i> Events
+                    </a>
+                    <ul class="dropdown-menu">
+                        <li><a class="dropdown-item" href="<?= ViewHelper::url('/admin/events') ?>">
+                            <i class="bi bi-calendar"></i> Veranstaltungen
+                        </a></li>
+                        <li><a class="dropdown-item" href="<?= ViewHelper::url('/admin/event-templates') ?>">
+                            <i class="bi bi-card-list"></i> Templates
+                        </a></li>
+                    </ul>
+                </li>
+                <?php endif; ?>
+
                 <!-- Admin-Menü -->
                 <?php if ($user->isAdmin()): ?>
                 <li class="nav-item dropdown">

@@ -31,6 +31,14 @@ Darueber hinausgehende Daten benoetigen Einwilligung (Art. 6 Abs. 1 lit. a).
 | `work_entries.description` | Inhalt | s.o. | Antragsinhalt |
 | `dialog_messages.message` | Inhalt | s.o. | Rueckfragen-Dialog |
 | `audit_log.*` | Revisionssicher | 10 Jahre | Nachvollziehbarkeit |
+| `events.created_by`, `deleted_by` | Funktionsdaten | 10 Jahre | Event-Urheber / Loescher |
+| `events.location`, `description` | Freitext (optional PII) | 10 Jahre | Event-Details |
+| `event_organizers.user_id` | Funktionsdaten | 10 Jahre | Organisator-Historie (ON DELETE RESTRICT - Audit-Integritaet) |
+| `event_organizers.assigned_by` | Funktionsdaten | 10 Jahre | Wer hat zugewiesen |
+| `event_task_assignments.user_id` | Teilnahmedaten | 10 Jahre (Steuer/Helferstunden) | Helferstunden-Nachweis |
+| `event_task_assignments.replacement_suggested_user_id` | Funktionsdaten | 10 Jahre | Ersatz-Vorschlag |
+| `event_tasks.description` | Freitext (optional PII) | 10 Jahre | Aufgaben-Details |
+| `event_templates.created_by` | Funktionsdaten | Dauer Mitgliedschaft | Template-Urheber |
 
 ---
 

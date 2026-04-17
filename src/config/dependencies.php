@@ -7,6 +7,8 @@ use App\Controllers\AuditController;
 use App\Controllers\AuthController;
 use App\Controllers\CategoryController;
 use App\Controllers\DashboardController;
+use App\Controllers\EventAdminController;
+use App\Controllers\EventTemplateController;
 use App\Controllers\ReportController;
 use App\Controllers\TargetHoursController;
 use App\Controllers\UserController;
@@ -18,6 +20,11 @@ use App\Repositories\AuditRepository;
 use App\Repositories\CategoryRepository;
 use App\Repositories\DialogReadStatusRepository;
 use App\Repositories\DialogRepository;
+use App\Repositories\EventOrganizerRepository;
+use App\Repositories\EventRepository;
+use App\Repositories\EventTaskAssignmentRepository;
+use App\Repositories\EventTaskRepository;
+use App\Repositories\EventTemplateRepository;
 use App\Repositories\ReportRepository;
 use App\Repositories\SessionRepository;
 use App\Repositories\SettingsRepository;
@@ -123,6 +130,27 @@ return [
 
     ReportRepository::class => function (ContainerInterface $c): ReportRepository {
         return new ReportRepository($c->get(PDO::class));
+    },
+
+    // --- Modul 6: Events -----------------------------------------------------
+    EventRepository::class => function (ContainerInterface $c): EventRepository {
+        return new EventRepository($c->get(PDO::class));
+    },
+
+    EventOrganizerRepository::class => function (ContainerInterface $c): EventOrganizerRepository {
+        return new EventOrganizerRepository($c->get(PDO::class));
+    },
+
+    EventTaskRepository::class => function (ContainerInterface $c): EventTaskRepository {
+        return new EventTaskRepository($c->get(PDO::class));
+    },
+
+    EventTaskAssignmentRepository::class => function (ContainerInterface $c): EventTaskAssignmentRepository {
+        return new EventTaskAssignmentRepository($c->get(PDO::class));
+    },
+
+    EventTemplateRepository::class => function (ContainerInterface $c): EventTemplateRepository {
+        return new EventTemplateRepository($c->get(PDO::class));
     },
 
     // =========================================================================
@@ -326,6 +354,28 @@ return [
             $c->get(CsvExportService::class),
             $c->get(CategoryRepository::class),
             $c->get(SettingsService::class),
+            $c->get('settings')
+        );
+    },
+
+    // --- Modul 6: Event-Controllers ------------------------------------------
+    EventAdminController::class => function (ContainerInterface $c): EventAdminController {
+        return new EventAdminController(
+            $c->get(EventRepository::class),
+            $c->get(EventTaskRepository::class),
+            $c->get(EventOrganizerRepository::class),
+            $c->get(CategoryRepository::class),
+            $c->get(UserRepository::class),
+            $c->get(AuditService::class),
+            $c->get('settings')
+        );
+    },
+
+    EventTemplateController::class => function (ContainerInterface $c): EventTemplateController {
+        return new EventTemplateController(
+            $c->get(EventTemplateRepository::class),
+            $c->get(CategoryRepository::class),
+            $c->get(AuditService::class),
             $c->get('settings')
         );
     },

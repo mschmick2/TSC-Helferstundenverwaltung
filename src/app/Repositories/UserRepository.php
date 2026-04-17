@@ -299,6 +299,27 @@ class UserRepository
      *
      * @return array{users: User[], total: int}
      */
+    /**
+     * Einfache Liste aller aktiven Mitglieder (fuer Dropdowns / Auswahl-UI).
+     * Keine Paginierung.
+     *
+     * @return User[]
+     */
+    public function findAllActive(): array
+    {
+        $stmt = $this->pdo->query(
+            "SELECT u.* FROM users u
+             WHERE u.deleted_at IS NULL AND u.is_active = TRUE
+             ORDER BY u.nachname ASC, u.vorname ASC"
+        );
+
+        $users = [];
+        while ($row = $stmt->fetch(\PDO::FETCH_ASSOC)) {
+            $users[] = User::fromArray($row);
+        }
+        return $users;
+    }
+
     public function findAllPaginated(
         int $page = 1,
         int $perPage = 20,

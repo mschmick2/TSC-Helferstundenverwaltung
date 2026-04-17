@@ -7,6 +7,8 @@ use App\Controllers\AuditController;
 use App\Controllers\AuthController;
 use App\Controllers\CategoryController;
 use App\Controllers\DashboardController;
+use App\Controllers\EventAdminController;
+use App\Controllers\EventTemplateController;
 use App\Controllers\ReportController;
 use App\Controllers\TargetHoursController;
 use App\Controllers\UserController;
@@ -145,6 +147,36 @@ return function (App $app): void {
         $group->post('/targets/bulk', [TargetHoursController::class, 'bulkUpdate']);
     })
         ->add(new RoleMiddleware(['administrator']))
+        ->add(CsrfMiddleware::class)
+        ->add(AuthMiddleware::class);
+
+    // =========================================================================
+    // Event-Admin-Routen (event_admin + administrator, Modul 6 I1)
+    // =========================================================================
+    $app->group('/admin', function (RouteCollectorProxy $group) {
+        // Events
+        $group->get('/events', [EventAdminController::class, 'index']);
+        $group->get('/events/create', [EventAdminController::class, 'create']);
+        $group->post('/events', [EventAdminController::class, 'store']);
+        $group->get('/events/{id:[0-9]+}', [EventAdminController::class, 'show']);
+        $group->get('/events/{id:[0-9]+}/edit', [EventAdminController::class, 'edit']);
+        $group->post('/events/{id:[0-9]+}', [EventAdminController::class, 'update']);
+        $group->post('/events/{id:[0-9]+}/publish', [EventAdminController::class, 'publish']);
+        $group->post('/events/{id:[0-9]+}/cancel', [EventAdminController::class, 'cancel']);
+        $group->post('/events/{id:[0-9]+}/delete', [EventAdminController::class, 'delete']);
+
+        // Event-Tasks
+        $group->post('/events/{id:[0-9]+}/tasks', [EventAdminController::class, 'addTask']);
+        $group->post('/events/{eventId:[0-9]+}/tasks/{taskId:[0-9]+}/delete',
+            [EventAdminController::class, 'deleteTask']);
+
+        // Event-Templates
+        $group->get('/event-templates', [EventTemplateController::class, 'index']);
+        $group->post('/event-templates', [EventTemplateController::class, 'store']);
+        $group->get('/event-templates/{id:[0-9]+}', [EventTemplateController::class, 'show']);
+        $group->post('/event-templates/{id:[0-9]+}/delete', [EventTemplateController::class, 'delete']);
+    })
+        ->add(new RoleMiddleware(['event_admin', 'administrator']))
         ->add(CsrfMiddleware::class)
         ->add(AuthMiddleware::class);
 

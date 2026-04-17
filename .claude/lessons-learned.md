@@ -157,4 +157,69 @@ manuell neu anlegen.
 
 ---
 
+### 2026-04-17 — $user-Object vs. Array-Access: Runtime-Bug ueberlebt Syntax-Check + Unit-Tests
+
+**Kontext:**
+Modul 6 I1, Gate G3 Reviewer. Ich hatte in den neuen EventAdminController/EventTemplateController
+sieben Stellen mit `$user['id']` — Array-Access auf ein User-Objekt. Bestehende Controller
+nutzen konsistent `$user->getId()` (User ist eine Klasse mit Gettern, keine ArrayAccess-Impl).
+
+**Problem / Ueberraschung:**
+Der Bug haette zur Laufzeit mit "Cannot use object of type App\Models\User as array"
+crashen muessen. Aber: `php -l` (Syntax-Check) uebersieht ihn (syntaktisch gueltig),
+die 245 Unit-Tests fangen ihn nicht (keiner fuehrt einen Controller tatsaechlich aus).
+Ohne das manuelle Review waere der Bug erst in Prod aufgefallen.
+
+**Loesung:**
+- Alle 7 Stellen auf `$user->getId()` umgestellt
+- Neue Regressions-Tests in `tests/Unit/Controllers/EventAdminControllerInvariantsTest.php`
+  fangen solche Patterns statisch:
+  - `test_no_array_access_on_user_object` — Regex-Check
+  - `test_all_write_actions_call_auditService_log` — Audit-Completeness
+  - `test_enum_inputs_are_allowlist_validated` — Defensive Input-Check
+  - Zwei weitere gegen Migration-Regressionen
+
+**Praevention:**
+Bis Feature-Tests (echte HTTP-Roundtrips via Slim-App + Test-DB) verfuegbar sind,
+statische Invarianten-Tests als "poor man's feature tests" schreiben. Das Pattern:
+Regex gegen bekannte Anti-Patterns im Code, Datei-basiert, ohne Bootstrap-Overhead.
+
+Langfristig: `FeatureTestCase` (existiert seit dem Test-Env-Setup) aktivieren bei I3
+wenn echte Workflow-Logik mit Audit-Assertion sinnvoll testbar ist.
+
+---
+
+### 2026-04-17 — FK ON DELETE CASCADE verletzt Audit-Integritaet
+
+**Kontext:**
+Modul 6 I1, Gate G5 DSGVO. Meine Migration 002 setzte `event_organizers.user_id`
+auf `ON DELETE CASCADE` — intuitiv, weil bei User-Loeschung die Zuordnung "weg" sein soll.
+
+**Problem / Ueberraschung:**
+CASCADE loescht die Organizer-Historie MIT. Nach physischer User-Loeschung (z.B. nach
+Ablauf der 10-Jahres-Aufbewahrungsfrist) ist nicht mehr rekonstruierbar, wer historisch
+Organisator welchen Events war. Das verletzt den Audit-Anspruch der App (jede Zuordnung
+soll 10 Jahre nachvollziehbar bleiben).
+
+**Loesung:**
+- `fk_eo_user` auf `ON DELETE RESTRICT` umgestellt
+- Inline-Kommentar in Migration dokumentiert die Entscheidung + den
+  Anonymisierungs-Workaround fuer DSGVO-Loeschrecht
+
+**Praevention:**
+Default-Pattern fuer User-Referenzen in Audit-relevanten Tabellen:
+
+- `ON DELETE RESTRICT` fuer `user_id` in History/Participation-Tabellen
+  (`event_organizers`, `event_task_assignments`, `work_entries`)
+- `ON DELETE SET NULL` fuer Actor-Felder (`deleted_by`, `assigned_by`, `reviewed_by`)
+  wo Aktor anonymisiert werden darf, aber der Eintrag erhalten bleibt
+- `ON DELETE CASCADE` nur bei tight-coupling OHNE Audit-Bedeutung
+  (z.B. `event_organizers.event_id` → `events.id`: wenn das Event weg ist,
+  ist die Organizer-Zuordnung obsolet)
+
+Bei DSGVO-Loeschrecht: User werden **anonymisiert** (Name/E-Mail/Adresse ueberschrieben),
+nicht physisch geloescht — FK-Integritaet bleibt erhalten.
+
+---
+
 <!-- Neue Eintraege hier unten anfuegen, nicht oben. Append-Only. -->

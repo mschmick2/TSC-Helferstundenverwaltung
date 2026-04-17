@@ -14,6 +14,7 @@ class Category
     private ?string $description = null;
     private int $sortOrder = 0;
     private bool $isActive = true;
+    private bool $isContribution = false;
     private ?string $deletedAt = null;
 
     public static function fromArray(array $data): self
@@ -24,6 +25,7 @@ class Category
         $cat->description = $data['description'] ?? null;
         $cat->sortOrder = (int) ($data['sort_order'] ?? 0);
         $cat->isActive = (bool) ($data['is_active'] ?? true);
+        $cat->isContribution = (bool) ($data['is_contribution'] ?? false);
         $cat->deletedAt = $data['deleted_at'] ?? null;
         return $cat;
     }
@@ -33,5 +35,6 @@ class Category
     public function getDescription(): ?string { return $this->description; }
     public function getSortOrder(): int { return $this->sortOrder; }
     public function isActive(): bool { return $this->isActive; }
+    public function isContribution(): bool { return $this->isContribution; }
     public function getDeletedAt(): ?string { return $this->deletedAt; }
 }

@@ -70,6 +70,39 @@ UPDATE work_entry_dialogs SET
 WHERE message IS NOT NULL AND message <> '';
 
 -- =============================================================================
+-- events + event_tasks: Freitext-Felder koennten PII enthalten
+-- (z.B. Privatadresse im location-Feld, Namen in description)
+-- Tabellen existieren erst ab Migration 002 - wir pruefen vorab
+-- =============================================================================
+
+-- Wenn events existiert, Freitext-Felder anonymisieren
+-- Idempotent: leere oder nicht-existente Tabellen werden sauber uebersprungen.
+SET @events_exists := (
+    SELECT COUNT(*) FROM information_schema.TABLES
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'events'
+);
+SET @sql := IF(@events_exists > 0,
+    'UPDATE events SET
+        title = CONCAT(''Event #'', id),
+        description = NULL,
+        location = NULL',
+    'SELECT ''events-Tabelle nicht vorhanden (Migration 002 nicht eingespielt)'''
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @et_exists := (
+    SELECT COUNT(*) FROM information_schema.TABLES
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'event_tasks'
+);
+SET @sql := IF(@et_exists > 0,
+    'UPDATE event_tasks SET
+        title = CONCAT(''Task #'', id),
+        description = NULL',
+    'SELECT ''event_tasks-Tabelle nicht vorhanden'''
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- =============================================================================
 -- audit_log: komplett leeren.
 --
 -- Grund: Die Trigger audit_log_no_update / audit_log_no_delete blockieren
