@@ -11,7 +11,7 @@ use PDO;
  * Repository fuer Task-Zusagen.
  *
  * I1 liefert nur CRUD-Basics; die Workflow-Logik (Capacity-Check,
- * Deadline-Pruefung, Ersatz-Vorschlag) kommt in I2.
+ * Deadline-Pruefung, Ersatz-Vorschlag) lebt ab I2 in EventAssignmentService.
  */
 class EventTaskAssignmentRepository
 {
@@ -119,6 +119,95 @@ class EventTaskAssignmentRepository
         );
         $stmt->execute(['we' => $workEntryId, 'id' => $assignmentId]);
         return $stmt->rowCount() > 0;
+    }
+
+    /**
+     * Ersatz-Vorschlag setzen (beim Storno-Request).
+     */
+    public function setReplacement(int $assignmentId, ?int $replacementUserId): bool
+    {
+        $stmt = $this->pdo->prepare(
+            "UPDATE event_task_assignments SET replacement_suggested_user_id = :r
+             WHERE id = :id AND deleted_at IS NULL"
+        );
+        $stmt->execute(['r' => $replacementUserId, 'id' => $assignmentId]);
+        return $stmt->rowCount() > 0;
+    }
+
+    /**
+     * Hat User bereits eine aktive Zusage fuer die Task?
+     * (vorgeschlagen / bestaetigt / storno_angefragt zaehlen als aktiv)
+     */
+    public function hasActiveAssignment(int $taskId, int $userId): bool
+    {
+        $stmt = $this->pdo->prepare(
+            "SELECT 1 FROM event_task_assignments
+             WHERE task_id = :task_id AND user_id = :user_id
+               AND status IN (:s_vorg, :s_best, :s_storno)
+               AND deleted_at IS NULL
+             LIMIT 1"
+        );
+        $stmt->execute([
+            'task_id' => $taskId,
+            'user_id' => $userId,
+            's_vorg'   => EventTaskAssignment::STATUS_VORGESCHLAGEN,
+            's_best'   => EventTaskAssignment::STATUS_BESTAETIGT,
+            's_storno' => EventTaskAssignment::STATUS_STORNO_ANGEFRAGT,
+        ]);
+        return $stmt->fetchColumn() !== false;
+    }
+
+    /**
+     * Anzahl aktiver Zusagen fuer eine Task (Capacity-Check).
+     */
+    public function countActiveByTask(int $taskId): int
+    {
+        $stmt = $this->pdo->prepare(
+            "SELECT COUNT(*) FROM event_task_assignments
+             WHERE task_id = :task_id
+               AND status IN (:s_vorg, :s_best, :s_storno)
+               AND deleted_at IS NULL"
+        );
+        $stmt->execute([
+            'task_id' => $taskId,
+            's_vorg'   => EventTaskAssignment::STATUS_VORGESCHLAGEN,
+            's_best'   => EventTaskAssignment::STATUS_BESTAETIGT,
+            's_storno' => EventTaskAssignment::STATUS_STORNO_ANGEFRAGT,
+        ]);
+        return (int) $stmt->fetchColumn();
+    }
+
+    /**
+     * Offene Review-Items fuer einen Organisator:
+     * - vorgeschlagene variable Zeitfenster (muessen bestaetigt/abgelehnt werden)
+     * - angefragte Stornos (muessen freigegeben/abgelehnt werden)
+     * gefiltert auf Events, bei denen der User Organisator ist.
+     *
+     * @return EventTaskAssignment[]
+     */
+    public function findPendingReviewsForOrganizer(int $organizerId): array
+    {
+        $stmt = $this->pdo->prepare(
+            "SELECT eta.*
+             FROM event_task_assignments eta
+             JOIN event_tasks et ON et.id = eta.task_id AND et.deleted_at IS NULL
+             JOIN event_organizers eo ON eo.event_id = et.event_id
+             WHERE eo.user_id = :org_id
+               AND eta.status IN (:s_vorg, :s_storno)
+               AND eta.deleted_at IS NULL
+             ORDER BY eta.created_at ASC"
+        );
+        $stmt->execute([
+            'org_id' => $organizerId,
+            's_vorg'   => EventTaskAssignment::STATUS_VORGESCHLAGEN,
+            's_storno' => EventTaskAssignment::STATUS_STORNO_ANGEFRAGT,
+        ]);
+
+        $rows = [];
+        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+            $rows[] = EventTaskAssignment::fromArray($row);
+        }
+        return $rows;
     }
 
     public function softDelete(int $id, int $deletedBy): bool

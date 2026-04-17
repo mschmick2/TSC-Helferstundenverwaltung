@@ -9,6 +9,8 @@ use App\Controllers\CategoryController;
 use App\Controllers\DashboardController;
 use App\Controllers\EventAdminController;
 use App\Controllers\EventTemplateController;
+use App\Controllers\MemberEventController;
+use App\Controllers\OrganizerEventController;
 use App\Controllers\ReportController;
 use App\Controllers\TargetHoursController;
 use App\Controllers\UserController;
@@ -151,6 +153,18 @@ return [
 
     EventTemplateRepository::class => function (ContainerInterface $c): EventTemplateRepository {
         return new EventTemplateRepository($c->get(PDO::class));
+    },
+
+    // --- Modul 6 I2: Event-Assignment-Service --------------------------------
+    \App\Services\EventAssignmentService::class => function (ContainerInterface $c): \App\Services\EventAssignmentService {
+        return new \App\Services\EventAssignmentService(
+            $c->get(EventRepository::class),
+            $c->get(EventTaskRepository::class),
+            $c->get(EventTaskAssignmentRepository::class),
+            $c->get(EventOrganizerRepository::class),
+            $c->get(AuditService::class),
+            $c->get(UserRepository::class)
+        );
     },
 
     // =========================================================================
@@ -376,6 +390,30 @@ return [
             $c->get(EventTemplateRepository::class),
             $c->get(CategoryRepository::class),
             $c->get(AuditService::class),
+            $c->get('settings')
+        );
+    },
+
+    // --- Modul 6 I2: Mitglieder- + Organisator-Controller --------------------
+    MemberEventController::class => function (ContainerInterface $c): MemberEventController {
+        return new MemberEventController(
+            $c->get(EventRepository::class),
+            $c->get(EventTaskRepository::class),
+            $c->get(EventTaskAssignmentRepository::class),
+            $c->get(EventOrganizerRepository::class),
+            $c->get(\App\Services\EventAssignmentService::class),
+            $c->get('settings')
+        );
+    },
+
+    OrganizerEventController::class => function (ContainerInterface $c): OrganizerEventController {
+        return new OrganizerEventController(
+            $c->get(EventRepository::class),
+            $c->get(EventTaskRepository::class),
+            $c->get(EventTaskAssignmentRepository::class),
+            $c->get(EventOrganizerRepository::class),
+            $c->get(UserRepository::class),
+            $c->get(\App\Services\EventAssignmentService::class),
             $c->get('settings')
         );
     },

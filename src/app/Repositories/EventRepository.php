@@ -64,6 +64,28 @@ class EventRepository
         return $events;
     }
 
+    /**
+     * Events, bei denen der User als Organisator eingetragen ist.
+     *
+     * @return Event[]
+     */
+    public function findForOrganizer(int $userId): array
+    {
+        $stmt = $this->pdo->prepare(
+            "SELECT e.* FROM events e
+             JOIN event_organizers eo ON eo.event_id = e.id
+             WHERE eo.user_id = :user_id AND e.deleted_at IS NULL
+             ORDER BY e.start_at DESC"
+        );
+        $stmt->execute(['user_id' => $userId]);
+
+        $events = [];
+        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+            $events[] = Event::fromArray($row);
+        }
+        return $events;
+    }
+
     public function findById(int $id): ?Event
     {
         $stmt = $this->pdo->prepare(

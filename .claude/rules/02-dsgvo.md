@@ -31,6 +31,7 @@ Darueber hinausgehende Daten benoetigen Einwilligung (Art. 6 Abs. 1 lit. a).
 | `work_entries.description` | Inhalt | s.o. | Antragsinhalt |
 | `dialog_messages.message` | Inhalt | s.o. | Rueckfragen-Dialog |
 | `audit_log.*` | Revisionssicher | 10 Jahre | Nachvollziehbarkeit |
+| `audit_log.metadata.reason`, `description` | Inhalt (Freitext, PII-Risiko) | 10 Jahre | Storno-/Reject-Begruendungen; analog `dialog_messages.message` zu behandeln |
 | `events.created_by`, `deleted_by` | Funktionsdaten | 10 Jahre | Event-Urheber / Loescher |
 | `events.location`, `description` | Freitext (optional PII) | 10 Jahre | Event-Details |
 | `event_organizers.user_id` | Funktionsdaten | 10 Jahre | Organisator-Historie (ON DELETE RESTRICT - Audit-Integritaet) |

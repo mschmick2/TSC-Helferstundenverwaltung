@@ -20,6 +20,8 @@ final class EventAdminControllerInvariantsTest extends TestCase
     private const EVENT_CONTROLLERS = [
         'EventAdminController.php',
         'EventTemplateController.php',
+        'MemberEventController.php',
+        'OrganizerEventController.php',
     ];
 
     public function test_no_array_access_on_user_object(): void

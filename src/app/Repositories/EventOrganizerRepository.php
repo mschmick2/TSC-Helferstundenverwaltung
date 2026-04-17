@@ -91,4 +91,16 @@ class EventOrganizerRepository
         $stmt->execute(['event_id' => $eventId]);
         return array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN));
     }
+
+    /**
+     * @return int[] Event-IDs, bei denen User Organisator ist
+     */
+    public function findEventIdsForUser(int $userId): array
+    {
+        $stmt = $this->pdo->prepare(
+            "SELECT event_id FROM event_organizers WHERE user_id = :user_id"
+        );
+        $stmt->execute(['user_id' => $userId]);
+        return array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN));
+    }
 }

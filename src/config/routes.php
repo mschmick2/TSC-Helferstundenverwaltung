@@ -9,6 +9,8 @@ use App\Controllers\CategoryController;
 use App\Controllers\DashboardController;
 use App\Controllers\EventAdminController;
 use App\Controllers\EventTemplateController;
+use App\Controllers\MemberEventController;
+use App\Controllers\OrganizerEventController;
 use App\Controllers\ReportController;
 use App\Controllers\TargetHoursController;
 use App\Controllers\UserController;
@@ -177,6 +179,56 @@ return function (App $app): void {
         $group->post('/event-templates/{id:[0-9]+}/delete', [EventTemplateController::class, 'delete']);
     })
         ->add(new RoleMiddleware(['event_admin', 'administrator']))
+        ->add(CsrfMiddleware::class)
+        ->add(AuthMiddleware::class);
+
+    // =========================================================================
+    // Mitglieder-Events-Routen (Modul 6 I2, alle angemeldeten User)
+    // =========================================================================
+    $app->group('', function (RouteCollectorProxy $group) {
+        $group->get('/events', [MemberEventController::class, 'index']);
+        $group->get('/events/{id:[0-9]+}', [MemberEventController::class, 'show']);
+        $group->post(
+            '/events/{eventId:[0-9]+}/tasks/{taskId:[0-9]+}/assign',
+            [MemberEventController::class, 'assign']
+        );
+
+        $group->get('/my-events', [MemberEventController::class, 'myAssignments']);
+        $group->post(
+            '/my-events/assignments/{id:[0-9]+}/withdraw',
+            [MemberEventController::class, 'withdraw']
+        );
+        $group->post(
+            '/my-events/assignments/{id:[0-9]+}/cancel',
+            [MemberEventController::class, 'requestCancellation']
+        );
+    })
+        ->add(CsrfMiddleware::class)
+        ->add(AuthMiddleware::class);
+
+    // =========================================================================
+    // Organisator-Routen (Modul 6 I2, jeder angemeldete User kann - Owner-Check
+    // erfolgt serverseitig via EventAssignmentService/Guards)
+    // =========================================================================
+    $app->group('/organizer', function (RouteCollectorProxy $group) {
+        $group->get('/events', [OrganizerEventController::class, 'index']);
+        $group->post(
+            '/assignments/{id:[0-9]+}/approve-time',
+            [OrganizerEventController::class, 'approveTime']
+        );
+        $group->post(
+            '/assignments/{id:[0-9]+}/reject-time',
+            [OrganizerEventController::class, 'rejectTime']
+        );
+        $group->post(
+            '/assignments/{id:[0-9]+}/approve-cancel',
+            [OrganizerEventController::class, 'approveCancel']
+        );
+        $group->post(
+            '/assignments/{id:[0-9]+}/reject-cancel',
+            [OrganizerEventController::class, 'rejectCancel']
+        );
+    })
         ->add(CsrfMiddleware::class)
         ->add(AuthMiddleware::class);
 
