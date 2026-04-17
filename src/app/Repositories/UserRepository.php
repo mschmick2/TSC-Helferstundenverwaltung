@@ -301,7 +301,7 @@ class UserRepository
      */
     /**
      * Einfache Liste aller aktiven Mitglieder (fuer Dropdowns / Auswahl-UI).
-     * Keine Paginierung.
+     * Keine Paginierung. Blendet System-User aus (mitgliedsnummer='SYSTEM').
      *
      * @return User[]
      */
@@ -310,6 +310,7 @@ class UserRepository
         $stmt = $this->pdo->query(
             "SELECT u.* FROM users u
              WHERE u.deleted_at IS NULL AND u.is_active = TRUE
+               AND u.mitgliedsnummer <> 'SYSTEM'
              ORDER BY u.nachname ASC, u.vorname ASC"
         );
 
@@ -318,6 +319,27 @@ class UserRepository
             $users[] = User::fromArray($row);
         }
         return $users;
+    }
+
+    /**
+     * ID des technischen System-Users fuer Auto-Generate (Event-Abschluss).
+     * Wird durch Migration 003 angelegt.
+     *
+     * @throws \RuntimeException wenn System-User fehlt
+     */
+    public function getSystemUserId(): int
+    {
+        $stmt = $this->pdo->prepare(
+            "SELECT id FROM users WHERE mitgliedsnummer = 'SYSTEM' LIMIT 1"
+        );
+        $stmt->execute();
+        $id = $stmt->fetchColumn();
+        if ($id === false) {
+            throw new \RuntimeException(
+                'System-User nicht gefunden. Migration 003_system_user.sql einspielen.'
+            );
+        }
+        return (int) $id;
     }
 
     public function findAllPaginated(

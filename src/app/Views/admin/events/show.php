@@ -32,7 +32,21 @@ $statusMeta = $statusLabels[$event->getStatus()] ?? ['class' => 'secondary', 'la
                 <button type="submit" class="btn btn-success"><i class="bi bi-send"></i> Veroeffentlichen</button>
             </form>
         <?php endif; ?>
-        <?php if ($event->getStatus() !== 'abgesagt'): ?>
+        <?php
+        // Abschliessen nur wenn veroeffentlicht UND Event-Ende vorbei
+        $canComplete = $event->getStatus() === 'veroeffentlicht'
+            && strtotime($event->getEndAt()) < time();
+        ?>
+        <?php if ($canComplete): ?>
+            <form method="POST" action="<?= ViewHelper::url('/admin/events/' . (int) $event->getId() . '/complete') ?>" class="d-inline"
+                  onsubmit="return confirm('Event abschliessen?&#10;&#10;Fuer alle bestaetigten Zusagen werden automatisch Helferstunden-Antraege zur Pruefung erzeugt.&#10;Dies kann nicht rueckgaengig gemacht werden.');">
+                <?= ViewHelper::csrfField() ?>
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-check2-square"></i> Event abschliessen
+                </button>
+            </form>
+        <?php endif; ?>
+        <?php if ($event->getStatus() !== 'abgesagt' && $event->getStatus() !== 'abgeschlossen'): ?>
             <form method="POST" action="<?= ViewHelper::url('/admin/events/' . (int) $event->getId() . '/cancel') ?>" class="d-inline">
                 <?= ViewHelper::csrfField() ?>
                 <button type="submit" class="btn btn-outline-warning"

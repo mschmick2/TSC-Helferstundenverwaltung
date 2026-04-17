@@ -65,6 +65,8 @@ class WorkEntry
     private ?string $updatedAt = null;
     private ?string $deletedAt = null;
     private int $version = 1;
+    private string $origin = 'manual';
+    private ?int $eventTaskAssignmentId = null;
 
     // Joins (optional, bei Bedarf befüllt)
     private ?string $userName = null;
@@ -105,6 +107,9 @@ class WorkEntry
         $entry->updatedAt = $data['updated_at'] ?? null;
         $entry->deletedAt = $data['deleted_at'] ?? null;
         $entry->version = (int) ($data['version'] ?? 1);
+        $entry->origin = (string) ($data['origin'] ?? 'manual');
+        $entry->eventTaskAssignmentId = isset($data['event_task_assignment_id'])
+            ? (int) $data['event_task_assignment_id'] : null;
 
         // Join-Felder
         $entry->userName = $data['user_name'] ?? null;
@@ -146,6 +151,9 @@ class WorkEntry
     public function getDeletedAt(): ?string { return $this->deletedAt; }
     public function getUpdatedAt(): ?string { return $this->updatedAt; }
     public function getVersion(): int { return $this->version; }
+    public function getOrigin(): string { return $this->origin; }
+    public function getEventTaskAssignmentId(): ?int { return $this->eventTaskAssignmentId; }
+    public function isFromEvent(): bool { return $this->eventTaskAssignmentId !== null; }
 
     // Join-Felder
     public function getUserName(): ?string { return $this->userName; }

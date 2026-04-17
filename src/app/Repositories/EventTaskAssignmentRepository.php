@@ -178,6 +178,34 @@ class EventTaskAssignmentRepository
     }
 
     /**
+     * Alle bestaetigten Zusagen eines Events (fuer Event-Abschluss in I3).
+     *
+     * @return EventTaskAssignment[]
+     */
+    public function findConfirmedForEvent(int $eventId): array
+    {
+        $stmt = $this->pdo->prepare(
+            "SELECT eta.*
+             FROM event_task_assignments eta
+             JOIN event_tasks et ON et.id = eta.task_id AND et.deleted_at IS NULL
+             WHERE et.event_id = :event_id
+               AND eta.status = :status
+               AND eta.deleted_at IS NULL
+             ORDER BY eta.created_at ASC"
+        );
+        $stmt->execute([
+            'event_id' => $eventId,
+            'status' => EventTaskAssignment::STATUS_BESTAETIGT,
+        ]);
+
+        $rows = [];
+        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+            $rows[] = EventTaskAssignment::fromArray($row);
+        }
+        return $rows;
+    }
+
+    /**
      * Offene Review-Items fuer einen Organisator:
      * - vorgeschlagene variable Zeitfenster (muessen bestaetigt/abgelehnt werden)
      * - angefragte Stornos (muessen freigegeben/abgelehnt werden)

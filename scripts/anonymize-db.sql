@@ -21,6 +21,9 @@ SELECT CONCAT('Anonymisiere DB: ', DATABASE()) AS info;
 -- Betrifft bewusst ALLE Benutzer (inkl. soft-deleted), daher kein WHERE.
 -- mitgliedsnummer + eintrittsdatum werden ebenfalls ueberschrieben, weil
 -- deren Kombination mit anderen Feldern re-identifizierend wirken kann.
+-- AUSNAHME: System-User (mitgliedsnummer='SYSTEM') bleibt unberuehrt, weil
+-- EventCompletionService::getSystemUserId() per mitgliedsnummer sucht
+-- (DSGVO G5 D4). Kein PII-Risiko - System-User ist technischer Account.
 UPDATE users SET
     email                 = CONCAT('user', id, '@vaes.test'),
     vorname               = CONCAT('TestUser', id),
@@ -37,7 +40,8 @@ UPDATE users SET
     last_login_at         = NULL,
     failed_login_attempts = 0,
     locked_until          = NULL,
-    password_hash         = NULL;
+    password_hash         = NULL
+WHERE mitgliedsnummer <> 'SYSTEM';
 -- password_hash wird anschliessend durch seed-test-users.php pro Testuser
 -- frisch gesetzt. Alte Passwoerter sind damit sofort ungueltig.
 

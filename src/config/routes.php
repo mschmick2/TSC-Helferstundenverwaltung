@@ -165,6 +165,7 @@ return function (App $app): void {
         $group->post('/events/{id:[0-9]+}', [EventAdminController::class, 'update']);
         $group->post('/events/{id:[0-9]+}/publish', [EventAdminController::class, 'publish']);
         $group->post('/events/{id:[0-9]+}/cancel', [EventAdminController::class, 'cancel']);
+        $group->post('/events/{id:[0-9]+}/complete', [EventAdminController::class, 'complete']);
         $group->post('/events/{id:[0-9]+}/delete', [EventAdminController::class, 'delete']);
 
         // Event-Tasks

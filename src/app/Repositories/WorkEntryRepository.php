@@ -148,17 +148,21 @@ class WorkEntryRepository
     }
 
     /**
-     * Neuen Eintrag erstellen
+     * Neuen Eintrag erstellen.
+     *
+     * Ab I3 werden zusaetzliche Keys akzeptiert (origin, event_task_assignment_id),
+     * um Event-generierte Eintraege zu markieren. Default 'manual' bleibt
+     * non-breaking fuer alle Alt-Aufrufer.
      */
     public function create(array $data): int
     {
         $stmt = $this->pdo->prepare(
             "INSERT INTO work_entries
              (user_id, created_by_user_id, category_id, work_date, time_from, time_to,
-              hours, project, description, status)
+              hours, project, description, status, origin, event_task_assignment_id)
              VALUES
              (:user_id, :created_by_user_id, :category_id, :work_date, :time_from, :time_to,
-              :hours, :project, :description, :status)"
+              :hours, :project, :description, :status, :origin, :event_task_assignment_id)"
         );
 
         $stmt->execute([
@@ -172,6 +176,8 @@ class WorkEntryRepository
             'project' => $data['project'] ?? null,
             'description' => $data['description'] ?? null,
             'status' => $data['status'] ?? 'entwurf',
+            'origin' => $data['origin'] ?? 'manual',
+            'event_task_assignment_id' => $data['event_task_assignment_id'] ?? null,
         ]);
 
         return (int) $this->pdo->lastInsertId();

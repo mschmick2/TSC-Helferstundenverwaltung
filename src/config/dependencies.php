@@ -167,6 +167,19 @@ return [
         );
     },
 
+    // --- Modul 6 I3: Event-Completion-Service --------------------------------
+    \App\Services\EventCompletionService::class => function (ContainerInterface $c): \App\Services\EventCompletionService {
+        return new \App\Services\EventCompletionService(
+            $c->get(PDO::class),
+            $c->get(EventRepository::class),
+            $c->get(EventTaskRepository::class),
+            $c->get(EventTaskAssignmentRepository::class),
+            $c->get(WorkEntryRepository::class),
+            $c->get(UserRepository::class),
+            $c->get(AuditService::class)
+        );
+    },
+
     // =========================================================================
     // Services
     // =========================================================================
@@ -381,6 +394,7 @@ return [
             $c->get(CategoryRepository::class),
             $c->get(UserRepository::class),
             $c->get(AuditService::class),
+            $c->get(\App\Services\EventCompletionService::class),
             $c->get('settings')
         );
     },

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Controllers;
 
+use App\Exceptions\BusinessRuleException;
 use App\Helpers\ViewHelper;
 use App\Models\Event;
 use App\Repositories\CategoryRepository;
@@ -12,6 +13,7 @@ use App\Repositories\EventRepository;
 use App\Repositories\EventTaskRepository;
 use App\Repositories\UserRepository;
 use App\Services\AuditService;
+use App\Services\EventCompletionService;
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
 
@@ -30,6 +32,7 @@ class EventAdminController extends BaseController
         private CategoryRepository $categoryRepo,
         private UserRepository $userRepo,
         private AuditService $auditService,
+        private EventCompletionService $completionService,
         private array $settings
     ) {
     }
@@ -311,6 +314,36 @@ class EventAdminController extends BaseController
         );
 
         ViewHelper::flash('success', 'Event veroeffentlicht.');
+        return $this->redirect($response, '/admin/events/' . $id);
+    }
+
+    // =========================================================================
+    // POST /admin/events/{id}/complete  -- Abschliessen + Auto-Generate work_entries
+    // =========================================================================
+
+    public function complete(Request $request, Response $response): Response
+    {
+        $user = $request->getAttribute('user');
+        $id = (int) $this->routeArgs($request)['id'];
+
+        try {
+            $result = $this->completionService->completeEvent($id, (int) $user->getId());
+            ViewHelper::flash(
+                'success',
+                sprintf(
+                    'Event abgeschlossen. %d Helferstunden-Antraege zur Pruefung erzeugt.',
+                    $result['work_entries_created']
+                )
+            );
+        } catch (BusinessRuleException $e) {
+            ViewHelper::flash('danger', $e->getMessage());
+        } catch (\Throwable $e) {
+            ViewHelper::flash(
+                'danger',
+                'Event-Abschluss fehlgeschlagen (Transaktion zurueckgerollt): ' . $e->getMessage()
+            );
+        }
+
         return $this->redirect($response, '/admin/events/' . $id);
     }
 

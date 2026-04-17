@@ -98,6 +98,11 @@ use App\Models\WorkEntry;
                         <a href="<?= ViewHelper::url('/entries/' . $entry->getId() . '?from=review') ?>" class="text-decoration-none fw-semibold">
                             <?= ViewHelper::e($entry->getEntryNumber()) ?>
                         </a>
+                        <?php if (method_exists($entry, 'isFromEvent') && $entry->isFromEvent()): ?>
+                            <i class="bi bi-calendar-event text-primary ms-1"
+                               title="Aus Event automatisch erzeugt"
+                               aria-label="Aus Event automatisch erzeugt"></i>
+                        <?php endif; ?>
                     </td>
                     <td><?= ViewHelper::e($entry->getUserName()) ?></td>
                     <td><?= ViewHelper::formatDate($entry->getWorkDate()) ?></td>
