@@ -125,7 +125,8 @@ def main() -> int:
     print(f"  allocated:  {alloc:.2f} GB")
     print(f"  reserved:   {reserved:.2f} GB")
 
-    print("\n✓ GPU-Verifikation erfolgreich.")
+    # ASCII-only output - Windows-cp1252-Konsole frisst kein Unicode
+    print("\nOK - GPU-Verifikation erfolgreich.")
     return 0
 
 

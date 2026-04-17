@@ -5,7 +5,10 @@ const { login, TEST_USER_EMAIL } = require('../helpers/auth');
 test.describe('Login', () => {
     test('Login mit gueltigen Zugangsdaten', async ({ page }) => {
         await login(page);
-        await expect(page).toHaveURL(/\/(dashboard|entries)/);
+        // Dashboard oder Startseite erreicht (VAES nutzt "/" als Dashboard-Route)
+        await expect(page).not.toHaveURL(/\/login$/);
+        // Navigation sichtbar = authentifiziert
+        await expect(page.locator('nav')).toBeVisible();
         await page.context().storageState({ path: './auth-state.json' });
     });
 
@@ -16,7 +19,7 @@ test.describe('Login', () => {
         await page.click('button[type="submit"]');
         // Entweder bleibt auf /login mit Fehler ODER wird umgeleitet (je nach Impl.)
         const body = await page.textContent('body');
-        expect(body.toLowerCase()).toMatch(/fehler|ungueltig|falsch/);
+        expect(body.toLowerCase()).toMatch(/fehler|ungueltig|ungültig|falsch/);
     });
 
     test('Login-Form enthaelt CSRF-Token', async ({ page }) => {
