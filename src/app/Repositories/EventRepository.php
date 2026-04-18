@@ -44,6 +44,104 @@ class EventRepository
     }
 
     /**
+     * Events fuer Kalender-Ausschnitt (FullCalendar-Fetch Month-Range).
+     * Inkludiert alle Status ausser geloescht — Kalender-Client stellt den Status
+     * farbcodiert dar (abgesagt/abgeschlossen/veroeffentlicht/entwurf).
+     *
+     * Filter-Logik:
+     *   - Event beruehrt den Range, wenn start_at < range_end UND end_at >= range_start
+     *   - Draft-Events sind nur fuer Admins sichtbar (Filter im Controller via $includeDrafts)
+     *
+     * @return Event[]
+     */
+    public function findInRange(
+        \DateTimeImmutable $from,
+        \DateTimeImmutable $to,
+        bool $includeDrafts = false
+    ): array {
+        $sql = "SELECT * FROM events
+                WHERE deleted_at IS NULL
+                  AND start_at < :range_end
+                  AND end_at   >= :range_start";
+        if (!$includeDrafts) {
+            $sql .= " AND status != 'entwurf'";
+        }
+        $sql .= " ORDER BY start_at ASC";
+
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute([
+            'range_start' => $from->format('Y-m-d H:i:s'),
+            'range_end'   => $to->format('Y-m-d H:i:s'),
+        ]);
+
+        $events = [];
+        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+            $events[] = Event::fromArray($row);
+        }
+        return $events;
+    }
+
+    /**
+     * Alle zukuenftigen Events, an denen User als Assignment teilnimmt
+     * (fuer iCal-Subscription-Feed /ical/subscribe/{token}).
+     *
+     * @return Event[]
+     */
+    public function findUserAssignedEvents(int $userId): array
+    {
+        $stmt = $this->pdo->prepare(
+            "SELECT DISTINCT e.* FROM events e
+             JOIN event_tasks et ON et.event_id = e.id
+             JOIN event_task_assignments eta ON eta.task_id = et.id
+             WHERE eta.user_id = :user_id
+               AND eta.status IN ('vorgeschlagen', 'bestaetigt', 'abgeschlossen')
+               AND e.deleted_at IS NULL
+               AND e.status != 'entwurf'
+             ORDER BY e.start_at ASC"
+        );
+        $stmt->execute(['user_id' => $userId]);
+
+        $events = [];
+        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+            $events[] = Event::fromArray($row);
+        }
+        return $events;
+    }
+
+    /**
+     * Fuer FullCalendar-Color-Lookup: event_id -> Farbe der ersten Task-Kategorie
+     * (sort_order ASC, category_id IS NOT NULL). Ein Query fuer alle gegebenen IDs.
+     *
+     * @param int[] $eventIds
+     * @return array<int,string>  event_id -> hex-color (z.B. "#0d6efd")
+     */
+    public function findCategoryColorsByEventIds(array $eventIds): array
+    {
+        if (count($eventIds) === 0) {
+            return [];
+        }
+        $placeholders = implode(',', array_fill(0, count($eventIds), '?'));
+        $sql = "SELECT t.event_id, c.color
+                FROM event_tasks t
+                JOIN categories c ON c.id = t.category_id
+                WHERE t.event_id IN ($placeholders)
+                  AND c.deleted_at IS NULL
+                ORDER BY t.event_id, t.sort_order ASC";
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute(array_map('intval', $eventIds));
+
+        $colors = [];
+        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+            $eid = (int) $row['event_id'];
+            // ORDER BY sort_order ASC: erster Treffer gewinnt
+            if (!isset($colors[$eid])) {
+                $colors[$eid] = (string) $row['color'];
+            }
+        }
+        return $colors;
+    }
+
+    /**
      * Oeffentlich sichtbare Events (veroeffentlicht, nicht abgeschlossen/abgesagt).
      *
      * @return Event[]

@@ -9,6 +9,7 @@ use App\Controllers\CategoryController;
 use App\Controllers\DashboardController;
 use App\Controllers\EventAdminController;
 use App\Controllers\EventTemplateController;
+use App\Controllers\IcalController;
 use App\Controllers\MemberEventController;
 use App\Controllers\OrganizerEventController;
 use App\Controllers\ReportController;
@@ -189,6 +190,15 @@ return [
             $c->get(EventTaskRepository::class),
             $c->get(AuditService::class)
         );
+    },
+
+    // --- Modul 6 I5: Kalender + iCal -----------------------------------------
+    \App\Services\IcalService::class => function (): \App\Services\IcalService {
+        return new \App\Services\IcalService();
+    },
+
+    \App\Services\CalendarFeedService::class => function (): \App\Services\CalendarFeedService {
+        return new \App\Services\CalendarFeedService();
     },
 
     // =========================================================================
@@ -429,7 +439,19 @@ return [
             $c->get(EventTaskAssignmentRepository::class),
             $c->get(EventOrganizerRepository::class),
             $c->get(\App\Services\EventAssignmentService::class),
+            $c->get(\App\Services\CalendarFeedService::class),
+            $c->get(UserRepository::class),
+            $c->get(AuditService::class),
             $c->get('settings')
+        );
+    },
+
+    // --- Modul 6 I5: iCal-Controller ----------------------------------------
+    IcalController::class => function (ContainerInterface $c): IcalController {
+        return new IcalController(
+            $c->get(EventRepository::class),
+            $c->get(UserRepository::class),
+            $c->get(\App\Services\IcalService::class)
         );
     },
 

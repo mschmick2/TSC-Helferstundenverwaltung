@@ -15,7 +15,17 @@ $statusLabel = [
 ];
 ?>
 
-<h1 class="h3 mb-3"><i class="bi bi-person-check"></i> Meine Zusagen</h1>
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+    <h1 class="h3 mb-0"><i class="bi bi-person-check"></i> Meine Zusagen</h1>
+    <div class="btn-group">
+        <a href="<?= ViewHelper::url('/my-events/calendar') ?>" class="btn btn-outline-secondary">
+            <i class="bi bi-calendar-heart"></i> Kalender
+        </a>
+        <a href="<?= ViewHelper::url('/my-events/ical') ?>" class="btn btn-outline-secondary">
+            <i class="bi bi-link-45deg"></i> iCal-Abo
+        </a>
+    </div>
+</div>
 
 <?php if (empty($assignments)): ?>
     <div class="alert alert-info">

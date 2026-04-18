@@ -377,4 +377,119 @@ Warum hat niemand das gesehen?
 
 ---
 
+### 2026-04-18 — Slim-Bridge ControllerInvoker: `array $args` wird NICHT injected
+
+**Kontext:**
+Modul 6 I5, Gate G8 Smoke-Test. Neuer `IcalController::subscribe(Request, Response, array $args)`
+lieferte 500: `Invoker\Exception\NotEnoughParametersException — no value was given for parameter 3 ($args)`.
+
+**Problem / Ueberraschung:**
+Ich hatte die uebliche Slim-4-Controller-Signatur genommen:
+`function action(Request $request, Response $response, array $args): Response`.
+
+In diesem Projekt wird Slim jedoch via **php-di/slim-bridge** angesprochen, mit einem
+eigenen `ControllerInvoker`. Der nutzt PHP-DI-Reflection fuer Parameter-Resolution:
+- `Request` / `Response` werden ueber Type-Hint injected
+- Ein `array`-Parameter wird aber NICHT mit Route-Args populiert — der Invoker weiss
+  nicht, was er da reinstecken soll und wirft `NotEnoughParametersException`
+
+Alle anderen Controller im Projekt (z.B. `MemberEventController`, `EventAdminController`)
+haben die Signatur `function action(Request $request, Response $response): Response`
+und holen Route-Args via Helper `$this->routeArgs($request)` aus
+`BaseController::routeArgs()`, das intern `RouteContext::fromRequest()` nutzt.
+
+Ich hatte das Pattern uebersehen, weil Slim-Dokumentation den dritten Parameter als
+Standard zeigt. Es ist aber ein slim-bridge-spezifisches Invoker-Verhalten.
+
+**Loesung:**
+IcalController als `extends BaseController` geschrieben, `array $args`-Parameter entfernt,
+und Route-Args via `$this->routeArgs($request)['token']` gelesen.
+
+**Praevention:**
+- Neue Controller: **immer** `extends BaseController` und `$this->routeArgs($request)['<name>']`.
+- Rules-Ergaenzung in `.claude/rules/03-framework.md`: Beispiel-Snippet ist bereits so,
+  aber Hinweis zum `array $args`-Gotcha hinzufuegen (Slim-Bridge != Pure-Slim).
+- Wenn ein neuer Controller auch nur mit einem Parameter-Typ-Fehler bricht: **zuerst**
+  einen bestehenden Controller als Template nehmen, nicht die Slim-Doku.
+
+---
+
+### 2026-04-18 — FullCalendar v6 hat kein separates `main.min.css`
+
+**Kontext:**
+Modul 6 I5, Integration von FullCalendar in `events/calendar.php` und `my-events/calendar.php`.
+Download via `Invoke-WebRequest` schlug bei `main.min.css` mit HTTP 404 fehl:
+`Couldn't find the requested file /main.min.css in fullcalendar`.
+
+**Problem / Ueberraschung:**
+FullCalendar v5 hatte ein separates CSS-Bundle (`main.min.css`). **Ab v6** wurde das
+geaendert: Das JS-Bundle (`index.global.min.js`) injected die Styles zur Laufzeit
+selbst (ueber dynamisch generierte `<style>`-Tags). Es gibt gar **kein** separates
+CSS-File mehr.
+
+Ich hatte blind die v5-Dokumentation als Quelle genommen und auch ein `<link>`-Tag
+auf das nicht existierende CSS in den Views.
+
+**Loesung:**
+- `<link rel="stylesheet">` fuer `main.min.css` aus beiden Calendar-Views entfernt
+- README in `src/public/js/vendor/fullcalendar/` korrigiert (Hinweis: kein CSS noetig)
+
+**Praevention:**
+- Bei neuen JS-Libraries: erst die **aktuelle** Doku (npm readme / offizielle Docs)
+  lesen, nicht Stack-Overflow-Antworten, die meist aelter sind.
+- Bei Library-Upgrades: Changelog/Breaking-Changes pruefen, auch fuer Asset-Struktur.
+
+---
+
+### 2026-04-18 — `app.url` + `base_path`: Doppelter Prefix bei naiver URL-Konstruktion
+
+**Kontext:**
+Modul 6 I5, `MemberEventController::icalSettings()` konstruiert die persoenliche
+Abo-URL fuer den iCal-Client: `https://domain/helferstunden/helferstunden/ical/subscribe/...`
+— der `/helferstunden`-Prefix war DOPPELT.
+
+**Problem / Ueberraschung:**
+In `src/config/config.php` ist `app.url` oft als vollstaendige Produktions-URL
+**inklusive** base_path eingetragen:
+```php
+'app' => [
+    'url' => 'https://192.168.3.98/helferstunden',
+    'base_path' => '/helferstunden',
+],
+```
+
+Mein erster Ansatz war die naive Konkatenation:
+```php
+$subscribeUrl = $appUrl . $basePath . '/ical/subscribe/' . $token;
+```
+
+Das doppelt den Prefix, weil `$appUrl` ihn schon enthaelt. Der Bug ist nicht sichtbar,
+solange man immer nur relative URLs baut (ViewHelper::url() macht das richtig), aber
+fuer absolute URLs wie die iCal-Abo-URL, die ausserhalb der Session vom Kalender-Client
+gepollt wird, muss sie genau einmal den Prefix haben.
+
+Historisch ist im Projekt unklar, ob `app.url` Origin-only oder inkl. base_path sein soll.
+Beide Varianten sind in der Praxis angetroffen worden.
+
+**Loesung:**
+Defensives Prefix-Handling im Controller:
+```php
+$appUrl = rtrim($this->settings['app']['url'] ?? '', '/');
+if ($basePath !== '' && !str_ends_with($appUrl, $basePath)) {
+    $appUrl .= $basePath;
+}
+$subscribeUrl = $appUrl . '/ical/subscribe/' . $token;
+```
+
+**Praevention:**
+- Rules-Ergaenzung in `.claude/rules/03-framework.md`: fuer **absolute** URLs (Mail,
+  iCal-Abo, Exports, Webhook-Callbacks) IMMER das defensive Pattern verwenden, nie
+  `$appUrl . $basePath . ...`.
+- Langfristig besser: `app.url` klar als Origin-only definieren und Validator-Check
+  in der Config-Load-Phase. Aber das ist ein Refactor fuer ein eigenes Ticket.
+- Noch besser: zentrale Helper-Methode `ViewHelper::absoluteUrl($path)` analog zu
+  `ViewHelper::url()`. Damit kann niemand mehr die Konkatenation falsch machen.
+
+---
+
 <!-- Neue Eintraege hier unten anfuegen, nicht oben. Append-Only. -->

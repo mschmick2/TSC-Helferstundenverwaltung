@@ -9,6 +9,7 @@ use App\Controllers\CategoryController;
 use App\Controllers\DashboardController;
 use App\Controllers\EventAdminController;
 use App\Controllers\EventTemplateController;
+use App\Controllers\IcalController;
 use App\Controllers\MemberEventController;
 use App\Controllers\OrganizerEventController;
 use App\Controllers\ReportController;
@@ -45,6 +46,9 @@ return function (App $app): void {
         // Passwort zurücksetzen
         $group->get('/reset-password/{token}', [AuthController::class, 'showResetPassword']);
         $group->post('/reset-password/{token}', [AuthController::class, 'resetPassword']);
+
+        // iCal-Subscription-Feed (Token-Auth, KEINE Session)
+        $group->get('/ical/subscribe/{token:[a-f0-9]{64}}', [IcalController::class, 'subscribe']);
     })->add(CsrfMiddleware::class);
 
     // =========================================================================
@@ -199,6 +203,21 @@ return function (App $app): void {
     // Mitglieder-Events-Routen (Modul 6 I2, alle angemeldeten User)
     // =========================================================================
     $app->group('', function (RouteCollectorProxy $group) {
+        // Kalender-Ansichten (I5) — muessen VOR /events/{id} stehen
+        $group->get('/events/calendar', [MemberEventController::class, 'calendar']);
+        $group->get('/my-events/calendar', [MemberEventController::class, 'myCalendar']);
+
+        // API fuer FullCalendar (JSON-Feed)
+        $group->get('/api/events/calendar', [MemberEventController::class, 'calendarJson']);
+        $group->get('/api/my-events/calendar', [MemberEventController::class, 'myCalendarJson']);
+
+        // iCal-Settings + Token-Regenerate (authenticated)
+        $group->get('/my-events/ical', [MemberEventController::class, 'icalSettings']);
+        $group->post('/my-events/ical/regenerate', [MemberEventController::class, 'regenerateIcalToken']);
+
+        // Event-Einzel-iCal-Download
+        $group->get('/events/{id:[0-9]+}.ics', [IcalController::class, 'downloadEvent']);
+
         $group->get('/events', [MemberEventController::class, 'index']);
         $group->get('/events/{id:[0-9]+}', [MemberEventController::class, 'show']);
         $group->post(

@@ -7,9 +7,14 @@ use App\Helpers\ViewHelper;
 
 <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
     <h1 class="h3 mb-0"><i class="bi bi-calendar-event"></i> Events</h1>
-    <a href="<?= ViewHelper::url('/my-events') ?>" class="btn btn-outline-secondary">
-        <i class="bi bi-person-check"></i> Meine Zusagen
-    </a>
+    <div class="btn-group">
+        <a href="<?= ViewHelper::url('/events/calendar') ?>" class="btn btn-outline-secondary">
+            <i class="bi bi-calendar3"></i> Kalender
+        </a>
+        <a href="<?= ViewHelper::url('/my-events') ?>" class="btn btn-outline-secondary">
+            <i class="bi bi-person-check"></i> Meine Zusagen
+        </a>
+    </div>
 </div>
 
 <?php if (empty($events)): ?>

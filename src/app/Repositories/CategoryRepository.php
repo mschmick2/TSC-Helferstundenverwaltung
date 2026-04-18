@@ -104,12 +104,13 @@ class CategoryRepository
     public function create(array $data): int
     {
         $stmt = $this->pdo->prepare(
-            "INSERT INTO categories (name, description, sort_order, is_active, is_contribution)
-             VALUES (:name, :description, :sort_order, :is_active, :is_contribution)"
+            "INSERT INTO categories (name, description, color, sort_order, is_active, is_contribution)
+             VALUES (:name, :description, :color, :sort_order, :is_active, :is_contribution)"
         );
         $stmt->execute([
             'name' => $data['name'],
             'description' => $data['description'] ?? null,
+            'color' => $data['color'] ?? \App\Models\Category::DEFAULT_COLOR,
             'sort_order' => (int) ($data['sort_order'] ?? 0),
             'is_active' => isset($data['is_active']) ? (int) $data['is_active'] : 1,
             'is_contribution' => isset($data['is_contribution']) ? (int) $data['is_contribution'] : 0,
@@ -125,7 +126,7 @@ class CategoryRepository
     {
         $stmt = $this->pdo->prepare(
             "UPDATE categories
-             SET name = :name, description = :description,
+             SET name = :name, description = :description, color = :color,
                  sort_order = :sort_order, is_active = :is_active,
                  is_contribution = :is_contribution
              WHERE id = :id AND deleted_at IS NULL"
@@ -133,6 +134,7 @@ class CategoryRepository
         $stmt->execute([
             'name' => $data['name'],
             'description' => $data['description'] ?? null,
+            'color' => $data['color'] ?? \App\Models\Category::DEFAULT_COLOR,
             'sort_order' => (int) ($data['sort_order'] ?? 0),
             'is_active' => (int) ($data['is_active'] ?? 1),
             'is_contribution' => (int) ($data['is_contribution'] ?? 0),

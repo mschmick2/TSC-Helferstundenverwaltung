@@ -61,6 +61,7 @@ class CategoryController extends BaseController
         $name = trim($data['name'] ?? '');
         $description = trim($data['description'] ?? '');
         $sortOrder = (int) ($data['sort_order'] ?? 0);
+        $color = $this->normalizeColor($data['color'] ?? null);
 
         // Validierung
         if ($name === '') {
@@ -76,6 +77,7 @@ class CategoryController extends BaseController
         $categoryId = $this->categoryRepo->create([
             'name' => $name,
             'description' => $description ?: null,
+            'color' => $color,
             'sort_order' => $sortOrder,
             'is_active' => 1,
         ]);
@@ -84,7 +86,7 @@ class CategoryController extends BaseController
             'create',
             'categories',
             $categoryId,
-            newValues: ['name' => $name, 'description' => $description, 'sort_order' => $sortOrder],
+            newValues: ['name' => $name, 'description' => $description, 'color' => $color, 'sort_order' => $sortOrder],
             description: "Kategorie erstellt: {$name}"
         );
 
@@ -111,6 +113,7 @@ class CategoryController extends BaseController
         $name = trim($data['name'] ?? '');
         $description = trim($data['description'] ?? '');
         $sortOrder = (int) ($data['sort_order'] ?? 0);
+        $color = $this->normalizeColor($data['color'] ?? null);
 
         if ($name === '') {
             ViewHelper::flash('danger', 'Der Name ist ein Pflichtfeld.');
@@ -127,6 +130,7 @@ class CategoryController extends BaseController
         $this->categoryRepo->update($id, [
             'name' => $name,
             'description' => $description ?: null,
+            'color' => $color,
             'sort_order' => $sortOrder,
             'is_active' => $category->isActive() ? 1 : 0,
         ]);
@@ -136,7 +140,7 @@ class CategoryController extends BaseController
             'categories',
             $id,
             oldValues: $oldValues,
-            newValues: ['name' => $name, 'description' => $description, 'sort_order' => $sortOrder],
+            newValues: ['name' => $name, 'description' => $description, 'color' => $color, 'sort_order' => $sortOrder],
             description: "Kategorie aktualisiert: {$name}"
         );
 
@@ -257,5 +261,21 @@ class CategoryController extends BaseController
         }
 
         return $this->json($response, ['success' => true]);
+    }
+
+    /**
+     * Hex-Farbcode normalisieren/validieren. Fallback: Bootstrap Primary.
+     */
+    private function normalizeColor(?string $value): string
+    {
+        $default = \App\Models\Category::DEFAULT_COLOR;
+        if ($value === null) {
+            return $default;
+        }
+        $value = strtolower(trim($value));
+        if (!preg_match('/^#[0-9a-f]{6}$/', $value)) {
+            return $default;
+        }
+        return $value;
     }
 }
