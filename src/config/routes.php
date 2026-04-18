@@ -173,11 +173,23 @@ return function (App $app): void {
         $group->post('/events/{eventId:[0-9]+}/tasks/{taskId:[0-9]+}/delete',
             [EventAdminController::class, 'deleteTask']);
 
-        // Event-Templates
+        // Event-Templates (I1: CRUD; I4: Task-Editor, Versionierung, Ableitung)
         $group->get('/event-templates', [EventTemplateController::class, 'index']);
         $group->post('/event-templates', [EventTemplateController::class, 'store']);
         $group->get('/event-templates/{id:[0-9]+}', [EventTemplateController::class, 'show']);
+        $group->get('/event-templates/{id:[0-9]+}/edit', [EventTemplateController::class, 'edit']);
         $group->post('/event-templates/{id:[0-9]+}/delete', [EventTemplateController::class, 'delete']);
+        $group->post('/event-templates/{id:[0-9]+}/tasks', [EventTemplateController::class, 'addTask']);
+        $group->post('/event-templates/{id:[0-9]+}/tasks/{taskId:[0-9]+}/update',
+            [EventTemplateController::class, 'updateTask']);
+        $group->post('/event-templates/{id:[0-9]+}/tasks/{taskId:[0-9]+}/delete',
+            [EventTemplateController::class, 'deleteTask']);
+        $group->post('/event-templates/{id:[0-9]+}/save-as-new-version',
+            [EventTemplateController::class, 'saveAsNewVersion']);
+        $group->get('/event-templates/{id:[0-9]+}/derive',
+            [EventTemplateController::class, 'deriveForm']);
+        $group->post('/event-templates/{id:[0-9]+}/derive',
+            [EventTemplateController::class, 'deriveStore']);
     })
         ->add(new RoleMiddleware(['event_admin', 'administrator']))
         ->add(CsrfMiddleware::class)

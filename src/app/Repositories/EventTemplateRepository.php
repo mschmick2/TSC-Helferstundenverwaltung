@@ -14,7 +14,8 @@ use PDO;
  * Policy (siehe §7 Requirements):
  *   - Neue Version: parent_template_id = alte_id, alte Version is_current=0
  *   - findCurrent() liefert nur is_current=1 + deleted_at IS NULL
- *   - saveAsNewVersion() erledigt die Versionierungs-Mechanik atomar
+ *   - saveAsNewVersion() liefert die Versionierungs-Mechanik; Transaction
+ *     liegt in der Verantwortung des aufrufenden Service (siehe G3-Finding I4)
  */
 class EventTemplateRepository
 {
@@ -119,7 +120,9 @@ class EventTemplateRepository
     /**
      * Neue Version eines Templates anlegen (parent bekommt is_current=0).
      *
-     * Tasks muessen nach dem Call mit addTask() separat kopiert/ergaenzt werden.
+     * KEINE eigene Transaction - der aufrufende Service ist fuer
+     * Transaction-Grenzen verantwortlich (Layering).
+     * Tasks muessen nach dem Call separat kopiert/ergaenzt werden.
      */
     public function saveAsNewVersion(
         int $parentId,
@@ -127,43 +130,34 @@ class EventTemplateRepository
         ?string $description,
         int $createdBy
     ): int {
-        $this->pdo->beginTransaction();
-        try {
-            // Parent-Info holen
-            $parent = $this->findById($parentId);
-            if ($parent === null) {
-                throw new \RuntimeException("Parent-Template #$parentId nicht gefunden.");
-            }
-
-            // Parent deaktivieren
-            $stmt = $this->pdo->prepare(
-                "UPDATE event_templates SET is_current = 0 WHERE id = :id"
-            );
-            $stmt->execute(['id' => $parentId]);
-
-            // Neue Version anlegen
-            $newVersion = $parent->getVersion() + 1;
-            $stmt = $this->pdo->prepare(
-                "INSERT INTO event_templates
-                 (name, description, version, parent_template_id, is_current, created_by)
-                 VALUES
-                 (:name, :description, :version, :parent, 1, :created_by)"
-            );
-            $stmt->execute([
-                'name' => $name,
-                'description' => $description,
-                'version' => $newVersion,
-                'parent' => $parentId,
-                'created_by' => $createdBy,
-            ]);
-
-            $newId = (int) $this->pdo->lastInsertId();
-            $this->pdo->commit();
-            return $newId;
-        } catch (\Throwable $e) {
-            $this->pdo->rollBack();
-            throw $e;
+        $parent = $this->findById($parentId);
+        if ($parent === null) {
+            throw new \RuntimeException("Parent-Template #$parentId nicht gefunden.");
         }
+
+        // Parent deaktivieren
+        $stmt = $this->pdo->prepare(
+            "UPDATE event_templates SET is_current = 0 WHERE id = :id"
+        );
+        $stmt->execute(['id' => $parentId]);
+
+        // Neue Version anlegen
+        $newVersion = $parent->getVersion() + 1;
+        $stmt = $this->pdo->prepare(
+            "INSERT INTO event_templates
+             (name, description, version, parent_template_id, is_current, created_by)
+             VALUES
+             (:name, :description, :version, :parent, 1, :created_by)"
+        );
+        $stmt->execute([
+            'name' => $name,
+            'description' => $description,
+            'version' => $newVersion,
+            'parent' => $parentId,
+            'created_by' => $createdBy,
+        ]);
+
+        return (int) $this->pdo->lastInsertId();
     }
 
     public function addTask(int $templateId, array $data): int
@@ -203,5 +197,118 @@ class EventTemplateRepository
         );
         $stmt->execute(['user' => $deletedBy, 'id' => $templateId]);
         return $stmt->rowCount() > 0;
+    }
+
+    public function findTaskById(int $taskId): ?EventTemplateTask
+    {
+        $stmt = $this->pdo->prepare(
+            "SELECT * FROM event_template_tasks WHERE id = :id"
+        );
+        $stmt->execute(['id' => $taskId]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $row !== false ? EventTemplateTask::fromArray($row) : null;
+    }
+
+    public function updateTask(int $taskId, array $data): bool
+    {
+        $stmt = $this->pdo->prepare(
+            "UPDATE event_template_tasks SET
+                category_id = :category_id,
+                title = :title,
+                description = :description,
+                task_type = :task_type,
+                slot_mode = :slot_mode,
+                default_offset_minutes_start = :off_start,
+                default_offset_minutes_end = :off_end,
+                capacity_mode = :capacity_mode,
+                capacity_target = :capacity_target,
+                hours_default = :hours_default,
+                sort_order = :sort_order
+             WHERE id = :id"
+        );
+        $stmt->execute([
+            'category_id' => $data['category_id'] ?? null,
+            'title' => $data['title'],
+            'description' => $data['description'] ?? null,
+            'task_type' => $data['task_type'] ?? 'aufgabe',
+            'slot_mode' => $data['slot_mode'] ?? 'fix',
+            'off_start' => $data['default_offset_minutes_start'] ?? null,
+            'off_end' => $data['default_offset_minutes_end'] ?? null,
+            'capacity_mode' => $data['capacity_mode'] ?? 'unbegrenzt',
+            'capacity_target' => $data['capacity_target'] ?? null,
+            'hours_default' => $data['hours_default'] ?? 0.0,
+            'sort_order' => (int) ($data['sort_order'] ?? 0),
+            'id' => $taskId,
+        ]);
+        return $stmt->rowCount() > 0;
+    }
+
+    public function deleteTask(int $taskId): bool
+    {
+        $stmt = $this->pdo->prepare(
+            "DELETE FROM event_template_tasks WHERE id = :id"
+        );
+        $stmt->execute(['id' => $taskId]);
+        return $stmt->rowCount() > 0;
+    }
+
+    /**
+     * Sort-Order aller Tasks eines Templates setzen.
+     *
+     * @param int[] $orderedTaskIds Task-IDs in gewuenschter Reihenfolge
+     */
+    public function reorderTasks(int $templateId, array $orderedTaskIds): void
+    {
+        $stmt = $this->pdo->prepare(
+            "UPDATE event_template_tasks
+             SET sort_order = :ord
+             WHERE id = :id AND template_id = :tid"
+        );
+        foreach (array_values($orderedTaskIds) as $index => $taskId) {
+            $stmt->execute([
+                'ord' => $index,
+                'id'  => (int) $taskId,
+                'tid' => $templateId,
+            ]);
+        }
+    }
+
+    /**
+     * Pruefung: wurden aus einer beliebigen Version dieses Template-Root
+     * bereits Events abgeleitet?
+     */
+    public function hasDerivedEvents(int $templateId): bool
+    {
+        $stmt = $this->pdo->prepare(
+            "SELECT 1 FROM events
+             WHERE source_template_id = :tid AND deleted_at IS NULL
+             LIMIT 1"
+        );
+        $stmt->execute(['tid' => $templateId]);
+        return $stmt->fetch() !== false;
+    }
+
+    /**
+     * Alle Tasks einer Template-Version in ein Ziel-Template kopieren.
+     * Wird von saveAsNewVersion verwendet.
+     */
+    public function copyTasks(int $fromTemplateId, int $toTemplateId): int
+    {
+        $stmt = $this->pdo->prepare(
+            "INSERT INTO event_template_tasks
+                (template_id, category_id, title, description, task_type, slot_mode,
+                 default_offset_minutes_start, default_offset_minutes_end,
+                 capacity_mode, capacity_target, hours_default, sort_order)
+             SELECT :to_tid, category_id, title, description, task_type, slot_mode,
+                    default_offset_minutes_start, default_offset_minutes_end,
+                    capacity_mode, capacity_target, hours_default, sort_order
+             FROM event_template_tasks
+             WHERE template_id = :from_tid"
+        );
+        $stmt->execute([
+            'to_tid'   => $toTemplateId,
+            'from_tid' => $fromTemplateId,
+        ]);
+        return $stmt->rowCount();
     }
 }

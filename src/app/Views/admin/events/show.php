@@ -21,6 +21,20 @@ $statusMeta = $statusLabels[$event->getStatus()] ?? ['class' => 'secondary', 'la
         <span class="badge bg-<?= ViewHelper::e($statusMeta['class']) ?> fs-6">
             <?= ViewHelper::e($statusMeta['label']) ?>
         </span>
+        <?php if ($event->isDerivedFromTemplate()): ?>
+            <span class="badge bg-light text-dark border" title="Aus Template abgeleitet">
+                <i class="bi bi-card-list"></i>
+                aus Template
+                <?php if (!empty($sourceTemplate ?? null)): ?>
+                    <a href="<?= ViewHelper::url('/admin/event-templates/' . (int) $sourceTemplate->getId()) ?>">
+                        <?= ViewHelper::e($sourceTemplate->getName()) ?>
+                    </a>
+                <?php else: ?>
+                    <em>(geloescht)</em>
+                <?php endif; ?>
+                v<?= (int) $event->getSourceTemplateVersion() ?>
+            </span>
+        <?php endif; ?>
     </div>
     <div class="d-flex flex-wrap gap-2">
         <a href="<?= ViewHelper::url('/admin/events/' . (int) $event->getId() . '/edit') ?>" class="btn btn-outline-primary">

@@ -13,11 +13,6 @@ use App\Helpers\ViewHelper;
     </button>
 </div>
 
-<div class="alert alert-info">
-    <i class="bi bi-info-circle"></i>
-    In <strong>I1</strong> nur Basis-CRUD fuer Templates. Task-Editor (Aufgaben-Katalog bearbeiten,
-    als neue Version speichern) folgt in Increment <strong>I4</strong>.
-</div>
 
 <div class="collapse mb-3" id="newTemplateForm">
     <form method="POST" action="<?= ViewHelper::url('/admin/event-templates') ?>"

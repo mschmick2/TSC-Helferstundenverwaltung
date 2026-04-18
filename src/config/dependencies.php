@@ -180,6 +180,17 @@ return [
         );
     },
 
+    // --- Modul 6 I4: Event-Template-Service ----------------------------------
+    \App\Services\EventTemplateService::class => function (ContainerInterface $c): \App\Services\EventTemplateService {
+        return new \App\Services\EventTemplateService(
+            $c->get(PDO::class),
+            $c->get(EventTemplateRepository::class),
+            $c->get(EventRepository::class),
+            $c->get(EventTaskRepository::class),
+            $c->get(AuditService::class)
+        );
+    },
+
     // =========================================================================
     // Services
     // =========================================================================
@@ -395,6 +406,7 @@ return [
             $c->get(UserRepository::class),
             $c->get(AuditService::class),
             $c->get(\App\Services\EventCompletionService::class),
+            $c->get(EventTemplateRepository::class),
             $c->get('settings')
         );
     },
@@ -404,6 +416,7 @@ return [
             $c->get(EventTemplateRepository::class),
             $c->get(CategoryRepository::class),
             $c->get(AuditService::class),
+            $c->get(\App\Services\EventTemplateService::class),
             $c->get('settings')
         );
     },

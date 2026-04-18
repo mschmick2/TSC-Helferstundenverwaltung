@@ -9,7 +9,9 @@ const TEST_USER_EMAIL    = process.env.TEST_USER_EMAIL    || 'admin@vaes.test';
 const TEST_USER_PASSWORD = process.env.TEST_USER_PASSWORD || 'TestPass123!';
 
 async function login(page) {
-    await page.goto('/login');
+    // Relativer Pfad (ohne fuehrenden /), damit baseURL-Path-Prefix respektiert wird.
+    // Siehe https://playwright.dev/docs/api/class-testoptions#test-options-base-url
+    await page.goto('login');
     await page.fill('input[name="email"], input[name="username"]', TEST_USER_EMAIL);
     await page.fill('input[name="password"]', TEST_USER_PASSWORD);
     await page.click('button[type="submit"]');

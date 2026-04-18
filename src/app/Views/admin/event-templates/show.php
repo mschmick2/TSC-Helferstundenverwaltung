@@ -19,10 +19,31 @@ use App\Helpers\ViewHelper;
             <span class="badge bg-secondary">Alte Version</span>
         <?php endif; ?>
     </div>
-    <a href="<?= ViewHelper::url('/admin/event-templates') ?>" class="btn btn-outline-secondary">
-        <i class="bi bi-arrow-left"></i> Zurueck
-    </a>
+    <div class="d-flex gap-2">
+        <a href="<?= ViewHelper::url('/admin/event-templates') ?>" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Zurueck
+        </a>
+        <?php if ($template->isCurrent()): ?>
+            <a href="<?= ViewHelper::url('/admin/event-templates/' . (int) $template->getId() . '/edit') ?>"
+               class="btn btn-outline-primary">
+                <i class="bi bi-pencil"></i> Bearbeiten
+            </a>
+            <?php if (!empty($tasks)): ?>
+                <a href="<?= ViewHelper::url('/admin/event-templates/' . (int) $template->getId() . '/derive') ?>"
+                   class="btn btn-primary">
+                    <i class="bi bi-calendar-plus"></i> Event ableiten
+                </a>
+            <?php endif; ?>
+        <?php endif; ?>
+    </div>
 </div>
+
+<?php if (!empty($hasDerivedEvents ?? false)): ?>
+    <div class="alert alert-secondary small">
+        <i class="bi bi-info-circle"></i>
+        Aus dieser Template-Version wurden bereits Events abgeleitet. Bearbeitung nur via "Als neue Version speichern".
+    </div>
+<?php endif; ?>
 
 <?php if (!empty($template->getDescription())): ?>
     <div class="card mb-3">
@@ -39,7 +60,12 @@ use App\Helpers\ViewHelper;
     <div class="card-body">
         <?php if (empty($tasks)): ?>
             <p class="text-muted mb-0">
-                Noch keine Task-Vorlagen definiert. Der Task-Editor folgt in <strong>Increment I4</strong>.
+                Noch keine Task-Vorlagen definiert.
+                <?php if ($template->isCurrent()): ?>
+                    <a href="<?= ViewHelper::url('/admin/event-templates/' . (int) $template->getId() . '/edit') ?>">
+                        Jetzt Tasks hinzufuegen.
+                    </a>
+                <?php endif; ?>
             </p>
         <?php else: ?>
             <ul class="list-group list-group-flush">

@@ -120,10 +120,12 @@ class EventRepository
         $stmt = $this->pdo->prepare(
             "INSERT INTO events
              (title, description, location, start_at, end_at,
-              status, cancel_deadline_hours, created_by)
+              status, cancel_deadline_hours, created_by,
+              source_template_id, source_template_version)
              VALUES
              (:title, :description, :location, :start_at, :end_at,
-              :status, :cancel_deadline_hours, :created_by)"
+              :status, :cancel_deadline_hours, :created_by,
+              :source_template_id, :source_template_version)"
         );
         $stmt->execute([
             'title' => $data['title'],
@@ -134,6 +136,8 @@ class EventRepository
             'status' => Event::STATUS_ENTWURF,
             'cancel_deadline_hours' => $data['cancel_deadline_hours'] ?? Event::DEFAULT_CANCEL_DEADLINE_HOURS,
             'created_by' => $data['created_by'],
+            'source_template_id' => $data['source_template_id'] ?? null,
+            'source_template_version' => $data['source_template_version'] ?? null,
         ]);
 
         return (int) $this->pdo->lastInsertId();

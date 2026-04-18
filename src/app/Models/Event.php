@@ -39,25 +39,31 @@ class Event
     private ?string $updatedAt = null;
     private ?string $deletedAt = null;
     private ?int $deletedBy = null;
+    private ?int $sourceTemplateId = null;
+    private ?int $sourceTemplateVersion = null;
 
     public static function fromArray(array $data): self
     {
         $event = new self();
-        $event->id                  = isset($data['id']) ? (int) $data['id'] : null;
-        $event->title               = (string) ($data['title'] ?? '');
-        $event->description         = $data['description'] ?? null;
-        $event->location            = $data['location'] ?? null;
-        $event->startAt             = (string) ($data['start_at'] ?? '');
-        $event->endAt               = (string) ($data['end_at'] ?? '');
-        $event->status              = (string) ($data['status'] ?? self::STATUS_ENTWURF);
-        $event->cancelDeadlineHours = isset($data['cancel_deadline_hours'])
+        $event->id                    = isset($data['id']) ? (int) $data['id'] : null;
+        $event->title                 = (string) ($data['title'] ?? '');
+        $event->description           = $data['description'] ?? null;
+        $event->location              = $data['location'] ?? null;
+        $event->startAt               = (string) ($data['start_at'] ?? '');
+        $event->endAt                 = (string) ($data['end_at'] ?? '');
+        $event->status                = (string) ($data['status'] ?? self::STATUS_ENTWURF);
+        $event->cancelDeadlineHours   = isset($data['cancel_deadline_hours'])
             ? (int) $data['cancel_deadline_hours']
             : self::DEFAULT_CANCEL_DEADLINE_HOURS;
-        $event->createdBy           = (int) ($data['created_by'] ?? 0);
-        $event->createdAt           = $data['created_at'] ?? null;
-        $event->updatedAt           = $data['updated_at'] ?? null;
-        $event->deletedAt           = $data['deleted_at'] ?? null;
-        $event->deletedBy           = isset($data['deleted_by']) ? (int) $data['deleted_by'] : null;
+        $event->createdBy             = (int) ($data['created_by'] ?? 0);
+        $event->createdAt             = $data['created_at'] ?? null;
+        $event->updatedAt             = $data['updated_at'] ?? null;
+        $event->deletedAt             = $data['deleted_at'] ?? null;
+        $event->deletedBy             = isset($data['deleted_by']) ? (int) $data['deleted_by'] : null;
+        $event->sourceTemplateId      = isset($data['source_template_id'])
+            ? (int) $data['source_template_id'] : null;
+        $event->sourceTemplateVersion = isset($data['source_template_version'])
+            ? (int) $data['source_template_version'] : null;
         return $event;
     }
 
@@ -74,6 +80,9 @@ class Event
     public function getUpdatedAt(): ?string { return $this->updatedAt; }
     public function getDeletedAt(): ?string { return $this->deletedAt; }
     public function getDeletedBy(): ?int { return $this->deletedBy; }
+    public function getSourceTemplateId(): ?int { return $this->sourceTemplateId; }
+    public function getSourceTemplateVersion(): ?int { return $this->sourceTemplateVersion; }
+    public function isDerivedFromTemplate(): bool { return $this->sourceTemplateId !== null; }
 
     public function isPublished(): bool
     {

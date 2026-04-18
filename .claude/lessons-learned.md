@@ -222,4 +222,159 @@ nicht physisch geloescht — FK-Integritaet bleibt erhalten.
 
 ---
 
+### 2026-04-18 — Playwright baseURL + absoluter Pfad: Base-Path wird ignoriert
+
+**Kontext:**
+Modul 6 I4, Gate G8 Smoke-Test. Playwright-Config hat `baseURL: http://localhost:8000/helferstunden/`.
+Alle Specs nutzten `page.goto('/login')`, `page.goto('/admin/event-templates')` etc.
+Resultat: `404 Not Found` fuer Pfade, die in der App registriert sind.
+
+**Problem / Ueberraschung:**
+Playwright folgt WHATWG-URL: ein mit `/` beginnender Pfad ist **absolut** und ersetzt
+den kompletten Path-Teil der baseURL. Aus `http://localhost:8000/helferstunden/` +
+`/login` wird also `http://localhost:8000/login` — der `/helferstunden`-Prefix geht verloren.
+Ohne Prefix findet der Slim-Router keine Route und wirft 404.
+
+Das ist **kein Playwright-Bug**, sondern Standard-URL-Resolution. Bestehende Specs
+liefen nur, weil der User sie bisher mit `BASE_URL=http://localhost:8000/` (ohne Prefix)
+laufen liess.
+
+**Loesung:**
+`page.goto()`-Pfade ohne fuehrenden Slash schreiben:
+- `page.goto('login')` + baseURL mit Trailing-Slash → respektiert Prefix
+- `page.goto('admin/event-templates')` statt `/admin/event-templates`
+
+Angepasst wurden `e2e-tests/helpers/auth.js` (Login-Helper) und neue Spec
+`e2e-tests/tests/08-event-templates.spec.js`. Die Specs 03-07 haben denselben Bug
+und laufen nur gegen Root-baseURL — Fix als Follow-up dokumentiert.
+
+**Praevention:**
+- Team-Konvention fuer alle neuen Playwright-Specs: **relative Pfade (ohne `/`)**
+- Bei Anlegen eines neuen Specs: Pattern `page.goto('irgendwas')` statt `/irgendwas`
+- baseURL mit Trailing-Slash behalten (`/helferstunden/` statt `/helferstunden`)
+
+Koennte in `.claude/rules/` unter einem neuen `09-e2e.md` landen, wenn die
+Playwright-Suite weiter waechst.
+
+---
+
+### 2026-04-18 — `DROP COLUMN IF EXISTS` nicht portabel zwischen MySQL und MariaDB
+
+**Kontext:**
+Modul 6 I4, Gate G8. Migration `004_events_source_template.down.sql` nutzte
+`ALTER TABLE events DROP COLUMN IF EXISTS source_template_version;`. Lief lokal
+auf WAMP mit Fehler `#1064 Fehler in der SQL-Syntax bei 'IF EXISTS ...'`.
+
+**Problem / Ueberraschung:**
+`DROP COLUMN IF EXISTS` ist erst ab **MySQL 8.0.29** vorhanden. MariaDB (was WAMP
+oft mitbringt) und aeltere MySQL-Versionen kennen das nicht. Die UP-Migration
+nutzte bereits das portable INFORMATION_SCHEMA-Pattern — die DOWN-Migration
+wich ab und verliess sich auf das neuere Feature.
+
+Strato laeuft mit MySQL 8.4, dort haette es funktioniert — aber lokale Dev-Envs
+(WAMP/XAMPP) sind oft aelter. Inkonsistenz zwischen UP- und DOWN-Migration ist
+der eigentliche Defekt.
+
+**Loesung:**
+Die DOWN-Migration analog zur UP-Migration umgebaut: INFORMATION_SCHEMA.COLUMNS-
+Check + `PREPARE stmt FROM @sql` + `EXECUTE stmt`. Damit laeuft der Rollback auf
+jeder MySQL-Version ≥ 5.7 und auf MariaDB ≥ 10.x.
+
+**Praevention:**
+- Rule-Ergaenzung in `.claude/rules/04-database.md`: Migrations (up + down) muessen
+  **beide** mit INFORMATION_SCHEMA-Pattern arbeiten, nie mit `IF EXISTS` auf
+  Spalten-Ebene (Tabellen-Ebene ist OK).
+- Bei neuen Down-Migrations: Pattern aus UP kopieren, nicht eigenes erfinden.
+- Lokale Dev-DB auf MySQL ≥ 8.0.29 bringen (Empfehlung) ODER MariaDB, in beiden
+  Faellen muss das INFORMATION_SCHEMA-Pattern greifen.
+
+---
+
+### 2026-04-18 — `ValidationException`-Signatur: array statt string
+
+**Kontext:**
+Modul 6 I4, Gate G6 Audit-Fix-Iteration. Die IDE markierte 12 Aufrufe von
+`new ValidationException('string')` in `EventTemplateService.php` als Typ-Fehler.
+
+**Problem / Ueberraschung:**
+`App\Exceptions\ValidationException::__construct(array $errors, ...)` erwartet
+seit langem ein **Array**, nicht einen String. Der Rest des Codebases
+(`WorkEntryController`) nutzt korrekt `throw new ValidationException($errorsArray)`.
+In I4 hatte die Coder-Phase durchgaengig Strings uebergeben.
+
+PHP 8 mit `strict_types=1` wirft hier zur Laufzeit einen `TypeError`, KEINE
+`ValidationException`. Im Fehler-Pfad sieht der User dann einen 500er mit
+"Argument must be of type array, string given" statt einer sauberen Flash-Message.
+
+Warum hat niemand das gesehen?
+- `php -l` (Syntax-Check) ist syntaktisch OK — Parameter-Typ wird nicht gepruft
+- Unit-Tests decken nur Happy-Path ab — die `throw`-Zweige werden nie ausgeloest
+- G3 Reviewer/G4 Security haben die Zeilen ueberflogen, nicht gegen die Klassen-
+  Signatur validiert
+
+Die IDE hat die Fehler erst offengelegt, als ich waehrend G6-Fix eine andere Stelle
+in der gleichen Datei editierte — der Diagnostics-Hook rechnete die ganze Datei
+neu und meldete die 12 pre-existing Bugs.
+
+**Loesung:**
+Alle 12 Stellen auf `throw new ValidationException(['string'])` umgestellt. Konsistent
+mit restlichem Codebase.
+
+**Praevention:**
+- **G3 Reviewer** und **G4 Coder**: bei Exceptions **immer** kurz die Signatur
+  der Exception-Klasse checken (1x per Klasse, nicht pro Call). Die richtige
+  Pruefung: Grep nach `class NameException` → `__construct` lesen.
+- Bei neuen Exception-Klassen: eine Convenience-Factory erwaegen
+  (`ValidationException::single(string $msg)`), damit String-Usage valide wird
+  — aber das veraendert den Service-Layer, darum vorlaeufig aufgehoben.
+- Langfristig: PHPStan/Psalm-Config aktivieren, die solche Arg-Typ-Mismatches
+  statisch erkennt. Wuerde die 12 Bugs noch VOR G3 fangen.
+
+---
+
+### 2026-04-18 — DB-Check-Constraint findet Service-Validation-Luecke (fix-slot Offsets)
+
+**Kontext:**
+Modul 6 I4, Gate G8 Browser-Smoke-Test. Playwright klickte den Derive-Flow durch
+und bekam 500: `Check constraint 'chk_et_fix_times' is violated` beim Insert in
+`event_tasks`.
+
+**Problem / Ueberraschung:**
+`EventTemplateService::validateTaskData()` erlaubte `slot_mode='fix'` auch ohne
+`default_offset_minutes_start`/`_end`. Beim `deriveEvent()` wurden die Offsets
+zu `null` aufgeloest → `event_tasks`-Row mit `slot_mode='fix'` + `start_at=NULL`
++ `end_at=NULL` → DB-Constraint `chk_et_fix_times` schlaegt zu.
+
+Der Bug war **latent**: Nur beim Ableiten eines Events **aus einem fix-Template
+ohne Offsets** kracht es. Der Happy-Path "Template anlegen + Task erstellen"
+funktioniert bis dahin einwandfrei. Weder G2 Coder, noch G3 Reviewer, noch G4
+Security haben es gesehen — der Smoke-Test hat es beim ersten echten End-to-End-
+Durchlauf gefunden.
+
+Warum hat niemand das gesehen?
+- Der Check-Constraint wurde in I1 auf `event_tasks` gesetzt — das Template-Schema
+  (I4-Scope) hat keinen entsprechenden Constraint, weil Offsets dort null sein
+  duerfen (ein Template KANN variable Slots haben).
+- Service-Validation prueft Feldformat, nicht die Kombinations-Invariante
+  `slot_mode=fix ⇒ Offsets != null`.
+
+**Loesung:**
+1. `validateTaskData()` um expliziten Check erweitert: `slot_mode === SLOT_FIX && (offsetStart === null || offsetEnd === null)` → `ValidationException`.
+2. Neuer Invariants-Test `test_fix_slot_requires_both_offsets` in
+   `EventTemplateServiceInvariantsTest.php` sichert die Regel statisch ab.
+3. Der Smoke-Spec fuellt die Offset-Felder, damit der Happy-Path durchlaeuft.
+
+**Praevention:**
+- **Service-Layer-Prinzip**: Business-Invarianten gehoeren in die Service-Validation,
+  nicht nur als DB-Check-Constraint. Der Constraint ist die *letzte* Verteidigungs-
+  linie, nicht die erste.
+- Bei neuen Invarianten-Regeln: immer beide Seiten pruefen (Service + DB), damit
+  User saubere Validation-Fehler sehen statt 500er.
+- Smoke-Tests mit realistischen End-to-End-Flows sind unverzichtbar — statische
+  Invariants-Tests allein finden solche Kombinations-Luecken nicht.
+- Bei aggregierten Schemas (Template → Event): Template-Validation muss die
+  **engere** Event-Side-Constraint spiegeln, nicht die losere Template-Side.
+
+---
+
 <!-- Neue Eintraege hier unten anfuegen, nicht oben. Append-Only. -->

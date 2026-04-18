@@ -13,7 +13,7 @@ test.describe('Login', () => {
     });
 
     test('Login mit falschem Passwort zeigt Fehler', async ({ page }) => {
-        await page.goto('/login');
+        await page.goto('login');
         await page.fill('input[name="email"], input[name="username"]', TEST_USER_EMAIL);
         await page.fill('input[name="password"]', 'wrong-password-xyz');
         await page.click('button[type="submit"]');
@@ -23,7 +23,7 @@ test.describe('Login', () => {
     });
 
     test('Login-Form enthaelt CSRF-Token', async ({ page }) => {
-        await page.goto('/login');
+        await page.goto('login');
         const csrfInput = page.locator('input[name="csrf_token"]');
         await expect(csrfInput).toHaveCount(1);
         const value = await csrfInput.inputValue();

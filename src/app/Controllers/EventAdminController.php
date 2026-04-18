@@ -11,6 +11,7 @@ use App\Repositories\CategoryRepository;
 use App\Repositories\EventOrganizerRepository;
 use App\Repositories\EventRepository;
 use App\Repositories\EventTaskRepository;
+use App\Repositories\EventTemplateRepository;
 use App\Repositories\UserRepository;
 use App\Services\AuditService;
 use App\Services\EventCompletionService;
@@ -33,6 +34,7 @@ class EventAdminController extends BaseController
         private UserRepository $userRepo,
         private AuditService $auditService,
         private EventCompletionService $completionService,
+        private EventTemplateRepository $templateRepo,
         private array $settings
     ) {
     }
@@ -152,6 +154,10 @@ class EventAdminController extends BaseController
 
         $tasks = $this->taskRepo->findByEvent($id);
         $organizers = $this->organizerRepo->listForEvent($id);
+        $sourceTemplate = null;
+        if ($event->isDerivedFromTemplate()) {
+            $sourceTemplate = $this->templateRepo->findById((int) $event->getSourceTemplateId());
+        }
 
         return $this->render($response, 'admin/events/show', [
             'title' => 'Event: ' . $event->getTitle(),
@@ -161,6 +167,7 @@ class EventAdminController extends BaseController
             'tasks' => $tasks,
             'organizers' => $organizers,
             'categories' => $this->categoryRepo->findAllActive(),
+            'sourceTemplate' => $sourceTemplate,
             'breadcrumbs' => [
                 ['label' => 'Dashboard', 'url' => '/'],
                 ['label' => 'Events', 'url' => '/admin/events'],
