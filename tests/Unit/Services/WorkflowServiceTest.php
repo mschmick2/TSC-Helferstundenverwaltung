@@ -13,6 +13,7 @@ use App\Repositories\UserRepository;
 use App\Repositories\WorkEntryRepository;
 use App\Services\AuditService;
 use App\Services\EmailService;
+use App\Services\SchedulerService;
 use App\Services\WorkflowService;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
@@ -32,6 +33,7 @@ class WorkflowServiceTest extends TestCase
     private EmailService&MockObject $emailService;
     private UserRepository&MockObject $userRepo;
     private LoggerInterface&MockObject $logger;
+    private SchedulerService&MockObject $scheduler;
 
     protected function setUp(): void
     {
@@ -41,6 +43,7 @@ class WorkflowServiceTest extends TestCase
         $this->emailService = $this->createMock(EmailService::class);
         $this->userRepo = $this->createMock(UserRepository::class);
         $this->logger = $this->createMock(LoggerInterface::class);
+        $this->scheduler = $this->createMock(SchedulerService::class);
 
         $this->service = new WorkflowService(
             $this->entryRepo,
@@ -49,7 +52,8 @@ class WorkflowServiceTest extends TestCase
             $this->emailService,
             $this->userRepo,
             $this->logger,
-            'https://example.com'
+            'https://example.com',
+            $this->scheduler
         );
     }
 
@@ -541,5 +545,94 @@ class WorkflowServiceTest extends TestCase
             ->with($this->stringContains('fehlgeschlagen'));
 
         $this->service->approve($entry, $reviewer);
+    }
+
+    // =========================================================================
+    // Scheduler-Hooks: Dialog-Reminder
+    // =========================================================================
+
+    /** @test */
+    public function return_for_revision_dispatcht_dialog_reminder(): void
+    {
+        $entry = $this->createEntry(42, 'eingereicht', 10, 10);
+        $reviewer = $this->createUser(20, ['pruefer']);
+
+        $this->entryRepo->method('updateStatus')->willReturn(true);
+        $this->userRepo->method('findById')->willReturn($this->createUser(10));
+
+        $this->scheduler->expects($this->once())
+            ->method('dispatch')
+            ->with(
+                'dialog_reminder',
+                $this->callback(fn ($p) => is_array($p)
+                    && ($p['work_entry_id'] ?? null) === 42
+                    && ($p['days_open'] ?? null) === 3),
+                $this->isInstanceOf(\DateTimeImmutable::class),
+                'dialog:42:reminder'
+            );
+
+        $this->service->returnForRevision($entry, $reviewer, 'Bitte nachliefern');
+    }
+
+    /** @test */
+    public function approve_cancelt_dialog_reminder(): void
+    {
+        $entry = $this->createEntry(42, 'eingereicht', 10, 10);
+        $reviewer = $this->createUser(20, ['pruefer']);
+
+        $this->entryRepo->method('updateStatus')->willReturn(true);
+        $this->userRepo->method('findById')->willReturn($this->createUser(10));
+
+        $this->scheduler->expects($this->once())
+            ->method('cancel')
+            ->with('dialog:42:reminder');
+
+        $this->service->approve($entry, $reviewer);
+    }
+
+    /** @test */
+    public function reject_cancelt_dialog_reminder(): void
+    {
+        $entry = $this->createEntry(42, 'eingereicht', 10, 10);
+        $reviewer = $this->createUser(20, ['pruefer']);
+
+        $this->entryRepo->method('updateStatus')->willReturn(true);
+        $this->userRepo->method('findById')->willReturn($this->createUser(10));
+
+        $this->scheduler->expects($this->once())
+            ->method('cancel')
+            ->with('dialog:42:reminder');
+
+        $this->service->reject($entry, $reviewer, 'Begruendung');
+    }
+
+    /** @test */
+    public function withdraw_cancelt_dialog_reminder(): void
+    {
+        $entry = $this->createEntry(42, 'eingereicht', 10, 10);
+        $user = $this->createUser(10);
+
+        $this->entryRepo->method('updateStatus')->willReturn(true);
+
+        $this->scheduler->expects($this->once())
+            ->method('cancel')
+            ->with('dialog:42:reminder');
+
+        $this->service->withdraw($entry, $user);
+    }
+
+    /** @test */
+    public function cancel_cancelt_dialog_reminder(): void
+    {
+        $entry = $this->createEntry(42, 'eingereicht', 10, 10);
+        $user = $this->createUser(10);
+
+        $this->entryRepo->method('updateStatus')->willReturn(true);
+
+        $this->scheduler->expects($this->once())
+            ->method('cancel')
+            ->with('dialog:42:reminder');
+
+        $this->service->cancel($entry, $user);
     }
 }

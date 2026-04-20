@@ -42,7 +42,8 @@ final class EventCompletionService
         private readonly EventTaskAssignmentRepository $assignmentRepo,
         private readonly WorkEntryRepository $workEntryRepo,
         private readonly UserRepository $userRepo,
-        private readonly AuditService $audit
+        private readonly AuditService $audit,
+        private readonly ?SchedulerService $scheduler = null
     ) {
     }
 
@@ -127,6 +128,14 @@ final class EventCompletionService
                     'actor_user_id' => $actorUserId,
                 ]
             );
+
+            // Pending Reminder/Completion-Jobs des Events einsammeln —
+            // das Event ist jetzt im Endzustand, weitere Mails machen keinen Sinn.
+            if ($this->scheduler !== null) {
+                $this->scheduler->cancel("event:{$eventId}:reminder:7d");
+                $this->scheduler->cancel("event:{$eventId}:reminder:24h");
+                $this->scheduler->cancel("event:{$eventId}:completion_reminder");
+            }
 
             $this->pdo->commit();
 

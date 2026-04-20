@@ -13,7 +13,7 @@
 | **Sprache / Runtime** | PHP 8.1+ (Ziel 8.3) |
 | **Framework** | Slim 4 (Micro-Framework) + PHP-DI 7 |
 | **Architektur** | MVC + Repository/Service-Pattern |
-| **Datenbank** | MySQL 8.4, PDO + Prepared Statements |
+| **Datenbank** | MySQL 8.4 (Mindestanforderung: 8.0, SKIP LOCKED noetig), PDO + Prepared Statements |
 | **Frontend** | Bootstrap 5, Vanilla JS (ES6+), Fetch API |
 | **Hosting** | Strato Shared Webhosting (Apache) |
 | **Deployment** | FTP/SFTP — KEIN SSH, KEINE Cron-Jobs, KEIN Node.js |
@@ -98,7 +98,10 @@ E:\TSC-Helferstundenverwaltung\
 
 ## 4. 9-Rollen-Pipeline
 
-Jede Aenderung durchlaeuft diese Gates. Handoff-Format: `[Gate] G[N]: [bestanden/blockiert]. Findings: [Liste]. [Next], bitte G[N+1] pruefen.`
+Jede Aenderung durchlaeuft diese Gates. Die Kurz-Notation fuer interne Logs lautet
+`[Gate] G[N]: [bestanden/blockiert]. Findings: [Liste]. [Next], bitte G[N+1] pruefen.`
+— **fuer die Meldung an den Nutzer** immer die verstaendliche Form aus Abschnitt 10
+verwenden (Was ist passiert, was bedeutet das, was kommt als naechstes).
 
 | Gate | Rolle | Datei | Skippable? |
 |------|-------|-------|------------|
@@ -198,6 +201,56 @@ Ergaenzen die Gates um technische Detailtiefe:
 - `.claude/agents/security.md` — OWASP-Threat-Model PHP-spezifisch
 
 Die Legacy-Rollen unter `.claude/roles/` bleiben als Referenz, werden aber nicht mehr aktiv geladen. Neue Arbeit orientiert sich an `.claude/agents/`.
+
+---
+
+## 10. Berichte in Ingenieurs-Sprache
+
+Status-, Fehler- und Prozess-Berichte sollen lesen wie ein kurzer Ingenieurs-Bericht,
+nicht wie Compiler-Output. Der Nutzer muss aus der Meldung sofort verstehen koennen:
+**was ist passiert, was bedeutet das, was kommt als naechstes.**
+
+### Gate-Berichte
+
+Die Kurz-Notation `[Gate] G[N]: [bestanden/blockiert]. Findings: [Liste].` darf
+intern (Commit-Trailer, Log) bleiben. **Fuer den Nutzer** immer in Klartext uebersetzen:
+
+- ❌ `G4: blockiert. Findings: [CSRF ausgesetzt, XSS in L:203].`
+- ✅ `Security-Gate haengt. Zwei Probleme: (1) am Ablehnen-Button fehlt der CSRF-Schutz,
+  (2) im Dialog-View wird User-Text nicht escaped (XSS-Risiko). Beides fixe ich
+  vor dem Commit — dauert ~10 Minuten.`
+
+### Fehler-Berichte
+
+- ❌ `PDOException SQLSTATE[42S02] at WorkEntryRepository.php:87`
+- ✅ `DB-Fehler im WorkEntryRepository: Query schlaegt fehl, weil die Tabelle
+  `work_entries_archive` nicht existiert. Sieht aus wie eine fehlende Migration —
+  ich pruefe, welche Datei da fehlt.`
+
+### Test-Ergebnisse
+
+- ❌ `Test failed: expected X, got Y`
+- ✅ `Der Test erwartet genau einen execute()-Call, bekommt aber zwei — weil der
+  Service mit 10%-Wahrscheinlichkeit einen Cleanup-Call einschiebt. Das Test-Setup
+  ist flaky, nicht der Produktionscode. Fix ist im Test-Mock.`
+
+### Regeln
+
+1. **Ergebnis zuerst, Detail danach.** Ein Satz der Kernaussage, dann Begruendung.
+2. **Datei/Zeile nur als Wegweiser**, nicht als Ersatz fuer die Erklaerung. Wenn
+   eine Zeilenangabe auftaucht, muss daneben stehen, *was* dort passiert.
+3. **Fachbegriffe ja, Code-Kuerzel nein.** `CSRF-Token`, `Prepared Statement`,
+   `Foreign Key` sind praezise und okay. `L:87`, `rc=3`, `42S02` ohne Uebersetzung
+   nicht.
+4. **Keine nackten Status-Token** wie `bestanden/blockiert` als ganze Antwort.
+   Immer dazu schreiben, was *genau* bestanden wurde und welcher Schritt jetzt
+   ansteht.
+5. **Verstaendlich fuer einen mitlesenden Menschen**, der nicht direkt am Code
+   sitzt. Wenn der Nutzer 30 Sekunden spaeter noch wissen soll, was lief, muss
+   die Meldung ohne Code-Blick tragen.
+
+Gilt fuer: Gate-Handoffs, Test-Ausgaben, Fehler-Analysen, Commit-Zusammenfassungen
+und alle Zwischen-Antworten an den Nutzer.
 
 ---
 

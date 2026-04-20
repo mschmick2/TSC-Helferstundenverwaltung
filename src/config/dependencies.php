@@ -6,6 +6,7 @@ use App\Controllers\AdminController;
 use App\Controllers\AuditController;
 use App\Controllers\AuthController;
 use App\Controllers\CategoryController;
+use App\Controllers\CronController;
 use App\Controllers\DashboardController;
 use App\Controllers\EventAdminController;
 use App\Controllers\EventTemplateController;
@@ -18,6 +19,7 @@ use App\Controllers\UserController;
 use App\Controllers\WorkEntryController;
 use App\Middleware\AuthMiddleware;
 use App\Middleware\CsrfMiddleware;
+use App\Middleware\OpportunisticSchedulerMiddleware;
 use App\Middleware\RoleMiddleware;
 use App\Repositories\AuditRepository;
 use App\Repositories\CategoryRepository;
@@ -29,6 +31,8 @@ use App\Repositories\EventTaskAssignmentRepository;
 use App\Repositories\EventTaskRepository;
 use App\Repositories\EventTemplateRepository;
 use App\Repositories\ReportRepository;
+use App\Repositories\ScheduledJobRepository;
+use App\Repositories\SchedulerRunRepository;
 use App\Repositories\SessionRepository;
 use App\Repositories\SettingsRepository;
 use App\Repositories\UserRepository;
@@ -39,9 +43,17 @@ use App\Services\AuthService;
 use App\Services\CsvExportService;
 use App\Services\EmailService;
 use App\Services\ImportService;
+use App\Services\Jobs\AssignmentInviteHandler;
+use App\Services\Jobs\AssignmentReminderHandler;
+use App\Services\Jobs\DialogReminderHandler;
+use App\Services\Jobs\EventCompletionReminderHandler;
+use App\Services\Jobs\EventReminderHandler;
+use App\Services\Jobs\JobHandlerRegistry;
+use App\Services\NotificationService;
 use App\Services\PdfService;
 use App\Services\RateLimitService;
 use App\Services\ReportService;
+use App\Services\SchedulerService;
 use App\Services\SettingsService;
 use App\Services\TargetHoursService;
 use App\Services\TotpService;
@@ -156,6 +168,15 @@ return [
         return new EventTemplateRepository($c->get(PDO::class));
     },
 
+    // --- Modul 6 I6: Scheduler-Repositories ----------------------------------
+    ScheduledJobRepository::class => function (ContainerInterface $c): ScheduledJobRepository {
+        return new ScheduledJobRepository($c->get(PDO::class));
+    },
+
+    SchedulerRunRepository::class => function (ContainerInterface $c): SchedulerRunRepository {
+        return new SchedulerRunRepository($c->get(PDO::class));
+    },
+
     // --- Modul 6 I2: Event-Assignment-Service --------------------------------
     \App\Services\EventAssignmentService::class => function (ContainerInterface $c): \App\Services\EventAssignmentService {
         return new \App\Services\EventAssignmentService(
@@ -164,7 +185,8 @@ return [
             $c->get(EventTaskAssignmentRepository::class),
             $c->get(EventOrganizerRepository::class),
             $c->get(AuditService::class),
-            $c->get(UserRepository::class)
+            $c->get(UserRepository::class),
+            $c->get(SchedulerService::class)
         );
     },
 
@@ -177,7 +199,8 @@ return [
             $c->get(EventTaskAssignmentRepository::class),
             $c->get(WorkEntryRepository::class),
             $c->get(UserRepository::class),
-            $c->get(AuditService::class)
+            $c->get(AuditService::class),
+            $c->get(SchedulerService::class)
         );
     },
 
@@ -199,6 +222,91 @@ return [
 
     \App\Services\CalendarFeedService::class => function (): \App\Services\CalendarFeedService {
         return new \App\Services\CalendarFeedService();
+    },
+
+    // --- Modul 6 I6: Notifications + Scheduler -------------------------------
+    NotificationService::class => function (ContainerInterface $c): NotificationService {
+        $settings = $c->get('settings');
+        return new NotificationService(
+            $c->get(EmailService::class),
+            (string) ($settings['app']['url'] ?? '')
+        );
+    },
+
+    EventReminderHandler::class => function (ContainerInterface $c): EventReminderHandler {
+        return new EventReminderHandler(
+            $c->get(EventRepository::class),
+            $c->get(EventTaskAssignmentRepository::class),
+            $c->get(UserRepository::class),
+            $c->get(NotificationService::class),
+            $c->get(LoggerInterface::class)
+        );
+    },
+
+    AssignmentInviteHandler::class => function (ContainerInterface $c): AssignmentInviteHandler {
+        return new AssignmentInviteHandler(
+            $c->get(EventTaskAssignmentRepository::class),
+            $c->get(EventTaskRepository::class),
+            $c->get(EventRepository::class),
+            $c->get(UserRepository::class),
+            $c->get(NotificationService::class),
+            $c->get(LoggerInterface::class)
+        );
+    },
+
+    AssignmentReminderHandler::class => function (ContainerInterface $c): AssignmentReminderHandler {
+        return new AssignmentReminderHandler(
+            $c->get(EventTaskAssignmentRepository::class),
+            $c->get(EventTaskRepository::class),
+            $c->get(EventRepository::class),
+            $c->get(UserRepository::class),
+            $c->get(NotificationService::class),
+            $c->get(LoggerInterface::class)
+        );
+    },
+
+    DialogReminderHandler::class => function (ContainerInterface $c): DialogReminderHandler {
+        return new DialogReminderHandler(
+            $c->get(WorkEntryRepository::class),
+            $c->get(DialogRepository::class),
+            $c->get(UserRepository::class),
+            $c->get(NotificationService::class),
+            $c->get(LoggerInterface::class)
+        );
+    },
+
+    EventCompletionReminderHandler::class => function (ContainerInterface $c): EventCompletionReminderHandler {
+        return new EventCompletionReminderHandler(
+            $c->get(EventRepository::class),
+            $c->get(EventOrganizerRepository::class),
+            $c->get(UserRepository::class),
+            $c->get(NotificationService::class),
+            $c->get(LoggerInterface::class)
+        );
+    },
+
+    JobHandlerRegistry::class => function (ContainerInterface $c): JobHandlerRegistry {
+        $registry = new JobHandlerRegistry($c);
+        // Mapping job_type -> Handler-Klasse.
+        // EventReminderHandler bedient sowohl 24h- als auch 7d-Vorlauf
+        // (Unterscheidung kommt aus dem Payload-Feld days_before).
+        $registry->register('event_reminder_24h',     EventReminderHandler::class);
+        $registry->register('event_reminder_7d',      EventReminderHandler::class);
+        $registry->register('assignment_invite',      AssignmentInviteHandler::class);
+        $registry->register('assignment_reminder',    AssignmentReminderHandler::class);
+        $registry->register('dialog_reminder',        DialogReminderHandler::class);
+        $registry->register('event_completion_reminder', EventCompletionReminderHandler::class);
+        return $registry;
+    },
+
+    SchedulerService::class => function (ContainerInterface $c): SchedulerService {
+        return new SchedulerService(
+            $c->get(ScheduledJobRepository::class),
+            $c->get(SchedulerRunRepository::class),
+            $c->get(SettingsRepository::class),
+            $c->get(JobHandlerRegistry::class),
+            $c->get(LoggerInterface::class)
+        );
     },
 
     // =========================================================================
@@ -240,7 +348,9 @@ return [
             $c->get(EmailService::class),
             $c->get(UserRepository::class),
             $c->get(LoggerInterface::class),
-            $settings['app']['url'] ?? ''
+            $settings['app']['url'] ?? '',
+            $c->get(SchedulerService::class),
+            $c->get(SettingsService::class)
         );
     },
 
@@ -306,6 +416,17 @@ return [
 
     CsrfMiddleware::class => function (): CsrfMiddleware {
         return new CsrfMiddleware();
+    },
+
+    OpportunisticSchedulerMiddleware::class => function (ContainerInterface $c): OpportunisticSchedulerMiddleware {
+        // Default 10% Wahrscheinlichkeit pro Dashboard-Aufruf, max 5 Jobs pro Trigger.
+        // Werte koennen spaeter ins settings-System wandern, wenn Bedarf besteht.
+        return new OpportunisticSchedulerMiddleware(
+            $c->get(SchedulerService::class),
+            $c->get(LoggerInterface::class),
+            10,
+            5
+        );
     },
 
     // =========================================================================
@@ -417,7 +538,8 @@ return [
             $c->get(AuditService::class),
             $c->get(\App\Services\EventCompletionService::class),
             $c->get(EventTemplateRepository::class),
-            $c->get('settings')
+            $c->get('settings'),
+            $c->get(SchedulerService::class)
         );
     },
 
@@ -452,6 +574,16 @@ return [
             $c->get(EventRepository::class),
             $c->get(UserRepository::class),
             $c->get(\App\Services\IcalService::class)
+        );
+    },
+
+    // --- Modul 6 I6: Cron-Controller (externer Pinger-Endpunkt) -------------
+    CronController::class => function (ContainerInterface $c): CronController {
+        return new CronController(
+            $c->get(SchedulerService::class),
+            $c->get(SettingsRepository::class),
+            $c->get(RateLimitService::class),
+            $c->get(LoggerInterface::class)
         );
     },
 

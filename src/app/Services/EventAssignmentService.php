@@ -14,6 +14,7 @@ use App\Repositories\EventRepository;
 use App\Repositories\EventTaskAssignmentRepository;
 use App\Repositories\EventTaskRepository;
 use App\Repositories\UserRepository;
+use DateInterval;
 use DateTimeImmutable;
 
 /**
@@ -37,7 +38,8 @@ final class EventAssignmentService
         private readonly EventTaskAssignmentRepository $assignmentRepo,
         private readonly EventOrganizerRepository $organizerRepo,
         private readonly AuditService $audit,
-        private readonly ?UserRepository $userRepo = null
+        private readonly ?UserRepository $userRepo = null,
+        private readonly ?SchedulerService $scheduler = null
     ) {
     }
 
@@ -126,6 +128,14 @@ final class EventAssignmentService
             // Defensive: sollte nie passieren, wir haben gerade inserted
             throw new \RuntimeException('Zusage nach Insert nicht auffindbar.');
         }
+
+        // Bei VORGESCHLAGEN: Helfer per Invite informieren (sofort) und in 48h
+        // erinnern, falls keine Bestaetigung erfolgt. Bei BESTAETIGT brauchen
+        // wir keinen Invite — der Helfer hat die Aufgabe selbst aktiv genommen.
+        if ($status === EventTaskAssignment::STATUS_VORGESCHLAGEN) {
+            $this->dispatchAssignmentInvite($assignmentId);
+        }
+
         return $assignment;
     }
 
@@ -160,6 +170,8 @@ final class EventAssignmentService
             description: 'Zusage zurueckgezogen (unbestaetigt)',
             metadata: ['task_id' => $a->getTaskId()]
         );
+
+        $this->cancelAssignmentJobs($assignmentId);
     }
 
     /**
@@ -280,6 +292,9 @@ final class EventAssignmentService
                 'approver_id' => $organizerId,
             ]
         );
+
+        // Bestaetigte Zusage braucht keinen Reminder mehr.
+        $this->cancelAssignmentJobs($assignmentId);
     }
 
     /**
@@ -325,6 +340,8 @@ final class EventAssignmentService
                 'rejecter_id' => $organizerId,
             ]
         );
+
+        $this->cancelAssignmentJobs($assignmentId);
     }
 
     /**
@@ -364,6 +381,8 @@ final class EventAssignmentService
                 'replacement_user_id' => $a->getReplacementSuggestedUserId(),
             ]
         );
+
+        $this->cancelAssignmentJobs($assignmentId);
     }
 
     /**
@@ -490,5 +509,55 @@ final class EventAssignmentService
                 . 'Bitte den Organisator direkt kontaktieren.'
             );
         }
+    }
+
+    // =========================================================================
+    // Scheduler-Hooks (Notifications/Reminder)
+    // =========================================================================
+
+    /**
+     * Plant Invite (jetzt) und Reminder (in 48h) fuer eine VORGESCHLAGEN-Zusage.
+     *
+     * - Invite: `dispatchIfNew()` — einmalige Einladungsmail, wird nicht
+     *   nochmal verschickt, wenn der Assignment-Status hin-und-her-kippt
+     *   (VORGESCHLAGEN -> ABGELEHNT -> wieder VORGESCHLAGEN).
+     * - Reminder: normaler `dispatch()` — darf bei Event-Verschiebung
+     *   neu eingeplant werden.
+     */
+    private function dispatchAssignmentInvite(int $assignmentId): void
+    {
+        if ($this->scheduler === null) {
+            return;
+        }
+
+        $now = new DateTimeImmutable();
+        $payload = ['assignment_id' => $assignmentId];
+
+        $this->scheduler->dispatchIfNew(
+            'assignment_invite',
+            $payload,
+            $now,
+            "assignment:{$assignmentId}:invite"
+        );
+
+        $reminderAt = $now->add(new DateInterval('PT48H'));
+        $this->scheduler->dispatch(
+            'assignment_reminder',
+            $payload,
+            $reminderAt,
+            "assignment:{$assignmentId}:reminder"
+        );
+    }
+
+    /**
+     * Storniert pending Invite/Reminder einer Zusage. Idempotent (UPDATE).
+     */
+    private function cancelAssignmentJobs(int $assignmentId): void
+    {
+        if ($this->scheduler === null) {
+            return;
+        }
+        $this->scheduler->cancel("assignment:{$assignmentId}:invite");
+        $this->scheduler->cancel("assignment:{$assignmentId}:reminder");
     }
 }

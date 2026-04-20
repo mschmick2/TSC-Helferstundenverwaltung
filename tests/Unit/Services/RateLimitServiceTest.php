@@ -102,21 +102,29 @@ class RateLimitServiceTest extends TestCase
     /** @test */
     public function is_allowed_prueft_korrekte_parameter(): void
     {
-        $stmt = $this->createMock(\PDOStatement::class);
-        $stmt->expects($this->once())
+        // Count-Stmt: erwartet die drei isAllowed-Parameter
+        $countStmt = $this->createMock(\PDOStatement::class);
+        $countStmt->expects($this->once())
             ->method('execute')
             ->with([
                 'ip' => '10.0.0.1',
                 'endpoint' => 'forgot-password',
                 'window' => 900,
             ]);
-        $stmt->method('fetchColumn')->willReturn(0);
+        $countStmt->method('fetchColumn')->willReturn(0);
+
+        // Cleanup-Stmt: darf auftreten (10% Wahrscheinlichkeit in isAllowed),
+        // soll aber diesen Test nicht stoeren.
+        $cleanupStmt = $this->createMock(\PDOStatement::class);
 
         $this->pdo->method('prepare')
-            ->with($this->stringContains('rate_limits'))
-            ->willReturn($stmt);
+            ->willReturnCallback(fn (string $sql) => str_starts_with(ltrim($sql), 'DELETE')
+                ? $cleanupStmt
+                : $countStmt);
 
-        $this->service->isAllowed('10.0.0.1', 'forgot-password', 5, 900);
+        $this->assertTrue(
+            $this->service->isAllowed('10.0.0.1', 'forgot-password', 5, 900)
+        );
     }
 
     // =========================================================================

@@ -15,6 +15,9 @@ use App\Repositories\EventTemplateRepository;
 use App\Repositories\UserRepository;
 use App\Services\AuditService;
 use App\Services\EventCompletionService;
+use App\Services\SchedulerService;
+use DateInterval;
+use DateTimeImmutable;
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
 
@@ -35,7 +38,8 @@ class EventAdminController extends BaseController
         private AuditService $auditService,
         private EventCompletionService $completionService,
         private EventTemplateRepository $templateRepo,
-        private array $settings
+        private array $settings,
+        private ?SchedulerService $scheduler = null
     ) {
     }
 
@@ -320,6 +324,8 @@ class EventAdminController extends BaseController
             description: 'Event veroeffentlicht: ' . $event->getTitle()
         );
 
+        $this->scheduleEventReminders($event);
+
         ViewHelper::flash('success', 'Event veroeffentlicht.');
         return $this->redirect($response, '/admin/events/' . $id);
     }
@@ -377,6 +383,8 @@ class EventAdminController extends BaseController
             newValues: ['status' => Event::STATUS_ABGESAGT],
             description: 'Event abgesagt: ' . $event->getTitle()
         );
+
+        $this->cancelEventJobs($id);
 
         ViewHelper::flash('success', 'Event abgesagt.');
         return $this->redirect($response, '/admin/events/' . $id);
@@ -538,5 +546,71 @@ class EventAdminController extends BaseController
             return 'Mindestens ein Organisator muss ausgewaehlt sein.';
         }
         return null;
+    }
+
+    // =========================================================================
+    // Scheduler-Hooks (Notifications/Reminder)
+    // =========================================================================
+
+    /**
+     * Plant 7-Tage-, 24h- und Completion-Reminder fuer ein veroeffentlichtes Event.
+     * Reminder, deren Zeitpunkt schon vorbei ist, werden uebersprungen.
+     */
+    private function scheduleEventReminders(Event $event): void
+    {
+        if ($this->scheduler === null) {
+            return;
+        }
+        $eventId = (int) $event->getId();
+        if ($eventId <= 0) {
+            return;
+        }
+
+        try {
+            $startAt = new DateTimeImmutable($event->getStartAt());
+            $endAt   = new DateTimeImmutable($event->getEndAt());
+        } catch (\Exception) {
+            return;
+        }
+
+        $now = new DateTimeImmutable();
+
+        $runAt7d = $startAt->sub(new DateInterval('P7D'));
+        if ($runAt7d > $now) {
+            $this->scheduler->dispatch(
+                'event_reminder_7d',
+                ['event_id' => $eventId, 'days_before' => 7],
+                $runAt7d,
+                "event:{$eventId}:reminder:7d"
+            );
+        }
+
+        $runAt24h = $startAt->sub(new DateInterval('PT24H'));
+        if ($runAt24h > $now) {
+            $this->scheduler->dispatch(
+                'event_reminder_24h',
+                ['event_id' => $eventId, 'days_before' => 1],
+                $runAt24h,
+                "event:{$eventId}:reminder:24h"
+            );
+        }
+
+        $runAtCompletion = $endAt->add(new DateInterval('PT24H'));
+        $this->scheduler->dispatch(
+            'event_completion_reminder',
+            ['event_id' => $eventId],
+            $runAtCompletion,
+            "event:{$eventId}:completion_reminder"
+        );
+    }
+
+    private function cancelEventJobs(int $eventId): void
+    {
+        if ($this->scheduler === null) {
+            return;
+        }
+        $this->scheduler->cancel("event:{$eventId}:reminder:7d");
+        $this->scheduler->cancel("event:{$eventId}:reminder:24h");
+        $this->scheduler->cancel("event:{$eventId}:completion_reminder");
     }
 }

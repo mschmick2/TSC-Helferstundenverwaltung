@@ -132,4 +132,63 @@ final class EventAdminControllerInvariantsTest extends TestCase
             'Migration 002 darf audit_log_no_delete-Trigger NICHT droppen.'
         );
     }
+
+    public function test_publish_schedules_event_reminders(): void
+    {
+        // Beim Veroeffentlichen muss publish() drei Reminder-Jobs einplanen:
+        //   event:{id}:reminder:7d, event:{id}:reminder:24h, event:{id}:completion_reminder
+        // Die Hook-Methode scheduleEventReminders() ist private; statische Pruefung
+        // verifiziert, dass publish() sie aufruft und die Schluessel-Konvention stimmt.
+        $code = (string) file_get_contents(
+            self::CONTROLLERS_DIR . '/EventAdminController.php'
+        );
+
+        $publishBody = $this->extractMethodBody($code, 'publish');
+        self::assertStringContainsString(
+            'scheduleEventReminders',
+            $publishBody,
+            'EventAdminController::publish() muss scheduleEventReminders() aufrufen, '
+            . 'damit nach Veroeffentlichung Erinnerungen eingeplant werden.'
+        );
+
+        // Drei unique_keys muessen in scheduleEventReminders() erscheinen
+        foreach (['reminder:7d', 'reminder:24h', 'completion_reminder'] as $key) {
+            self::assertMatchesRegularExpression(
+                '/"event:\{.*\}:' . preg_quote($key, '/') . '"/',
+                $code,
+                "EventAdminController muss event:*:{$key} dispatchen."
+            );
+        }
+    }
+
+    public function test_cancel_cancels_pending_event_jobs(): void
+    {
+        // Beim Absagen muss cancel() die drei eingeplanten Reminder stornieren.
+        $code = (string) file_get_contents(
+            self::CONTROLLERS_DIR . '/EventAdminController.php'
+        );
+
+        $cancelBody = $this->extractMethodBody($code, 'cancel');
+        self::assertStringContainsString(
+            'cancelEventJobs',
+            $cancelBody,
+            'EventAdminController::cancel() muss cancelEventJobs() aufrufen, '
+            . 'damit Reminder-Mails fuer ein abgesagtes Event nicht mehr rausgehen.'
+        );
+    }
+
+    /**
+     * Extrahiert den Body einer public-Methode bis zur naechsten public-Methode
+     * oder Datei-Ende. Funktioniert ohne PHP-AST, naive aber robust gegen
+     * geschachtelte if/foreach-Bloecke.
+     */
+    private function extractMethodBody(string $code, string $method): string
+    {
+        $pattern = '/public function ' . preg_quote($method, '/')
+            . '\s*\([^{]*\{(.*?)(?=public function |\z)/s';
+        if (preg_match($pattern, $code, $matches) !== 1) {
+            self::fail("Methode $method() im Code nicht gefunden.");
+        }
+        return $matches[1];
+    }
 }

@@ -14,6 +14,34 @@ use App\Helpers\ViewHelper;
     </h1>
 </div>
 
+<?php
+// Frisch rotierter Cron-Token: einmalig prominent anzeigen, danach loeschen.
+// TTL (5 min) verhindert, dass der Klartext dauerhaft in der Session bleibt,
+// wenn der Admin nach dem Rotate nicht mehr hierher zurueckkehrt.
+$cronTokenPlain = null;
+$tokenExp       = (int) ($_SESSION['_cron_token_plain_exp'] ?? 0);
+if (isset($_SESSION['_cron_token_plain']) && $tokenExp > time()) {
+    $cronTokenPlain = (string) $_SESSION['_cron_token_plain'];
+}
+unset($_SESSION['_cron_token_plain'], $_SESSION['_cron_token_plain_exp']);
+?>
+<?php if (is_string($cronTokenPlain) && $cronTokenPlain !== ''): ?>
+<div class="alert alert-warning border-warning d-flex align-items-start" role="alert">
+    <i class="bi bi-exclamation-triangle-fill me-2 mt-1"></i>
+    <div class="flex-grow-1">
+        <strong>Neuer Cron-Token &mdash; bitte JETZT kopieren.</strong>
+        <p class="mb-2 small">
+            Nach dem Verlassen dieser Seite wird der Token nicht mehr angezeigt.
+            Im externen Pinger als Header <code>X-Cron-Token</code> hinterlegen.
+        </p>
+        <code class="d-inline-block p-2 bg-light text-dark border rounded user-select-all"
+              style="word-break: break-all;">
+            <?= ViewHelper::e($cronTokenPlain) ?>
+        </code>
+    </div>
+</div>
+<?php endif; ?>
+
 <form method="POST" action="<?= ViewHelper::url('/admin/settings') ?>">
     <?= ViewHelper::csrfField() ?>
 
@@ -42,7 +70,16 @@ use App\Helpers\ViewHelper;
                             <?php endif; ?>
                         </div>
                         <div class="col-md-8">
-                            <?php if ($setting['setting_type'] === 'boolean'): ?>
+                            <?php if ($key === 'cron_last_run_at'): ?>
+                                <?php $lastRun = trim((string) ($setting['setting_value'] ?? '')); ?>
+                                <div class="form-control-plaintext small">
+                                    <?php if ($lastRun === ''): ?>
+                                        <span class="text-muted">Noch kein Lauf erfolgt.</span>
+                                    <?php else: ?>
+                                        <code><?= ViewHelper::e($lastRun) ?></code>
+                                    <?php endif; ?>
+                                </div>
+                            <?php elseif ($setting['setting_type'] === 'boolean'): ?>
                                 <div class="form-check form-switch">
                                     <input type="checkbox" name="settings[<?= ViewHelper::e($key) ?>]"
                                            id="setting-<?= ViewHelper::e($key) ?>"
@@ -116,6 +153,56 @@ use App\Helpers\ViewHelper;
     </form>
 </div>
 
+<!-- Cron-Token-Verwaltung (separates Formular, außerhalb des Hauptformulars) -->
+<?php
+    $cronTokenHash = trim((string) ($allSettings['cron_external_token_hash']['setting_value'] ?? ''));
+    $cronTokenSet  = $cronTokenHash !== '';
+?>
+<div class="card mt-4">
+    <div class="card-header">
+        <i class="bi bi-key"></i> Cron-Token (externer Pinger)
+    </div>
+    <div class="card-body">
+        <p class="small text-muted mb-2">
+            Der externe Pinger (z.&nbsp;B. cron-job.org) schickt seinen Token im Header
+            <code>X-Cron-Token</code> an <code>/cron/run</code>. Wir vergleichen den
+            SHA-256-Hash &mdash; den Klartext kennt nur der Pinger und Sie nach dem
+            Erzeugen <em>einmalig</em>.
+        </p>
+        <p class="small mb-3">
+            Status:
+            <?php if ($cronTokenSet): ?>
+                <span class="badge bg-success">aktiv</span>
+                <span class="text-muted ms-1">Hash hinterlegt &mdash; externer Pinger kann sich authentifizieren.</span>
+            <?php else: ?>
+                <span class="badge bg-secondary">nicht gesetzt</span>
+                <span class="text-muted ms-1">Externe Pings werden abgewiesen, bis ein Token erzeugt wird.</span>
+            <?php endif; ?>
+        </p>
+
+        <form method="POST" action="<?= ViewHelper::url('/admin/settings/cron-token') ?>" class="d-inline">
+            <?= ViewHelper::csrfField() ?>
+            <input type="hidden" name="action" value="rotate">
+            <button type="submit" class="btn btn-sm btn-outline-primary"
+                    onclick="return confirm('Neuer Cron-Token wird erzeugt. Der bisherige (falls vorhanden) wird sofort ungültig. Fortfahren?');">
+                <i class="bi bi-arrow-clockwise"></i>
+                <?= $cronTokenSet ? 'Token rotieren' : 'Token erzeugen' ?>
+            </button>
+        </form>
+
+        <?php if ($cronTokenSet): ?>
+        <form method="POST" action="<?= ViewHelper::url('/admin/settings/cron-token') ?>" class="d-inline ms-2">
+            <?= ViewHelper::csrfField() ?>
+            <input type="hidden" name="action" value="remove">
+            <button type="submit" class="btn btn-sm btn-outline-danger"
+                    onclick="return confirm('Token entfernen? Der externe Pinger wird damit deaktiviert. Fortfahren?');">
+                <i class="bi bi-trash"></i> Token entfernen
+            </button>
+        </form>
+        <?php endif; ?>
+    </div>
+</div>
+
 <?php
 // Helper-Funktion für Setting-Labels (lokal in der View)
 function getSettingLabel(string $key): string
@@ -149,6 +236,9 @@ function getSettingLabel(string $key): string
         'field_projekt_required' => 'Projekt',
         'field_beschreibung_required' => 'Beschreibung',
         'lock_timeout_minutes' => 'Sperr-Timeout (Min.)',
+        'notifications_enabled' => 'Benachrichtigungen aktiv',
+        'cron_min_interval_seconds' => 'Scheduler-Mindestintervall (Sek.)',
+        'cron_last_run_at' => 'Letzter Scheduler-Lauf',
         default => $key,
     };
 }

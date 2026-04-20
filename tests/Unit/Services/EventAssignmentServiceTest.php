@@ -15,6 +15,7 @@ use App\Repositories\EventTaskAssignmentRepository;
 use App\Repositories\EventTaskRepository;
 use App\Services\AuditService;
 use App\Services\EventAssignmentService;
+use App\Services\SchedulerService;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -284,7 +285,8 @@ final class EventAssignmentServiceTest extends TestCase
         \Closure $countActiveByTask = null,
         \Closure $onCreate = null,
         \Closure $findByIdAfterCreate = null,
-        \Closure $onChangeStatus = null
+        \Closure $onChangeStatus = null,
+        ?SchedulerService $scheduler = null
     ): EventAssignmentService {
         $eventRepo = new class($eventById) extends EventRepository {
             public function __construct(private array $events) { /* no parent */ }
@@ -356,7 +358,168 @@ final class EventAssignmentServiceTest extends TestCase
             $taskRepo,
             $assignmentRepo,
             $organizerRepo,
-            $audit
+            $audit,
+            null,
+            $scheduler
         );
+    }
+
+    /**
+     * Anonymous SchedulerService, der dispatch/cancel-Calls in oeffentlichen
+     * Arrays sammelt. Kein parent-Konstruktor → keine echten Repos noetig.
+     *
+     * @return SchedulerService&object{dispatched: array, cancelled: array}
+     */
+    private function mkSchedulerSpy(): SchedulerService
+    {
+        return new class extends SchedulerService {
+            public array $dispatched = [];
+            public array $cancelled = [];
+            public function __construct() { /* no parent */ }
+            public function dispatch(
+                string $jobType,
+                ?array $payload,
+                \DateTimeImmutable $runAt,
+                ?string $uniqueKey = null,
+                int $maxAttempts = 3
+            ): ?int {
+                $this->dispatched[] = [
+                    'type' => $jobType,
+                    'key' => $uniqueKey,
+                    'payload' => $payload,
+                    'runAt' => $runAt,
+                    'mode' => 'reset',
+                ];
+                return count($this->dispatched);
+            }
+            public function dispatchIfNew(
+                string $jobType,
+                ?array $payload,
+                \DateTimeImmutable $runAt,
+                string $uniqueKey,
+                int $maxAttempts = 3
+            ): ?int {
+                $this->dispatched[] = [
+                    'type' => $jobType,
+                    'key' => $uniqueKey,
+                    'payload' => $payload,
+                    'runAt' => $runAt,
+                    'mode' => 'ifnew',
+                ];
+                return count($this->dispatched);
+            }
+            public function cancel(string $uniqueKey): int
+            {
+                $this->cancelled[] = $uniqueKey;
+                return 1;
+            }
+        };
+    }
+
+    // =========================================================================
+    // Scheduler-Hooks: Assignment-Invite/Reminder
+    // =========================================================================
+
+    /** @test */
+    public function test_assignMember_dispatcht_invite_und_reminder(): void
+    {
+        // SLOT_VARIABEL → Status nach create = VORGESCHLAGEN → Invite/Reminder kommen.
+        $task = $this->mkTask(10, slotMode: EventTask::SLOT_VARIABEL);
+        $event = $this->mkEvent(1, status: Event::STATUS_VEROEFFENTLICHT);
+
+        $scheduler = $this->mkSchedulerSpy();
+
+        $service = $this->mkService(
+            taskById: [10 => $task],
+            eventById: [1 => $event],
+            onCreate: fn () => 77,
+            findByIdAfterCreate: fn () => $this->mkAssignment(77, 7, EventTaskAssignment::STATUS_VORGESCHLAGEN),
+            scheduler: $scheduler,
+        );
+
+        $service->assignMember(10, 7, '2030-01-01 14:00:00', '2030-01-01 17:00:00');
+
+        self::assertCount(2, $scheduler->dispatched, 'Invite + Reminder erwartet');
+        self::assertSame('assignment_invite', $scheduler->dispatched[0]['type']);
+        self::assertSame('assignment:77:invite', $scheduler->dispatched[0]['key']);
+        self::assertSame(['assignment_id' => 77], $scheduler->dispatched[0]['payload']);
+        self::assertSame(
+            'ifnew',
+            $scheduler->dispatched[0]['mode'],
+            'Invite muss via dispatchIfNew() einplanen — sonst Doppelmails '
+            . 'bei Status-Hin-und-Her (VORGESCHLAGEN -> ABGELEHNT -> VORGESCHLAGEN).'
+        );
+        self::assertSame('assignment_reminder', $scheduler->dispatched[1]['type']);
+        self::assertSame('assignment:77:reminder', $scheduler->dispatched[1]['key']);
+        self::assertSame(
+            'reset',
+            $scheduler->dispatched[1]['mode'],
+            'Reminder nutzt normalen dispatch(), damit er bei Event-Verschiebung neu greift.'
+        );
+
+        // Reminder muss ~48h nach dem Invite liegen.
+        $diffSec = $scheduler->dispatched[1]['runAt']->getTimestamp()
+                 - $scheduler->dispatched[0]['runAt']->getTimestamp();
+        self::assertGreaterThanOrEqual(48 * 3600 - 5, $diffSec);
+        self::assertLessThanOrEqual(48 * 3600 + 5, $diffSec);
+    }
+
+    /** @test */
+    public function test_assignMember_fix_slot_skips_dispatch(): void
+    {
+        // SLOT_FIX → Status nach create = BESTAETIGT → KEIN Invite/Reminder.
+        // Begruendung: Der Helfer hat die Aufgabe selbst aktiv genommen, kein
+        // weiterer Anstoss noetig.
+        $task = $this->mkTask(10, slotMode: EventTask::SLOT_FIX);
+        $event = $this->mkEvent(1, status: Event::STATUS_VEROEFFENTLICHT);
+
+        $scheduler = $this->mkSchedulerSpy();
+
+        $service = $this->mkService(
+            taskById: [10 => $task],
+            eventById: [1 => $event],
+            onCreate: fn () => 77,
+            findByIdAfterCreate: fn () => $this->mkAssignment(77, 7, EventTaskAssignment::STATUS_BESTAETIGT),
+            scheduler: $scheduler,
+        );
+
+        $service->assignMember(10, 7);
+
+        self::assertSame([], $scheduler->dispatched, 'Bei BESTAETIGT-Status keine Invite/Reminder');
+    }
+
+    /** @test */
+    public function test_withdrawSelf_cancelt_assignment_jobs(): void
+    {
+        $assignment = $this->mkAssignment(77, 7, EventTaskAssignment::STATUS_VORGESCHLAGEN);
+        $scheduler = $this->mkSchedulerSpy();
+
+        $service = $this->mkService(
+            assignmentById: [77 => $assignment],
+            scheduler: $scheduler,
+        );
+
+        $service->withdrawSelf(77, 7);
+
+        self::assertSame(['assignment:77:invite', 'assignment:77:reminder'], $scheduler->cancelled);
+    }
+
+    /** @test */
+    public function test_approveTime_cancelt_assignment_jobs(): void
+    {
+        $assignment = $this->mkAssignment(77, 7, EventTaskAssignment::STATUS_VORGESCHLAGEN);
+        $scheduler = $this->mkSchedulerSpy();
+
+        $service = $this->mkService(
+            assignmentById: [77 => $assignment],
+            taskById: [10 => $this->mkTask(10)],
+            eventById: [1 => $this->mkEvent(1)],
+            isOrganizer: fn () => true,
+            scheduler: $scheduler,
+        );
+
+        $service->approveTime(77, 42);  // Organisator, nicht der Assignee
+
+        self::assertSame(['assignment:77:invite', 'assignment:77:reminder'], $scheduler->cancelled);
     }
 }

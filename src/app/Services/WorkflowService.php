@@ -11,6 +11,8 @@ use App\Models\WorkEntry;
 use App\Repositories\DialogRepository;
 use App\Repositories\UserRepository;
 use App\Repositories\WorkEntryRepository;
+use DateInterval;
+use DateTimeImmutable;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -32,7 +34,9 @@ class WorkflowService
         private EmailService $emailService,
         private UserRepository $userRepo,
         private LoggerInterface $logger,
-        private string $baseUrl
+        private string $baseUrl,
+        private ?SchedulerService $scheduler = null,
+        private ?SettingsService $settings = null
     ) {
     }
 
@@ -99,6 +103,8 @@ class WorkflowService
             $entry->getEntryNumber()
         );
 
+        $this->cancelDialogReminder($entry->getId());
+
         return true;
     }
 
@@ -129,6 +135,8 @@ class WorkflowService
             'Antrag storniert',
             $entry->getEntryNumber()
         );
+
+        $this->cancelDialogReminder($entry->getId());
 
         return true;
     }
@@ -208,6 +216,8 @@ class WorkflowService
             );
         });
 
+        $this->cancelDialogReminder($entry->getId());
+
         return true;
     }
 
@@ -261,6 +271,8 @@ class WorkflowService
             );
         });
 
+        $this->cancelDialogReminder($entry->getId());
+
         return true;
     }
 
@@ -310,6 +322,13 @@ class WorkflowService
                 $this->getEntryUrl($entry)
             );
         });
+
+        // Mitglied erinnern, falls keine Antwort kommt. Intervall aus
+        // Settings (reminder_days, Default 3 Tage) — Admin stellt ein.
+        $reminderDays = $this->settings !== null
+            ? max(1, $this->settings->getInt('reminder_days', 3))
+            : 3;
+        $this->dispatchDialogReminder($entry->getId(), $reminderDays);
 
         return true;
     }
@@ -488,5 +507,36 @@ class WorkflowService
     private function getEntryUrl(WorkEntry $entry): string
     {
         return rtrim($this->baseUrl, '/') . '/entries/' . $entry->getId();
+    }
+
+    /**
+     * Plant einen Dialog-Reminder, falls auf eine Rueckfrage nicht reagiert wird.
+     * Idempotent ueber unique_key — wiederholtes returnForRevision aktualisiert
+     * den bestehenden Job statt einen zweiten anzulegen.
+     */
+    private function dispatchDialogReminder(int $entryId, int $daysOpen): void
+    {
+        if ($this->scheduler === null || $entryId <= 0) {
+            return;
+        }
+        $runAt = (new DateTimeImmutable())->add(new DateInterval('P' . $daysOpen . 'D'));
+        $this->scheduler->dispatch(
+            'dialog_reminder',
+            ['work_entry_id' => $entryId, 'days_open' => $daysOpen],
+            $runAt,
+            "dialog:{$entryId}:reminder"
+        );
+    }
+
+    /**
+     * Storniert einen pending Dialog-Reminder, sobald der Eintrag den
+     * Klaerungs-Zustand verlaesst (entwurf/storniert/freigegeben/abgelehnt).
+     */
+    private function cancelDialogReminder(int $entryId): void
+    {
+        if ($this->scheduler === null || $entryId <= 0) {
+            return;
+        }
+        $this->scheduler->cancel("dialog:{$entryId}:reminder");
     }
 }

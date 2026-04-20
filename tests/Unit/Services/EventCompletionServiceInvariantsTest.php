@@ -137,4 +137,40 @@ final class EventCompletionServiceInvariantsTest extends TestCase
             'System-User muss password_hash=NULL haben.'
         );
     }
+
+    public function test_completion_cancels_pending_event_jobs(): void
+    {
+        $code = (string) file_get_contents(self::SERVICE_FILE);
+
+        // Drei unique_keys, die im Event-Lebenszyklus eingeplant wurden
+        // (publish dispatcht :reminder:7d/:reminder:24h/:completion_reminder),
+        // muessen beim Abschluss storniert werden — sonst landen Reminder-Mails
+        // fuer ein bereits abgeschlossenes Event in den Mailboxen.
+        $expectedCancelKeys = [
+            'reminder:7d',
+            'reminder:24h',
+            'completion_reminder',
+        ];
+
+        foreach ($expectedCancelKeys as $key) {
+            self::assertMatchesRegularExpression(
+                '/scheduler->cancel\(\s*"event:\{.*\}:' . preg_quote($key, '/') . '"/',
+                $code,
+                "EventCompletionService muss beim Abschluss event:*:{$key} stornieren."
+            );
+        }
+    }
+
+    public function test_scheduler_is_optional_constructor_arg(): void
+    {
+        $code = (string) file_get_contents(self::SERVICE_FILE);
+
+        // Das ?SchedulerService = null-Pattern ist Pflicht: Es haelt die existierenden
+        // Tests gruen, ohne dass jeder Service-Test einen Scheduler injizieren muss.
+        self::assertMatchesRegularExpression(
+            '/\?SchedulerService\s+\$\w+\s*=\s*null/',
+            $code,
+            'SchedulerService muss als optional ?SchedulerService = null injiziert werden.'
+        );
+    }
 }

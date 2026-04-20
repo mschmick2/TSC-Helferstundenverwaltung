@@ -6,6 +6,7 @@ use App\Controllers\AdminController;
 use App\Controllers\AuditController;
 use App\Controllers\AuthController;
 use App\Controllers\CategoryController;
+use App\Controllers\CronController;
 use App\Controllers\DashboardController;
 use App\Controllers\EventAdminController;
 use App\Controllers\EventTemplateController;
@@ -18,6 +19,7 @@ use App\Controllers\UserController;
 use App\Controllers\WorkEntryController;
 use App\Middleware\AuthMiddleware;
 use App\Middleware\CsrfMiddleware;
+use App\Middleware\OpportunisticSchedulerMiddleware;
 use App\Middleware\RoleMiddleware;
 use Slim\App;
 use Slim\Routing\RouteCollectorProxy;
@@ -52,12 +54,19 @@ return function (App $app): void {
     })->add(CsrfMiddleware::class);
 
     // =========================================================================
+    // Cron-Pinger (Strato-Cron-Ersatz, eigene Token-Auth, KEIN CSRF, KEINE Session)
+    // =========================================================================
+    $app->post('/cron/run', [CronController::class, 'run']);
+
+    // =========================================================================
     // Geschützte Routen (Login erforderlich)
     // =========================================================================
     $app->group('', function (RouteCollectorProxy $group) {
-        // Dashboard
-        $group->get('/', [DashboardController::class, 'index']);
-        $group->get('/dashboard', [DashboardController::class, 'index']);
+        // Dashboard — opportunistischer Scheduler-Trigger (Cron-Backup)
+        $group->get('/', [DashboardController::class, 'index'])
+            ->add(OpportunisticSchedulerMiddleware::class);
+        $group->get('/dashboard', [DashboardController::class, 'index'])
+            ->add(OpportunisticSchedulerMiddleware::class);
 
         // API: Ungelesene Dialog-Nachrichten Anzahl
         $group->get('/api/unread-dialog-count', [DashboardController::class, 'unreadCount']);
@@ -141,6 +150,7 @@ return function (App $app): void {
         $group->get('/settings', [AdminController::class, 'settings']);
         $group->post('/settings', [AdminController::class, 'updateSettings']);
         $group->post('/settings/test-email', [AdminController::class, 'testEmail']);
+        $group->post('/settings/cron-token', [AdminController::class, 'rotateCronToken']);
 
         // Audit-Trail
         $group->get('/audit', [AuditController::class, 'index']);
