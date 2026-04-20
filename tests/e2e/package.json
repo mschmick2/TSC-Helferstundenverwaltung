@@ -1,0 +1,19 @@
+{
+  "name": "vaes-e2e",
+  "version": "0.1.0",
+  "private": true,
+  "description": "VAES End-to-End-Tests mit Playwright (Modul 8)",
+  "scripts": {
+    "e2e": "playwright test --project=headed",
+    "e2e:headed": "playwright test --project=headed",
+    "e2e:headless": "playwright test --project=headless",
+    "e2e:ui": "playwright test --ui",
+    "e2e:report": "playwright show-report",
+    "db:reset": "php ../../scripts/setup-e2e-db.php"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.50.0",
+    "@types/node": "^22.10.0",
+    "typescript": "^5.7.0"
+  }
+}

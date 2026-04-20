@@ -71,8 +71,9 @@ return [
     // Settings
     // =========================================================================
     'settings' => function (): array {
-        $config = require __DIR__ . '/config.php';
-        return $config;
+        // Config-Datei via VAES_CONFIG_FILE umschaltbar (Modul 8 E2E).
+        $configFile = getenv('VAES_CONFIG_FILE') ?: __DIR__ . '/config.php';
+        return require $configFile;
     },
 
     // =========================================================================

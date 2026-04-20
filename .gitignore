@@ -95,3 +95,14 @@ vaes_backup_*
 /storage/*.pids
 /src/storage/*.pids
 
+# Playwright / Modul 8 E2E-Suite — Artefakte nicht committen
+/tests/e2e/node_modules/
+/tests/e2e/test-results/
+/tests/e2e/playwright-report/
+/tests/e2e/blob-report/
+/tests/e2e/.playwright-cache/
+/tests/e2e/package-lock.json
+
+# E2E-Config mit DB-Zugang (Vorlage bleibt: config.e2e.example.php)
+/src/config/config.e2e.php
+

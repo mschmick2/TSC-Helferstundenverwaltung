@@ -20,10 +20,10 @@
 
 declare(strict_types=1);
 
-// Base-Path aus config.php lesen (Single Source of Truth)
-$config = @file_exists(__DIR__ . '/../config/config.php')
-    ? require __DIR__ . '/../config/config.php'
-    : [];
+// Base-Path aus Config lesen (Single Source of Truth).
+// VAES_CONFIG_FILE kann auf config.e2e.php umschalten (Modul 8 E2E).
+$configFile = getenv('VAES_CONFIG_FILE') ?: __DIR__ . '/../config/config.php';
+$config = @file_exists($configFile) ? require $configFile : [];
 $basePath = $config['app']['base_path'] ?? '';
 
 $uri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH) ?? '/';
