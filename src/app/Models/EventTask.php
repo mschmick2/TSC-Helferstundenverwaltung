@@ -36,6 +36,7 @@ class EventTask
     private ?string $updatedAt = null;
     private ?string $deletedAt = null;
     private ?int $deletedBy = null;
+    private int $version = 1;
 
     public static function fromArray(array $data): self
     {
@@ -57,6 +58,7 @@ class EventTask
         $t->updatedAt       = $data['updated_at'] ?? null;
         $t->deletedAt       = $data['deleted_at'] ?? null;
         $t->deletedBy       = isset($data['deleted_by']) ? (int) $data['deleted_by'] : null;
+        $t->version         = isset($data['version']) ? (int) $data['version'] : 1;
         return $t;
     }
 
@@ -76,6 +78,7 @@ class EventTask
     public function getCreatedAt(): ?string { return $this->createdAt; }
     public function getUpdatedAt(): ?string { return $this->updatedAt; }
     public function getDeletedAt(): ?string { return $this->deletedAt; }
+    public function getVersion(): int { return $this->version; }
 
     public function isContribution(): bool
     {

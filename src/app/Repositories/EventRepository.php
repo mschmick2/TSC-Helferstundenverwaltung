@@ -241,19 +241,23 @@ class EventRepository
         return (int) $this->pdo->lastInsertId();
     }
 
-    public function update(int $id, array $data): bool
+    /**
+     * Event aktualisieren. Mit $expectedVersion wird Optimistic Locking erzwungen:
+     * schlaegt das UPDATE fehl (rowCount = 0), hat parallel ein anderer Tab/Nutzer
+     * bereits geschrieben — Caller muss Formular neu laden.
+     */
+    public function update(int $id, array $data, ?int $expectedVersion = null): bool
     {
-        $stmt = $this->pdo->prepare(
-            "UPDATE events SET
-                title = :title,
-                description = :description,
-                location = :location,
-                start_at = :start_at,
-                end_at = :end_at,
-                cancel_deadline_hours = :cancel_deadline_hours
-             WHERE id = :id AND deleted_at IS NULL"
-        );
-        $stmt->execute([
+        $sql = "UPDATE events SET
+                    title = :title,
+                    description = :description,
+                    location = :location,
+                    start_at = :start_at,
+                    end_at = :end_at,
+                    cancel_deadline_hours = :cancel_deadline_hours,
+                    version = version + 1
+                WHERE id = :id AND deleted_at IS NULL";
+        $params = [
             'title' => $data['title'],
             'description' => $data['description'] ?? null,
             'location' => $data['location'] ?? null,
@@ -261,7 +265,14 @@ class EventRepository
             'end_at' => $data['end_at'],
             'cancel_deadline_hours' => $data['cancel_deadline_hours'] ?? Event::DEFAULT_CANCEL_DEADLINE_HOURS,
             'id' => $id,
-        ]);
+        ];
+        if ($expectedVersion !== null) {
+            $sql .= " AND version = :version";
+            $params['version'] = $expectedVersion;
+        }
+
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute($params);
 
         return $stmt->rowCount() > 0;
     }
@@ -273,7 +284,7 @@ class EventRepository
         }
 
         $stmt = $this->pdo->prepare(
-            "UPDATE events SET status = :status
+            "UPDATE events SET status = :status, version = version + 1
              WHERE id = :id AND deleted_at IS NULL"
         );
         $stmt->execute(['status' => $newStatus, 'id' => $id]);
@@ -283,7 +294,7 @@ class EventRepository
     public function softDelete(int $id, int $deletedBy): bool
     {
         $stmt = $this->pdo->prepare(
-            "UPDATE events SET deleted_at = NOW(), deleted_by = :user
+            "UPDATE events SET deleted_at = NOW(), deleted_by = :user, version = version + 1
              WHERE id = :id AND deleted_at IS NULL"
         );
         $stmt->execute(['user' => $deletedBy, 'id' => $id]);

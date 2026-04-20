@@ -28,6 +28,7 @@ class EventTaskAssignment
     private ?string $updatedAt = null;
     private ?string $deletedAt = null;
     private ?int $deletedBy = null;
+    private int $version = 1;
 
     public static function fromArray(array $data): self
     {
@@ -46,6 +47,7 @@ class EventTaskAssignment
         $a->updatedAt                    = $data['updated_at'] ?? null;
         $a->deletedAt                    = $data['deleted_at'] ?? null;
         $a->deletedBy                    = isset($data['deleted_by']) ? (int) $data['deleted_by'] : null;
+        $a->version                      = isset($data['version']) ? (int) $data['version'] : 1;
         return $a;
     }
 
@@ -59,6 +61,7 @@ class EventTaskAssignment
     public function getReplacementSuggestedUserId(): ?int { return $this->replacementSuggestedUserId; }
     public function getWorkEntryId(): ?int { return $this->workEntryId; }
     public function getCreatedAt(): ?string { return $this->createdAt; }
+    public function getVersion(): int { return $this->version; }
 
     public function isActive(): bool
     {

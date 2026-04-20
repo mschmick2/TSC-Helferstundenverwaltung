@@ -50,7 +50,15 @@ return [
         'domain' => '',      // Leer = aktuelle Domain
         'secure' => true,    // Nur ueber HTTPS (wird in index.php auto-erkannt)
         'httponly' => true,   // Nicht per JavaScript zugreifbar
-        'samesite' => 'Lax',
+        // Modul 7 I3: Produktions-Empfehlung ist 'Strict'. Damit werden Session-
+        // Cookies bei Cross-Site-Navigationen (Klick von fremder Domain auf
+        // VAES-URL) NICHT mitgesendet. Das verhindert bestimmte CSRF-artige
+        // Angriffe auch ohne Token. Nebenwirkung: Wer einen Deep-Link zu VAES
+        // anklickt und noch nicht eingeloggt ist, landet zuerst auf /login -
+        // das ist in einer reinen Vereinsverwaltung akzeptabel.
+        // Auf 'Lax' zurueckschalten, falls externe Auth-Rueckleitungen (OAuth o.ae.)
+        // ergaenzt werden.
+        'samesite' => 'Strict',
     ],
     
     // ==========================================================================

@@ -92,4 +92,25 @@ final class EventTest extends TestCase
     {
         self::assertGreaterThan(0, Event::DEFAULT_CANCEL_DEADLINE_HOURS);
     }
+
+    /**
+     * Modul 7 I3: Optimistic Locking - version wird aus DB-Zeile geparst.
+     */
+    public function test_fromArray_parses_version(): void
+    {
+        $event = Event::fromArray([
+            'title' => 'X', 'start_at' => '', 'end_at' => '', 'version' => 17,
+        ]);
+        self::assertSame(17, $event->getVersion());
+    }
+
+    /**
+     * Modul 7 I3: Fehlende version (z.B. bei frischen DB-Zeilen vor Migration)
+     * darf nicht knallen - Default 1 ist valide.
+     */
+    public function test_fromArray_defaults_version_to_1(): void
+    {
+        $event = Event::fromArray(['title' => 'X', 'start_at' => '', 'end_at' => '']);
+        self::assertSame(1, $event->getVersion());
+    }
 }

@@ -84,24 +84,30 @@ class EventTaskRepository
         return (int) $this->pdo->lastInsertId();
     }
 
-    public function update(int $id, array $data): bool
+    /**
+     * Task aktualisieren. version-Spalte wird immer inkrementiert, damit Aussen-
+     * stehende (Event-Admin-UI) eine verlaessliche Versionsnummer erhalten.
+     * Eine Version-Pruefung (Optimistic Lock) gibt es derzeit nicht, weil Tasks
+     * nur ueber die Event-Detail-Seite editiert werden und dort der Event-Schutz
+     * schon greift. Parameter $expectedVersion ist fuer spaetere Aktivierung reserviert.
+     */
+    public function update(int $id, array $data, ?int $expectedVersion = null): bool
     {
-        $stmt = $this->pdo->prepare(
-            "UPDATE event_tasks SET
-                category_id = :category_id,
-                title = :title,
-                description = :description,
-                task_type = :task_type,
-                slot_mode = :slot_mode,
-                start_at = :start_at,
-                end_at = :end_at,
-                capacity_mode = :capacity_mode,
-                capacity_target = :capacity_target,
-                hours_default = :hours_default,
-                sort_order = :sort_order
-             WHERE id = :id AND deleted_at IS NULL"
-        );
-        $stmt->execute([
+        $sql = "UPDATE event_tasks SET
+                    category_id = :category_id,
+                    title = :title,
+                    description = :description,
+                    task_type = :task_type,
+                    slot_mode = :slot_mode,
+                    start_at = :start_at,
+                    end_at = :end_at,
+                    capacity_mode = :capacity_mode,
+                    capacity_target = :capacity_target,
+                    hours_default = :hours_default,
+                    sort_order = :sort_order,
+                    version = version + 1
+                WHERE id = :id AND deleted_at IS NULL";
+        $params = [
             'category_id' => $data['category_id'] ?? null,
             'title' => $data['title'],
             'description' => $data['description'] ?? null,
@@ -114,14 +120,20 @@ class EventTaskRepository
             'hours_default' => $data['hours_default'] ?? 0.0,
             'sort_order' => (int) ($data['sort_order'] ?? 0),
             'id' => $id,
-        ]);
+        ];
+        if ($expectedVersion !== null) {
+            $sql .= " AND version = :version";
+            $params['version'] = $expectedVersion;
+        }
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute($params);
         return $stmt->rowCount() > 0;
     }
 
     public function softDelete(int $id, int $deletedBy): bool
     {
         $stmt = $this->pdo->prepare(
-            "UPDATE event_tasks SET deleted_at = NOW(), deleted_by = :user
+            "UPDATE event_tasks SET deleted_at = NOW(), deleted_by = :user, version = version + 1
              WHERE id = :id AND deleted_at IS NULL"
         );
         $stmt->execute(['user' => $deletedBy, 'id' => $id]);

@@ -35,6 +35,15 @@ final class EventTaskTest extends TestCase
         self::assertSame(EventTask::CAP_UNBEGRENZT, $t->getCapacityMode());
         self::assertNull($t->getCapacityTarget());
         self::assertSame(0.0, $t->getHoursDefault());
+        // Modul 7 I3: Default-Version darf nicht knallen, wenn Zeile aelter als
+        // Migration 007 ist.
+        self::assertSame(1, $t->getVersion());
+    }
+
+    public function test_fromArray_parses_version(): void
+    {
+        $t = EventTask::fromArray(['title' => 'x', 'version' => 5]);
+        self::assertSame(5, $t->getVersion());
     }
 
     public function test_constants_match_database_enum_values(): void

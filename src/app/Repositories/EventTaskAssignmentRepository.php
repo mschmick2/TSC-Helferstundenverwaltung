@@ -104,7 +104,7 @@ class EventTaskAssignmentRepository
         }
 
         $stmt = $this->pdo->prepare(
-            "UPDATE event_task_assignments SET status = :status
+            "UPDATE event_task_assignments SET status = :status, version = version + 1
              WHERE id = :id AND deleted_at IS NULL"
         );
         $stmt->execute(['status' => $newStatus, 'id' => $id]);
@@ -114,7 +114,7 @@ class EventTaskAssignmentRepository
     public function setWorkEntryId(int $assignmentId, int $workEntryId): bool
     {
         $stmt = $this->pdo->prepare(
-            "UPDATE event_task_assignments SET work_entry_id = :we
+            "UPDATE event_task_assignments SET work_entry_id = :we, version = version + 1
              WHERE id = :id AND deleted_at IS NULL"
         );
         $stmt->execute(['we' => $workEntryId, 'id' => $assignmentId]);
@@ -127,7 +127,7 @@ class EventTaskAssignmentRepository
     public function setReplacement(int $assignmentId, ?int $replacementUserId): bool
     {
         $stmt = $this->pdo->prepare(
-            "UPDATE event_task_assignments SET replacement_suggested_user_id = :r
+            "UPDATE event_task_assignments SET replacement_suggested_user_id = :r, version = version + 1
              WHERE id = :id AND deleted_at IS NULL"
         );
         $stmt->execute(['r' => $replacementUserId, 'id' => $assignmentId]);
@@ -241,7 +241,7 @@ class EventTaskAssignmentRepository
     public function softDelete(int $id, int $deletedBy): bool
     {
         $stmt = $this->pdo->prepare(
-            "UPDATE event_task_assignments SET deleted_at = NOW(), deleted_by = :user
+            "UPDATE event_task_assignments SET deleted_at = NOW(), deleted_by = :user, version = version + 1
              WHERE id = :id AND deleted_at IS NULL"
         );
         $stmt->execute(['user' => $deletedBy, 'id' => $id]);

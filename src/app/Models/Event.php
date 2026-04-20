@@ -41,6 +41,7 @@ class Event
     private ?int $deletedBy = null;
     private ?int $sourceTemplateId = null;
     private ?int $sourceTemplateVersion = null;
+    private int $version = 1;
 
     public static function fromArray(array $data): self
     {
@@ -64,6 +65,7 @@ class Event
             ? (int) $data['source_template_id'] : null;
         $event->sourceTemplateVersion = isset($data['source_template_version'])
             ? (int) $data['source_template_version'] : null;
+        $event->version               = isset($data['version']) ? (int) $data['version'] : 1;
         return $event;
     }
 
@@ -83,6 +85,7 @@ class Event
     public function getSourceTemplateId(): ?int { return $this->sourceTemplateId; }
     public function getSourceTemplateVersion(): ?int { return $this->sourceTemplateVersion; }
     public function isDerivedFromTemplate(): bool { return $this->sourceTemplateId !== null; }
+    public function getVersion(): int { return $this->version; }
 
     public function isPublished(): bool
     {

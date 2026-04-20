@@ -251,7 +251,22 @@ class EventAdminController extends BaseController
             'cancel_deadline_hours' => (int) ($data['cancel_deadline_hours'] ?? Event::DEFAULT_CANCEL_DEADLINE_HOURS),
         ];
 
-        $this->eventRepo->update($id, $newState);
+        // Modul 7 I3: Optimistic Locking. Formular transportiert die zum Read-
+        // Zeitpunkt gueltige version. Wenn zwischen Laden und Speichern ein anderer
+        // Tab/Admin den Datensatz veraendert hat, schlaegt das UPDATE fehl
+        // (rowCount = 0). In diesem Fall Fehler-Flash + zurueck zur Edit-Seite,
+        // damit der Nutzer den aktuellen Stand neu laedt und die Aenderungen
+        // uebernehmen kann.
+        $expectedVersion = isset($data['version']) ? (int) $data['version'] : null;
+        $updated = $this->eventRepo->update($id, $newState, $expectedVersion);
+        if (!$updated) {
+            ViewHelper::flash(
+                'warning',
+                'Das Event wurde zwischenzeitlich von jemand anderem geaendert. '
+                . 'Bitte Formular neu laden und Aenderungen erneut eintragen.'
+            );
+            return $this->redirect($response, '/admin/events/' . $id . '/edit');
+        }
 
         // Organizer-Sync
         $newOrganizerIds = array_map('intval', (array) ($data['organizer_ids'] ?? []));

@@ -291,21 +291,86 @@ beim `DOMContentLoaded` einmalig und sendet jede Nachricht.
 
 ---
 
-## 6. Inkrement 3 (I3) — Optimistic Locking ausrollen + Cookie-Haerting (Skizze)
+## 6. Inkrement 3 (I3) — Optimistic Locking ausrollen + Cookie-Haerting
 
-**Noch nicht implementiert. Hier nur die Zielarchitektur.**
+**Status: fertig 2026-04-20.**
 
-- Migration 007: `version INT UNSIGNED NOT NULL DEFAULT 1` auf `events`,
-  `event_tasks`, `event_task_assignments`.
-- Repositories ziehen den `WHERE version = :v` / `version = version + 1`
-  Pattern nach.
-- Conflict-UX: Zweispaltige Diff-Ansicht „Dein Stand" vs. „Aktueller
-  Stand", Re-Submit-Button.
-- Cookie-Policy in Produktion auf `SameSite=Strict` umstellen
-  (Rule 02-security schliessen).
+### 6.1 Schema
 
-**Aufwand-Schaetzung:** 2–3 Tage, Schema-Migration + Repository-Fleissarbeit
-+ UI-Design.
+- Migration `007_optimistic_locking.sql` ergaenzt
+  `version INT UNSIGNED NOT NULL DEFAULT 1` auf `events`, `event_tasks`,
+  `event_task_assignments`. Idempotent via `INFORMATION_SCHEMA.COLUMNS`
+  (gleiche Mechanik wie 004–006).
+- Rollback `007_optimistic_locking.down.sql` entfernt die Spalte wieder,
+  ebenfalls idempotent.
+- `scripts/database/create_database.sql` kommt ohne die drei Tabellen aus
+  (die leben ausschliesslich in Migration 002 + 007), deshalb kein Patch
+  dort notwendig.
+
+### 6.2 Repositories
+
+Alle Writes auf den drei Tabellen inkrementieren `version = version + 1`:
+
+- `EventRepository::update`, `changeStatus`, `softDelete`
+- `EventTaskRepository::update`, `softDelete`
+- `EventTaskAssignmentRepository::changeStatus`, `setWorkEntryId`,
+  `setReplacement`, `softDelete`
+
+Zusaetzlich akzeptieren `EventRepository::update` und
+`EventTaskRepository::update` den optionalen Parameter `?int $expectedVersion`.
+Ist er gesetzt, wird das UPDATE mit `AND version = :version` verriegelt und
+gibt `false` zurueck, wenn niemand betroffen ist (Konflikt). Default bleibt
+`null`, damit Bestandscaller ohne Anpassung funktionieren.
+
+### 6.3 Models
+
+`Event`, `EventTask` und `EventTaskAssignment` parsen `version` in
+`fromArray()` (Default 1 fuer Zeilen vor Migration 007) und bieten
+`getVersion(): int`. Damit koennen Views die Version im Formular
+transportieren.
+
+### 6.4 Conflict-UX
+
+`EventAdminController::update` liest `$_POST['version']` und reicht die Zahl
+an `EventRepository::update` weiter. Bleibt das UPDATE ohne Treffer (weil
+ein anderer Tab zwischen Read und Write geschrieben hat), setzt der
+Controller einen Warn-Flash — „Das Event wurde zwischenzeitlich von jemand
+anderem geaendert. Bitte Formular neu laden und Aenderungen erneut
+eintragen." — und leitet zurueck auf die Edit-Seite.
+
+Die urspruenglich geplante Diff-Ansicht („Dein Stand" vs. „Aktueller Stand")
+wurde zugunsten einer schlanken Reload-Aufforderung verworfen. Begruendung:
+Admins editieren Event-Rumpfdaten selten parallel und die Konflikt-Frequenz
+ist niedrig; eine vollstaendige Mergeview waere hoher Aufwand fuer einen
+Fall, der in Praxis selten vorkommt. Die Entscheidung ist reversibel,
+sobald der Anwendungsfall haeufiger wird.
+
+Das Formular in `src/app/Views/admin/events/edit.php` traegt
+`<input type="hidden" name="version" value="<?= $event->getVersion() ?>">`.
+Task- und Assignment-UI bleibt ohne Version-Prueflogik, weil dort aktuell
+kein paralleles Edit-Formular existiert; die version-Spalte laeuft trotzdem
+mit, damit spaeter ohne Migration eingeschaltet werden kann.
+
+### 6.5 Cookie-Haerting
+
+`src/config/config.example.php` empfiehlt jetzt `samesite => 'Strict'` als
+Produktions-Default. Damit werden Session-Cookies bei Cross-Site-
+Navigationen nicht mitgesendet, was CSRF-artige Angriffe zusaetzlich zum
+Token-Schutz erschwert. In einer reinen Vereinsverwaltung ohne externe
+Auth-Rueckleitungen ist die Einschraenkung unkritisch. `src/config/config.php`
+selbst (dev-Wert) bleibt unveraendert — die Empfehlung wirkt erst beim
+naechsten Produktions-Deployment, das die Vorlage als Referenz verwendet.
+
+### 6.6 Tests
+
+- Unit-Tests erweitert: `EventTest::test_fromArray_parses_version`,
+  `EventTest::test_fromArray_defaults_version_to_1`,
+  `EventTaskTest::test_fromArray_parses_version`,
+  plus die bestehende `test_fromArray_uses_sensible_defaults`-Erweiterung.
+- PHPUnit-Gesamtlauf: 440 Tests, 923 Assertions, 6 Fehler (alle aus den
+  DB-gebundenen Integration-/Feature-Suiten, weil `helferstunden_test` in
+  dieser Dev-Umgebung nicht laeuft — deckungsgleich mit der Baseline vor
+  I3). Keine Regression.
 
 ---
 
@@ -315,14 +380,16 @@ beim `DOMContentLoaded` einmalig und sendet jede Nachricht.
 |---------|-------|--------|
 | I1 — Pessimistic Lock | G1–G9 | **fertig 2026-04-20** |
 | I2 — BroadcastChannel | G1–G9 | **fertig 2026-04-20** |
-| I3 — Optimistic Rollout + Cookie-Strict | G1–G9 | offen, Skizze hier |
+| I3 — Optimistic Rollout + Cookie-Strict | G1–G9 | **fertig 2026-04-20** |
 
 I1 hat keinen Konflikt mit der laufenden Arbeit aus Modul 6 I6 und beruehrt
-bewusst nur den `work_entries`-Edit-Flow. Events/Tasks/Assignments werden
-erst in I3 einbezogen — das haelt den Blast-Radius klein.
+bewusst nur den `work_entries`-Edit-Flow. Events/Tasks/Assignments kamen
+in I3 dazu — der Blast-Radius blieb klein, weil alle drei Repos dem bereits
+in `WorkEntryRepository` erprobten Pattern folgen.
 
 ---
 
-*Letzte Aktualisierung: 2026-04-20 — I1 + I2 abgeschlossen. PHPUnit: 437 Tests
-(Unit-Suite gruen, 6 DB-gebundene Integration-/Feature-Tests warten auf
-`helferstunden_test`-Instanz).*
+*Letzte Aktualisierung: 2026-04-20 — I1 + I2 + I3 abgeschlossen. PHPUnit:
+440 Tests (Unit-Suite gruen, 6 DB-gebundene Integration-/Feature-Tests
+warten weiterhin auf `helferstunden_test`-Instanz — identische Baseline
+wie vor I3).*

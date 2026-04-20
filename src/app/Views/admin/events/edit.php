@@ -12,6 +12,7 @@ use App\Helpers\ViewHelper;
 <form method="POST" action="<?= ViewHelper::url('/admin/events/' . (int) $event->getId()) ?>"
       class="row g-3 needs-validation" novalidate>
     <?= ViewHelper::csrfField() ?>
+    <input type="hidden" name="version" value="<?= (int) $event->getVersion() ?>"><!-- Modul 7 I3: Optimistic Locking -->
 
     <div class="col-md-12">
         <label for="title" class="form-label">Titel <span class="text-danger">*</span></label>
