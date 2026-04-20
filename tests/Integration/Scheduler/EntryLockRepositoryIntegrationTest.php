@@ -162,11 +162,12 @@ class EntryLockRepositoryIntegrationTest extends IntegrationTestCase
         }
 
         $stmt = $this->pdo()->prepare(
-            "INSERT INTO work_entries (user_id, category_id, work_date, hours, description, status, entry_number, created_at, version)
-             VALUES (:uid, :cid, '2026-04-20', 1.0, 'Lock-Test', 'entwurf', :en, NOW(), 1)"
+            "INSERT INTO work_entries (user_id, created_by_user_id, category_id, work_date, hours, description, status, entry_number, created_at, version)
+             VALUES (:uid, :cby, :cid, '2026-04-20', 1.0, 'Lock-Test', 'entwurf', :en, NOW(), 1)"
         );
         $stmt->execute([
             'uid' => $userId,
+            'cby' => $userId,
             'cid' => $catId,
             'en'  => 'LT-' . bin2hex(random_bytes(4)),
         ]);
