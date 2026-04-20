@@ -89,6 +89,11 @@ return function (App $app): void {
         $group->post('/entries/{id:[0-9]+}', [WorkEntryController::class, 'update']);
         $group->post('/entries/{id:[0-9]+}/delete', [WorkEntryController::class, 'delete']);
 
+        // Modul 7 I1: Pessimistic-Lock-AJAX
+        $group->post('/entries/{id:[0-9]+}/lock/heartbeat', [WorkEntryController::class, 'lockHeartbeat']);
+        $group->post('/entries/{id:[0-9]+}/lock/release', [WorkEntryController::class, 'lockRelease']);
+        $group->get('/entries/{id:[0-9]+}/lock/status', [WorkEntryController::class, 'lockStatus']);
+
         // Workflow-Aktionen (Eigentümer)
         $group->post('/entries/{id:[0-9]+}/submit', [WorkEntryController::class, 'submit']);
         $group->post('/entries/{id:[0-9]+}/withdraw', [WorkEntryController::class, 'withdraw']);

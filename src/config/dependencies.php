@@ -25,6 +25,7 @@ use App\Repositories\AuditRepository;
 use App\Repositories\CategoryRepository;
 use App\Repositories\DialogReadStatusRepository;
 use App\Repositories\DialogRepository;
+use App\Repositories\EntryLockRepository;
 use App\Repositories\EventOrganizerRepository;
 use App\Repositories\EventRepository;
 use App\Repositories\EventTaskAssignmentRepository;
@@ -42,6 +43,7 @@ use App\Services\AuditService;
 use App\Services\AuthService;
 use App\Services\CsvExportService;
 use App\Services\EmailService;
+use App\Services\EntryLockService;
 use App\Services\ImportService;
 use App\Services\Jobs\AssignmentInviteHandler;
 use App\Services\Jobs\AssignmentReminderHandler;
@@ -177,6 +179,11 @@ return [
         return new SchedulerRunRepository($c->get(PDO::class));
     },
 
+    // --- Modul 7 I1: Entry-Lock-Repository ----------------------------------
+    EntryLockRepository::class => function (ContainerInterface $c): EntryLockRepository {
+        return new EntryLockRepository($c->get(PDO::class));
+    },
+
     // --- Modul 6 I2: Event-Assignment-Service --------------------------------
     \App\Services\EventAssignmentService::class => function (ContainerInterface $c): \App\Services\EventAssignmentService {
         return new \App\Services\EventAssignmentService(
@@ -305,7 +312,17 @@ return [
             $c->get(SchedulerRunRepository::class),
             $c->get(SettingsRepository::class),
             $c->get(JobHandlerRegistry::class),
-            $c->get(LoggerInterface::class)
+            $c->get(LoggerInterface::class),
+            $c->get(EntryLockService::class)
+        );
+    },
+
+    // --- Modul 7 I1: Entry-Lock-Service --------------------------------------
+    EntryLockService::class => function (ContainerInterface $c): EntryLockService {
+        return new EntryLockService(
+            $c->get(EntryLockRepository::class),
+            $c->get(UserRepository::class),
+            $c->get(SettingsService::class)
         );
     },
 
@@ -466,7 +483,8 @@ return [
             $c->get(UserRepository::class),
             $c->get(SettingsService::class),
             $c->get(LoggerInterface::class),
-            $c->get('settings')
+            $c->get('settings'),
+            $c->get(EntryLockService::class)
         );
     },
 

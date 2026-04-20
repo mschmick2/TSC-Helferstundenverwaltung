@@ -27,7 +27,8 @@ class SchedulerService
         private SchedulerRunRepository $runs,
         private SettingsRepository $settings,
         private JobHandlerRegistry $registry,
-        private LoggerInterface $logger
+        private LoggerInterface $logger,
+        private ?EntryLockService $entryLocks = null
     ) {
     }
 
@@ -151,6 +152,24 @@ class SchedulerService
         $failed = 0;
 
         try {
+            // Modul 7 I1: Stale-Lock-Cleanup als Teil jedes Scheduler-Laufs.
+            // Best-effort — Fehler nur loggen, damit Jobs weiterlaufen.
+            if ($this->entryLocks !== null) {
+                try {
+                    $removed = $this->entryLocks->cleanupStale();
+                    if ($removed > 0) {
+                        $this->logger->info(
+                            "Scheduler: {$removed} abgelaufene Entry-Locks aufgeraeumt."
+                        );
+                    }
+                } catch (Throwable $e) {
+                    $this->logger->error(
+                        'Scheduler: Stale-Lock-Cleanup fehlgeschlagen: ' . $e->getMessage(),
+                        ['exception' => $e]
+                    );
+                }
+            }
+
             $this->jobs->requeueStuckJobs();
 
             $due = $this->jobs->claimDue($maxJobs);

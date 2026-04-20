@@ -2,12 +2,16 @@
 /**
  * Arbeitsstunden-Eintrag bearbeiten
  *
- * Variablen: $entry, $categories, $user, $fieldConfig
+ * Variablen: $entry, $categories, $user, $fieldConfig, $lock
  */
 
 use App\Helpers\ViewHelper;
 
 $fc = $fieldConfig ?? [];
+$lockInfo = $lock ?? ['owned' => true, 'expires_at' => null];
+$lockOwned = (bool) ($lockInfo['owned'] ?? true);
+$lockHeldBy = (string) ($lockInfo['held_by'] ?? '');
+$lockExpiresAt = $lockInfo['expires_at'] ?? null;
 ?>
 
 <div class="row justify-content-center">
@@ -21,6 +25,23 @@ $fc = $fieldConfig ?? [];
                 <i class="bi bi-arrow-left"></i> Zurück
             </a>
         </div>
+
+        <?php if (!$lockOwned): ?>
+            <div class="alert alert-warning d-flex align-items-start" role="alert">
+                <i class="bi bi-lock-fill me-2 fs-4"></i>
+                <div>
+                    <strong>Eintrag wird bereits bearbeitet</strong><br>
+                    Dieser Eintrag ist gerade durch
+                    <strong><?= ViewHelper::e($lockHeldBy !== '' ? $lockHeldBy : 'einen anderen Nutzer') ?></strong>
+                    gesperrt.
+                    <?php if ($lockExpiresAt): ?>
+                        Die Sperre laeuft voraussichtlich um
+                        <?= ViewHelper::e((string) $lockExpiresAt) ?> ab.
+                    <?php endif; ?>
+                    Sie koennen die Felder einsehen, aber nicht aendern.
+                </div>
+            </div>
+        <?php endif; ?>
 
         <div class="card">
             <div class="card-body">
@@ -130,10 +151,10 @@ $fc = $fieldConfig ?? [];
 
                     <!-- Buttons -->
                     <div class="d-flex gap-2">
-                        <button type="submit" class="btn btn-secondary">
+                        <button type="submit" class="btn btn-secondary" <?= $lockOwned ? '' : 'disabled' ?>>
                             <i class="bi bi-save"></i> Speichern
                         </button>
-                        <button type="submit" name="submit_immediately" value="1" class="btn btn-primary">
+                        <button type="submit" name="submit_immediately" value="1" class="btn btn-primary" <?= $lockOwned ? '' : 'disabled' ?>>
                             <i class="bi bi-send"></i> Speichern & Einreichen
                         </button>
                         <a href="<?= ViewHelper::url('/entries/' . $entry->getId()) ?>" class="btn btn-outline-secondary ms-auto">
@@ -145,3 +166,21 @@ $fc = $fieldConfig ?? [];
         </div>
     </div>
 </div>
+
+<?php if ($lockOwned): ?>
+    <script
+        src="<?= ViewHelper::url('/js/entry-lock.js') ?>"
+        data-entry-id="<?= (int) $entry->getId() ?>"
+        data-heartbeat-url="<?= ViewHelper::url('/entries/' . $entry->getId() . '/lock/heartbeat') ?>"
+        data-release-url="<?= ViewHelper::url('/entries/' . $entry->getId() . '/lock/release') ?>"
+        data-csrf-token="<?= ViewHelper::e(\App\Helpers\SecurityHelper::generateCsrfToken()) ?>"
+        defer></script>
+<?php else: ?>
+    <script
+        src="<?= ViewHelper::url('/js/entry-lock.js') ?>"
+        data-entry-id="<?= (int) $entry->getId() ?>"
+        data-poll-only="1"
+        data-status-url="<?= ViewHelper::url('/entries/' . $entry->getId() . '/lock/status') ?>"
+        data-csrf-token="<?= ViewHelper::e(\App\Helpers\SecurityHelper::generateCsrfToken()) ?>"
+        defer></script>
+<?php endif; ?>
