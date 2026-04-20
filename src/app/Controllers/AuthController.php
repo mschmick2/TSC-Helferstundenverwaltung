@@ -316,6 +316,8 @@ class AuthController extends BaseController
         // Neue Session starten für Flash-Message nach Session-Destroy
         session_start();
         ViewHelper::flash('info', 'Sie wurden erfolgreich abgemeldet.');
+        // Modul 7 I2: andere Tabs aus der Bearbeitung werfen.
+        ViewHelper::broadcast('auth:logout');
         return $this->redirect($response, '/login');
     }
 

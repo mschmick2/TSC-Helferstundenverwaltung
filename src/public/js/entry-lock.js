@@ -145,6 +145,14 @@
 
     if (pollOnly) {
         setInterval(pollReadOnly, POLL_READONLY_MS);
+        // Modul 7 I2: Wenn ein anderer Tab den Eintrag speichert, schneller
+        // reagieren als der 30-s-Poll.
+        document.addEventListener('vaes:entry:updated', function (ev) {
+            var detail = ev && ev.detail;
+            if (detail && parseInt(detail.id, 10) === entryId) {
+                showFreeBanner();
+            }
+        });
     } else {
         setInterval(heartbeat, HEARTBEAT_MS);
         window.addEventListener('beforeunload', releaseSync);

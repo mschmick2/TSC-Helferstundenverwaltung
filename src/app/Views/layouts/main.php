@@ -10,6 +10,12 @@ use App\Helpers\ViewHelper;
 
 $appVersion = $settings['app']['version'] ?? '1.4.0';
 $vereinsname = $settings['verein']['name'] ?? 'VAES';
+
+// Modul 7 I2: Pending Cross-Tab-Broadcasts fuers <body data-Attribut serialisieren.
+$broadcasts = ViewHelper::getBroadcasts();
+$broadcastAttr = $broadcasts !== []
+    ? ' data-vaes-broadcasts="' . ViewHelper::e(json_encode($broadcasts, JSON_UNESCAPED_UNICODE)) . '"'
+    : '';
 ?>
 <!DOCTYPE html>
 <html lang="de">
@@ -23,7 +29,7 @@ $vereinsname = $settings['verein']['name'] ?? 'VAES';
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
     <link href="<?= ViewHelper::url('/css/app.css') ?>" rel="stylesheet">
 </head>
-<body data-unread-url="<?= ViewHelper::url('/api/unread-dialog-count') ?>">
+<body data-unread-url="<?= ViewHelper::url('/api/unread-dialog-count') ?>"<?= $broadcastAttr ?>>
 
     <!-- Navbar -->
     <?php require __DIR__ . '/../components/_navbar.php'; ?>
@@ -53,6 +59,7 @@ $vereinsname = $settings['verein']['name'] ?? 'VAES';
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
             integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
+    <script src="<?= ViewHelper::url('/js/broadcast.js') ?>"></script>
     <script src="<?= ViewHelper::url('/js/app.js') ?>"></script>
 </body>
 </html>

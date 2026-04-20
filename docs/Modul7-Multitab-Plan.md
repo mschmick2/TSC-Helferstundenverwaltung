@@ -233,26 +233,61 @@ I6-Ueberlebensregel). Kein separater Job-Handler noetig.
 
 ---
 
-## 5. Inkrement 2 (I2) — BroadcastChannel fuer Cross-Tab-Sync (Skizze)
+## 5. Inkrement 2 (I2) — BroadcastChannel fuer Cross-Tab-Sync
 
-**Noch nicht implementiert. Hier nur die Zielarchitektur.**
+**Status: fertig 2026-04-20.** Cross-Tab-Sync ueber `BroadcastChannel` mit
+`localStorage`-Fallback ist aktiv. Logout und erfolgreiche Entry-Updates
+werden an andere Tabs derselben Session verteilt.
 
-Problem: Nach I1 weiss Tab B zwar beim Oeffnen, dass Tab A locked — aber
-wenn Tab A mittendrin fertig wird, merkt Tab B das erst bei seinem naechsten
-Poll. Und Logout in Tab A laesst Tab B bis zum naechsten Request
-eingeloggt.
+### 5.1 Kanaele (Implementierung)
 
-**Loesung (Browser-nativ):** Eine kleine JS-Library `broadcast.js` nutzt die
-`BroadcastChannel`-API. Drei Kanaele:
+- `auth:logout` — setzt andere Tabs auf `/login`. Verhindert Zombie-Tabs
+  nach Logout.
+- `entry:updated` mit `{id}` — read-only-Tabs (`entry-lock.js` im Poll-
+  Modus) zeigen sofort den „jetzt frei / neu laden"-Banner statt auf den
+  30-s-Poll zu warten.
 
-- `vaes:auth` — Logout-Broadcast; andere Tabs redirecten auf `/login`.
-- `vaes:entry:{id}` — Save-Broadcast; andere Tabs zeigen „in anderem Tab
-  geaendert, [Neu laden]".
-- `vaes:session` — Session-Timeout-Warnung synchron in allen Tabs.
+`vaes:session`-Timeout-Kanal aus der urspruenglichen Skizze bleibt
+offen — dafuer fehlt heute noch eine Client-Countdown-UI. Wenn der Bedarf
+kommt, nachziehen.
 
-Fallback: `localStorage`-`storage`-Event (100 % Abdeckung der Ziel-Browser).
+### 5.2 Transport
 
-**Aufwand-Schaetzung:** 1–2 Tage, rein Frontend. Kein Backend-Change.
+- Primaer: `BroadcastChannel('vaes')` — same-origin, kein Backend.
+- Fallback: `localStorage.setItem(STORAGE_KEY, JSON.stringify(msg))` +
+  sofortiges `removeItem`. Andere Tabs bekommen den `storage`-Event und
+  deserialisieren. Deckt aeltere Browser und sehr restriktive iframes ab.
+
+Payload **bewusst minimal**: `{event, at, [id]}`. Keine PII, keine Titel,
+keine Nutzernamen. Andere Tabs holen sich Details bei Bedarf via normalem
+HTTP aus ihrer eigenen Session.
+
+### 5.3 Server-Trigger
+
+Neuer Flash-aehnlicher Helper `ViewHelper::broadcast(string $event, array
+$payload = [])` schreibt in `$_SESSION['_broadcast']`.
+Layout (`layouts/main.php`, `layouts/auth.php`) ruft beim naechsten Render
+`getBroadcasts()` und serialisiert die Liste in ein
+`data-vaes-broadcasts`-Attribut am `<body>`. `broadcast.js` liest das
+beim `DOMContentLoaded` einmalig und sendet jede Nachricht.
+
+**Trigger-Punkte:**
+
+- `AuthController::logout()` setzt `auth:logout` vor Redirect auf `/login`.
+- `WorkEntryController::update()` setzt `entry:updated` nach erfolgreichem
+  Write (vor Redirect auf Liste).
+
+### 5.4 Sicherheit
+
+- Kein CSRF-Token noetig — `BroadcastChannel` und `localStorage` sind rein
+  same-origin-lokale Browser-Mechanismen.
+- Payload enthaelt keine PII (nur `event/at/id`).
+- `JSON.parse` und `JSON` im Storage werden im `try/catch` gekapselt, damit
+  manipulierter Key nichts kippt. Falls doch manipuliert: im Worst Case
+  redirected die Tab auf `/login` oder zeigt den Banner — also nichts
+  Sicherheitsrelevantes.
+- Kein Audit-Eintrag fuer das Broadcast selbst. Der eigentliche Save /
+  Logout wird ohnehin per `AuditService` protokolliert.
 
 ---
 
@@ -279,7 +314,7 @@ Fallback: `localStorage`-`storage`-Event (100 % Abdeckung der Ziel-Browser).
 | Schritt | Gates | Status |
 |---------|-------|--------|
 | I1 — Pessimistic Lock | G1–G9 | **fertig 2026-04-20** |
-| I2 — BroadcastChannel | G1–G9 | offen, Skizze hier |
+| I2 — BroadcastChannel | G1–G9 | **fertig 2026-04-20** |
 | I3 — Optimistic Rollout + Cookie-Strict | G1–G9 | offen, Skizze hier |
 
 I1 hat keinen Konflikt mit der laufenden Arbeit aus Modul 6 I6 und beruehrt
@@ -288,4 +323,6 @@ erst in I3 einbezogen — das haelt den Blast-Radius klein.
 
 ---
 
-*Letzte Aktualisierung: 2026-04-20 — I1 abgeschlossen, 399 Unit-Tests gruen.*
+*Letzte Aktualisierung: 2026-04-20 — I1 + I2 abgeschlossen. PHPUnit: 437 Tests
+(Unit-Suite gruen, 6 DB-gebundene Integration-/Feature-Tests warten auf
+`helferstunden_test`-Instanz).*

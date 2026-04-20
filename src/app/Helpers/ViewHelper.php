@@ -55,6 +55,32 @@ class ViewHelper
     }
 
     /**
+     * Modul 7 I2: Einmaliges Broadcast-Event fuer Cross-Tab-Sync.
+     *
+     * Wird im naechsten Render ueber das Layout in ein data-Attribut
+     * serialisiert und von broadcast.js einmalig an andere Tabs verteilt.
+     * Payload darf KEINE PII enthalten (nur event, id, at).
+     *
+     * @param array<string, scalar> $payload
+     */
+    public static function broadcast(string $event, array $payload = []): void
+    {
+        $_SESSION['_broadcast'][] = ['event' => $event] + $payload;
+    }
+
+    /**
+     * Alle registrierten Broadcast-Events abrufen und aus Session entfernen.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public static function getBroadcasts(): array
+    {
+        $events = $_SESSION['_broadcast'] ?? [];
+        unset($_SESSION['_broadcast']);
+        return $events;
+    }
+
+    /**
      * Datum formatieren (deutsches Format)
      */
     public static function formatDate(?string $date): string

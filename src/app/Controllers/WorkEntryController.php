@@ -381,6 +381,9 @@ class WorkEntryController extends BaseController
             // Modul 7 I1: Lock nach erfolgreichem Update freigeben.
             $this->lockService?->release($entry->getId(), $user->getId());
 
+            // Modul 7 I2: andere Tabs informieren, dass der Eintrag neu ist.
+            ViewHelper::broadcast('entry:updated', ['id' => $entry->getId()]);
+
             return $this->redirect($response, '/entries');
         } catch (ValidationException $e) {
             ViewHelper::flashOldInput($data);
