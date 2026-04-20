@@ -177,6 +177,48 @@ final class EventAdminControllerInvariantsTest extends TestCase
         );
     }
 
+    public function test_update_renders_conflict_view_on_version_mismatch(): void
+    {
+        // Modul 7 I4: Bei Optimistic-Lock-Konflikt darf update() NICHT einfach
+        // redirecten + Flash - das wuerde die eingetippten Werte des Nutzers
+        // verwerfen. Stattdessen muss die Edit-View mit conflictMyState
+        // gerendert werden, damit der Nutzer Feld fuer Feld uebernehmen kann.
+        $code = (string) file_get_contents(
+            self::CONTROLLERS_DIR . '/EventAdminController.php'
+        );
+
+        $updateBody = $this->extractMethodBody($code, 'update');
+
+        self::assertStringContainsString(
+            'conflictMyState',
+            $updateBody,
+            'EventAdminController::update() muss bei Versions-Konflikt die Edit-View '
+            . 'mit conflictMyState rendern (Modul 7 I4 Diff-UI), statt zu redirecten.'
+        );
+    }
+
+    public function test_edit_view_renders_conflict_diff(): void
+    {
+        // Die Edit-View muss auf conflictMyState reagieren und die Abweichungs-
+        // Tabelle rendern. Ohne dieses Gegenstueck laeuft der Controller zwar
+        // richtig, der Nutzer sieht aber keine Diagnose.
+        $view = (string) file_get_contents(
+            __DIR__ . '/../../../src/app/Views/admin/events/edit.php'
+        );
+
+        self::assertStringContainsString(
+            'conflictMyState',
+            $view,
+            'admin/events/edit.php muss conflictMyState auswerten (Modul 7 I4).'
+        );
+        self::assertStringContainsString(
+            'Gleichzeitige Aenderung erkannt',
+            $view,
+            'admin/events/edit.php muss einen Konflikt-Alert anzeigen, wenn '
+            . 'conflictMyState gesetzt ist (Modul 7 I4 Diff-UI).'
+        );
+    }
+
     /**
      * Extrahiert den Body einer public-Methode bis zur naechsten public-Methode
      * oder Datei-Ende. Funktioniert ohne PHP-AST, naive aber robust gegen

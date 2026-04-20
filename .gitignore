@@ -74,6 +74,10 @@ phpunit.xml
 
 # Claude Code lokale Einstellungen
 .claude/settings.local.json
+.claude/settings.json
+
+# Lokale Workspace-Datei (VS Code Multi-Root-Workspace)
+/docs/*.code-workspace
 
 # Windows Artefakte
 nul

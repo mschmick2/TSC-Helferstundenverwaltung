@@ -374,22 +374,79 @@ naechsten Produktions-Deployment, das die Vorlage als Referenz verwendet.
 
 ---
 
-## 7. Reihenfolge und Gates
+## 7. Inkrement 4 (I4) — Conflict-Diff-UI fuer den Event-Editor
+
+**Status: fertig 2026-04-20.**
+
+I3 hatte den Konflikt-Fall mit einem Flash + Redirect auf die Edit-Seite
+behandelt. Das war ausreichend gegen Lost-Updates, aber unangenehm in der
+Praxis: Der Nutzer verlor seine eingetippten Werte und musste raten, was
+der andere Tab geaendert hatte.
+
+### 7.1 Verhalten
+
+`EventAdminController::update` rendert bei Versions-Konflikt statt zu
+redirecten die Edit-View erneut. Dabei wird:
+
+- `$event` aus frischem `findById()` gezogen (inkl. neuer version-Nummer),
+- das Formular mit dem aktuellen DB-Stand vorbelegt,
+- ein Zusatzparameter `$conflictMyState` mit den vom Nutzer gerade gesendeten
+  Werten uebergeben.
+
+Die View (`admin/events/edit.php`) baut in einem Warn-Alert eine drei-
+spaltige Tabelle auf: "Feld / Dein Stand / Aktueller DB-Stand". Nur Felder,
+die tatsaechlich auseinander laufen, werden gelistet — Organisator-Listen
+werden als sortierte Namen verglichen. Der Nutzer sieht sofort, wo der
+Konflikt liegt, kann seine Werte manuell uebernehmen (copy/paste aus der
+Tabelle) und speichert mit der frischen version erneut ab.
+
+### 7.2 Scope-Entscheidungen
+
+- **Kein Radio-/Toggle-UI pro Feld.** Wir haben das erwogen, aber in der
+  Praxis sind die Konfliktfelder wenige und der Nutzer hat den Text ohnehin
+  schon im Kopf. Ein Radio-Mechanismus haette serverseitig zusaetzliche
+  Merge-Logik verlangt, die fuer die niedrige Konflikt-Frequenz nicht
+  gerechtfertigt ist. Reversibel: sobald die Frequenz steigt, kann die
+  Tabelle zu einer aktiven UI ausgebaut werden.
+- **Kein Force-Apply-Flag.** Der Nutzer faellt nach manueller Uebernahme
+  zurueck in den regulaeren UPDATE-Pfad. Ein Force-Apply haette die
+  Optimistic-Locking-Garantie unterlaufen — nicht gewollt.
+- **Organizer-Liste** wird verglichen, aber nicht separat aufgeloest. Wer
+  zuletzt speichert, setzt die Organizer-Liste. Das ist vertretbar, weil
+  Organizer-Aenderungen selten konkurrieren und jeder Schreibversuch im
+  Audit-Log landet.
+
+### 7.3 Tests
+
+- Zwei neue statische Invarianten in
+  `tests/Unit/Controllers/EventAdminControllerInvariantsTest.php`:
+  - `test_update_renders_conflict_view_on_version_mismatch`: sichert, dass
+    `update()` das Token `conflictMyState` an die View weiterreicht.
+  - `test_edit_view_renders_conflict_diff`: sichert, dass die View das
+    Gegenstueck rendert (Alert-Heading + Auswertung von
+    `$conflictMyState`).
+- Gesamtlauf: 442 Tests, 926 Assertions, 6 Fehler (baseline-identisch).
+
+---
+
+## 8. Reihenfolge und Gates
 
 | Schritt | Gates | Status |
 |---------|-------|--------|
 | I1 — Pessimistic Lock | G1–G9 | **fertig 2026-04-20** |
 | I2 — BroadcastChannel | G1–G9 | **fertig 2026-04-20** |
 | I3 — Optimistic Rollout + Cookie-Strict | G1–G9 | **fertig 2026-04-20** |
+| I4 — Conflict-Diff-UI | G1–G9 | **fertig 2026-04-20** |
 
 I1 hat keinen Konflikt mit der laufenden Arbeit aus Modul 6 I6 und beruehrt
 bewusst nur den `work_entries`-Edit-Flow. Events/Tasks/Assignments kamen
 in I3 dazu — der Blast-Radius blieb klein, weil alle drei Repos dem bereits
-in `WorkEntryRepository` erprobten Pattern folgen.
+in `WorkEntryRepository` erprobten Pattern folgen. I4 schliesst die UX-
+Luecke, die I3 am Edit-Formular offen gelassen hatte.
 
 ---
 
-*Letzte Aktualisierung: 2026-04-20 — I1 + I2 + I3 abgeschlossen. PHPUnit:
-440 Tests (Unit-Suite gruen, 6 DB-gebundene Integration-/Feature-Tests
+*Letzte Aktualisierung: 2026-04-20 — I1 + I2 + I3 + I4 abgeschlossen. PHPUnit:
+442 Tests (Unit-Suite gruen, 6 DB-gebundene Integration-/Feature-Tests
 warten weiterhin auf `helferstunden_test`-Instanz — identische Baseline
-wie vor I3).*
+seit I3).*

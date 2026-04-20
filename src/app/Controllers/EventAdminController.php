@@ -254,18 +254,44 @@ class EventAdminController extends BaseController
         // Modul 7 I3: Optimistic Locking. Formular transportiert die zum Read-
         // Zeitpunkt gueltige version. Wenn zwischen Laden und Speichern ein anderer
         // Tab/Admin den Datensatz veraendert hat, schlaegt das UPDATE fehl
-        // (rowCount = 0). In diesem Fall Fehler-Flash + zurueck zur Edit-Seite,
-        // damit der Nutzer den aktuellen Stand neu laedt und die Aenderungen
-        // uebernehmen kann.
+        // (rowCount = 0).
         $expectedVersion = isset($data['version']) ? (int) $data['version'] : null;
         $updated = $this->eventRepo->update($id, $newState, $expectedVersion);
+
+        // Modul 7 I4: Bei Konflikt die Edit-View mit Diff-Panel rendern, damit
+        // der Nutzer Feld fuer Feld sehen kann, was der andere Tab geaendert hat,
+        // und seine Eingaben nicht verliert. Die Form wird mit dem aktuellen
+        // DB-Stand (frisch gelesen) und der neuen version vorbelegt - "Dein
+        // Stand" wird daneben angezeigt, damit der Nutzer bewusst uebernehmen
+        // oder verwerfen kann. Kein Force-Apply noetig: der Nutzer schickt das
+        // Formular erneut ab und faellt wieder in den regulaeren UPDATE-Pfad.
         if (!$updated) {
-            ViewHelper::flash(
-                'warning',
-                'Das Event wurde zwischenzeitlich von jemand anderem geaendert. '
-                . 'Bitte Formular neu laden und Aenderungen erneut eintragen.'
-            );
-            return $this->redirect($response, '/admin/events/' . $id . '/edit');
+            $freshEvent = $this->eventRepo->findById($id);
+            if ($freshEvent === null) {
+                ViewHelper::flash('danger', 'Event wurde zwischenzeitlich geloescht.');
+                return $this->redirect($response, '/admin/events');
+            }
+
+            $newOrganizerIdsPosted = array_map('intval', (array) ($data['organizer_ids'] ?? []));
+            $currentOrganizerIds = $this->organizerRepo->listUserIdsForEvent($id);
+
+            return $this->render($response, 'admin/events/edit', [
+                'title' => 'Event bearbeiten',
+                'user' => $user,
+                'settings' => $this->settings,
+                'event' => $freshEvent,
+                'users' => $this->userRepo->findAllActive(),
+                'organizerIds' => $currentOrganizerIds,
+                'conflictMyState' => $newState + [
+                    'organizer_ids' => $newOrganizerIdsPosted,
+                ],
+                'breadcrumbs' => [
+                    ['label' => 'Dashboard', 'url' => '/'],
+                    ['label' => 'Events', 'url' => '/admin/events'],
+                    ['label' => $freshEvent->getTitle(), 'url' => '/admin/events/' . $id],
+                    ['label' => 'Bearbeiten (Konflikt)'],
+                ],
+            ]);
         }
 
         // Organizer-Sync
