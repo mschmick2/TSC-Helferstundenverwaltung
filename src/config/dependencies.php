@@ -522,7 +522,8 @@ return [
         return new AuditController(
             $c->get(AuditRepository::class),
             $c->get(UserRepository::class),
-            $c->get('settings')
+            $c->get('settings'),
+            $c->get(LoggerInterface::class)
         );
     },
 

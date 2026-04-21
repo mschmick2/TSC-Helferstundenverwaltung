@@ -67,8 +67,10 @@ class AuthController extends BaseController
         $password = $body['password'] ?? '';
         $ipAddress = $this->getClientIp($request);
 
-        // Rate-Limiting: Max. 20 Versuche pro IP in 15 Minuten
-        if (!$this->rateLimitService->isAllowed($ipAddress, 'login', 20, 900)) {
+        // Rate-Limiting: Default 20 Versuche pro IP in 15 Minuten, ueber Settings anhebbar (E2E).
+        $rlMax = (int) ($this->settings['security']['login_rate_limit_max'] ?? 20);
+        $rlWindow = (int) ($this->settings['security']['login_rate_limit_window'] ?? 900);
+        if (!$this->rateLimitService->isAllowed($ipAddress, 'login', $rlMax, $rlWindow)) {
             ViewHelper::flash('danger', 'Zu viele Anmeldeversuche. Bitte versuchen Sie es später erneut.');
             return $this->redirect($response, '/login');
         }

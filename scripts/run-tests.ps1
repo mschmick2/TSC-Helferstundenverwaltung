@@ -5,7 +5,7 @@
 
 .DESCRIPTION
     Orchestriert:
-      - MailPit-Binary Download (gepinnt v1.21.5, SHA256-Verifikation via checksums.txt)
+      - MailPit-Binary Download (gepinnt v1.29.7, SHA256-Verifikation via checksums.txt)
       - MailPit SMTP-Server (Port 1025) + Web-UI (8025)
       - PHP-Dev-Server (localhost:8000) aus src/public/
       - Playwright E2E-Tests (e2e-tests/)
@@ -52,7 +52,7 @@ $StorageDir    = Join-Path $ProjectRoot 'storage'
 $PidFile       = Join-Path $StorageDir 'run-tests.pids'
 $MailPitDir    = Join-Path $ProjectRoot 'tools\mailpit'
 $MailPitExe    = Join-Path $MailPitDir 'mailpit.exe'
-$MailPitVersion = 'v1.21.5'
+$MailPitVersion = 'v1.29.7'
 $MailPitUrl     = "https://github.com/axllent/mailpit/releases/download/$MailPitVersion/mailpit-windows-amd64.zip"
 $MailPitChecksumsUrl = "https://github.com/axllent/mailpit/releases/download/$MailPitVersion/checksums.txt"
 $MailPitZipName = 'mailpit-windows-amd64.zip'

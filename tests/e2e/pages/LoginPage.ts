@@ -25,6 +25,7 @@ export class LoginPage {
     await this.goto();
     await this.fill(user.email, user.password);
     await this.submit();
+    await this.page.waitForURL((url) => !url.pathname.startsWith('/login'));
   }
 
   async expectLoginSuccess(user: SeedUser): Promise<void> {

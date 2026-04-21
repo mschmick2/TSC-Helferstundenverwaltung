@@ -70,6 +70,10 @@ return [
         'lockout_duration' => 900,  // 15 Minuten in Sekunden
         'csrf_token_lifetime' => 3600,
         'require_2fa' => true,
+        // IP-Rate-Limit fuer POST /login (Default: 20 Versuche pro IP / 15 Minuten).
+        // In E2E-Umgebungen hoeher setzen, damit serielle Tests nicht gegen das Limit laufen.
+        'login_rate_limit_max' => 20,
+        'login_rate_limit_window' => 900,
     ],
     
     // ==========================================================================

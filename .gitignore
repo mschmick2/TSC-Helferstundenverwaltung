@@ -106,3 +106,10 @@ vaes_backup_*
 # E2E-Config mit DB-Zugang (Vorlage bleibt: config.e2e.example.php)
 /src/config/config.e2e.php
 
+# Runtime-Artefakte (MailPit-Download-Metadaten, Mailpit-Laufzeit-JSON, Diagnose-Ausgaben)
+/mailpit-release.json
+/storage/mailpit-info.json
+/test_output.txt
+/tmp_audit.txt
+/.claude/scheduled_tasks.lock
+

@@ -173,6 +173,12 @@ foreach ($users as $u) {
 
 $pdo->exec("SET FOREIGN_KEY_CHECKS = 1");
 
+// Zusatz: Soll-Stunden-Funktion fuer E2E-Tests aktivieren.
+// Standard ist 'false' (siehe create_database.sql), Modul 8 I3 braucht die
+// Funktion zur Validierung des Dashboard-Fortschritts.
+$pdo->exec("UPDATE settings SET setting_value = 'true' WHERE setting_key = 'target_hours_enabled'");
+echo "✓ target_hours_enabled fuer E2E auf 'true' gesetzt.\n";
+
 echo "\n✓ E2E-DB '$target' bereit. Login-Passwort fuer alle Seed-User: 'e2e-test-pw'.\n";
 exit(0);
 

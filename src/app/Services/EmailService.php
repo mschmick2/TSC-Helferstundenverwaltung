@@ -30,10 +30,19 @@ class EmailService
             $mail->isSMTP();
             $mail->Host = $this->mailSettings['host'] ?? '';
             $mail->Port = (int) ($this->mailSettings['port'] ?? 587);
-            $mail->SMTPAuth = true;
-            $mail->Username = $this->mailSettings['username'] ?? '';
-            $mail->Password = $this->mailSettings['password'] ?? '';
-            $mail->SMTPSecure = $this->mailSettings['encryption'] ?? 'tls';
+            $username = (string) ($this->mailSettings['username'] ?? '');
+            $password = (string) ($this->mailSettings['password'] ?? '');
+            $mail->SMTPAuth = $username !== '';
+            if ($mail->SMTPAuth) {
+                $mail->Username = $username;
+                $mail->Password = $password;
+            }
+            $encryption = (string) ($this->mailSettings['encryption'] ?? 'tls');
+            if ($encryption !== '') {
+                $mail->SMTPSecure = $encryption;
+            } else {
+                $mail->SMTPAutoTLS = false;
+            }
             $mail->CharSet = 'UTF-8';
 
             // Absender
