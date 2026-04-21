@@ -140,7 +140,8 @@ class MemberEventController extends BaseController
     public function myAssignments(Request $request, Response $response): Response
     {
         $user = $request->getAttribute('user');
-        $assignments = $this->assignmentRepo->findByUser((int) $user->getId(), activeOnly: false);
+        $userId = (int) $user->getId();
+        $assignments = $this->assignmentRepo->findByUser($userId, activeOnly: false);
 
         // Kontext-Daten (Task + Event) vorladen
         $context = [];
@@ -150,12 +151,21 @@ class MemberEventController extends BaseController
             $context[$a->getId()] = ['task' => $task, 'event' => $event];
         }
 
+        // Kandidaten fuer Ersatz-Vorschlag im Storno-Dialog.
+        // Aktive Mitglieder ohne System-User; aktueller User raus
+        // (Self-Replacement wird serverseitig abgefangen).
+        $replacementCandidates = array_values(array_filter(
+            $this->userRepo->findAllActive(),
+            static fn($u) => (int) $u->getId() !== $userId
+        ));
+
         return $this->render($response, 'my-events/index', [
             'title' => 'Meine Zusagen',
             'user' => $user,
             'settings' => $this->settings,
             'assignments' => $assignments,
             'context' => $context,
+            'replacementCandidates' => $replacementCandidates,
             'breadcrumbs' => [
                 ['label' => 'Dashboard', 'url' => '/'],
                 ['label' => 'Meine Zusagen'],

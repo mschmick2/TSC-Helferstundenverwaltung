@@ -2,9 +2,12 @@
 /**
  * @var \App\Models\EventTaskAssignment[] $assignments
  * @var array<int, array{task: ?\App\Models\EventTask, event: ?\App\Models\Event}> $context
+ * @var \App\Models\User[] $replacementCandidates
  */
 use App\Helpers\ViewHelper;
 use App\Models\EventTaskAssignment;
+
+$replacementCandidates = $replacementCandidates ?? [];
 
 $statusLabel = [
     EventTaskAssignment::STATUS_VORGESCHLAGEN    => ['class' => 'warning', 'label' => 'Zeitfenster vorgeschlagen'],
@@ -99,9 +102,20 @@ $statusLabel = [
                                       action="<?= ViewHelper::url('/my-events/assignments/' . (int) $a->getId() . '/cancel') ?>"
                                       class="row g-2">
                                     <?= ViewHelper::csrfField() ?>
-                                    <div class="col-md-12">
+                                    <div class="col-md-6">
                                         <label class="form-label small">Begruendung (optional)</label>
                                         <input type="text" name="reason" class="form-control form-control-sm">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label small">Ersatz vorschlagen (optional)</label>
+                                        <select name="replacement_user_id" class="form-select form-select-sm">
+                                            <option value="">-- kein Vorschlag --</option>
+                                            <?php foreach ($replacementCandidates as $cand): ?>
+                                                <option value="<?= (int) $cand->getId() ?>">
+                                                    <?= ViewHelper::e($cand->getNachname() . ', ' . $cand->getVorname()) ?>
+                                                </option>
+                                            <?php endforeach; ?>
+                                        </select>
                                     </div>
                                     <div class="col-md-12">
                                         <button type="submit" class="btn btn-warning btn-sm">

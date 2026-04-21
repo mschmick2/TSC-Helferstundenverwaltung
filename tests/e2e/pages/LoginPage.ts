@@ -25,13 +25,21 @@ export class LoginPage {
     await this.goto();
     await this.fill(user.email, user.password);
     await this.submit();
-    await this.page.waitForURL((url) => !url.pathname.startsWith('/login'));
+    // Wartet auf ein positives Post-Login-Signal: den Logout-Link in der
+    // Navbar (im DOM, auch wenn Dropdown eingeklappt). Robuster als
+    // waitForURL — bei sehr schnellen Server-Redirects kann die URL-
+    // Subscription den Wechsel verpassen, toHaveCount() prueft immer
+    // wieder den aktuellen Zustand.
+    await expect(this.page.locator('a[href$="/logout"]'))
+      .toHaveCount(1, { timeout: 15_000 });
   }
 
   async expectLoginSuccess(user: SeedUser): Promise<void> {
-    await this.page.waitForURL((url) => !url.pathname.startsWith('/login'));
-    // Logout-Link existiert im DOM (eingeklappter Navbar-Dropdown)
-    await expect(this.page.locator('a[href$="/logout"]')).toHaveCount(1);
+    // Logout-Link existiert im DOM (eingeklappter Navbar-Dropdown) —
+    // dient hier gleichzeitig als Post-Login-Signal. Robuster als
+    // waitForURL mit negiertem Pfad-Predikat (siehe loginAs()).
+    await expect(this.page.locator('a[href$="/logout"]'))
+      .toHaveCount(1, { timeout: 15_000 });
     // Flash-Begruessung enthaelt Vornamen
     await expect(this.page.locator('body')).toContainText(user.vorname);
   }
