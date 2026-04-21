@@ -202,4 +202,90 @@ class RateLimitServiceTest extends TestCase
         $this->assertTrue($this->service->isAllowed('10.0.0.1', 'login', 5, 900));
         $this->assertFalse($this->service->isAllowed('10.0.0.1', 'forgot-password', 3, 900));
     }
+
+    // =========================================================================
+    // isAllowedForEmail() / recordAttemptForEmail()
+    //
+    // Email-Bucket ist der Anti-Flood-Schutz fuer das Postfach eines Opfers:
+    // unabhaengig davon, aus wie vielen IPs die Forgot-Password-Requests kommen,
+    // sollen pro Empfaenger-Adresse im Zeitfenster nur N Mails rausgehen.
+    // =========================================================================
+
+    /** @test */
+    public function is_allowed_for_email_true_bei_keinen_eintraegen(): void
+    {
+        $stmt = $this->createMock(\PDOStatement::class);
+        $stmt->method('execute');
+        $stmt->method('fetchColumn')->willReturn(0);
+
+        $this->pdo->method('prepare')->willReturn($stmt);
+
+        $this->assertTrue(
+            $this->service->isAllowedForEmail('opfer@example.com', 'forgot-password', 3, 3600)
+        );
+    }
+
+    /** @test */
+    public function is_allowed_for_email_false_bei_erreichtem_limit(): void
+    {
+        $stmt = $this->createMock(\PDOStatement::class);
+        $stmt->method('execute');
+        $stmt->method('fetchColumn')->willReturn(3);
+
+        $this->pdo->method('prepare')->willReturn($stmt);
+
+        $this->assertFalse(
+            $this->service->isAllowedForEmail('opfer@example.com', 'forgot-password', 3, 3600)
+        );
+    }
+
+    /** @test */
+    public function is_allowed_for_email_prueft_korrekte_parameter(): void
+    {
+        // Der Count-Query fuer den Email-Bucket muss auf email + endpoint + window
+        // filtern — nicht auf ip_address. Sonst wird der verteilte Angriff aus
+        // vielen IPs nicht als ein Bucket erkannt.
+        $countStmt = $this->createMock(\PDOStatement::class);
+        $countStmt->expects($this->once())
+            ->method('execute')
+            ->with([
+                'email' => 'opfer@example.com',
+                'endpoint' => 'forgot-password',
+                'window' => 3600,
+            ]);
+        $countStmt->method('fetchColumn')->willReturn(0);
+
+        $cleanupStmt = $this->createMock(\PDOStatement::class);
+
+        $this->pdo->method('prepare')
+            ->willReturnCallback(fn (string $sql) => str_starts_with(ltrim($sql), 'DELETE')
+                ? $cleanupStmt
+                : $countStmt);
+
+        $this->assertTrue(
+            $this->service->isAllowedForEmail('opfer@example.com', 'forgot-password', 3, 3600)
+        );
+    }
+
+    /** @test */
+    public function record_attempt_for_email_schreibt_ip_und_email_in_eine_zeile(): void
+    {
+        // Ein einzelner INSERT mit gefuellter email-Spalte zaehlt sowohl fuer
+        // den IP-Bucket als auch fuer den Email-Bucket — kein Doppel-Write.
+        $stmt = $this->createMock(\PDOStatement::class);
+        $stmt->expects($this->once())
+            ->method('execute')
+            ->with([
+                'ip' => '10.0.0.1',
+                'email' => 'opfer@example.com',
+                'endpoint' => 'forgot-password',
+            ]);
+
+        $this->pdo->expects($this->once())
+            ->method('prepare')
+            ->with($this->stringContains('INSERT INTO rate_limits'))
+            ->willReturn($stmt);
+
+        $this->service->recordAttemptForEmail('10.0.0.1', 'opfer@example.com', 'forgot-password');
+    }
 }

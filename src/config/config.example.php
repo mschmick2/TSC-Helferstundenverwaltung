@@ -74,6 +74,20 @@ return [
         // In E2E-Umgebungen hoeher setzen, damit serielle Tests nicht gegen das Limit laufen.
         'login_rate_limit_max' => 20,
         'login_rate_limit_window' => 900,
+
+        // Rate-Limits fuer POST /forgot-password.
+        // Zwei-Bucket-Strategie: IP-Bucket sperrt sichtbar (gleiche Fehlermeldung), Email-
+        // Bucket laeuft silent (gleiche Erfolgsmeldung, keine Mail) und schuetzt das
+        // Postfach eines Opfers vor verteilten Flood-Angriffen aus vielen IPs. Werte in
+        // E2E-Umgebungen NICHT anheben, sonst greift der Schutz im Test nicht.
+        'forgot_password_rate_limit_max_per_ip' => 5,
+        'forgot_password_rate_limit_window_per_ip' => 900,      // 15 Minuten
+        'forgot_password_rate_limit_max_per_email' => 3,
+        'forgot_password_rate_limit_window_per_email' => 3600,  // 1 Stunde
+
+        // Rate-Limit fuer POST /reset-password/{token} (Brute-Force auf ausgestelltes Token).
+        'reset_password_rate_limit_max' => 10,
+        'reset_password_rate_limit_window' => 900,
     ],
     
     // ==========================================================================

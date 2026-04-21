@@ -427,43 +427,63 @@ class AuthController extends BaseController
 
     /**
      * Passwort-Reset anfordern
+     *
+     * Zwei-Bucket-Rate-Limiting:
+     *  - IP-Bucket (sichtbares 429-Verhalten): schuetzt gegen einzelnen Angreifer.
+     *  - Email-Bucket (silent, gleiche Erfolgsmeldung): schuetzt Empfaenger-Postfach
+     *    gegen verteilte Flood-Angriffe aus vielen IPs auf ein einzelnes Opfer.
+     * Der Email-Bucket darf NICHT sichtbar sein, sonst koennte ein Angreifer durch
+     * wiederholtes Einreichen feststellen, dass eine Adresse existiert/gelockt ist.
      */
     public function requestReset(Request $request, Response $response): Response
     {
         $ipAddress = $this->getClientIp($request);
 
-        // Rate-Limiting: Max. 5 Anfragen pro IP in 15 Minuten
-        if (!$this->rateLimitService->isAllowed($ipAddress, 'forgot-password', 5, 900)) {
+        $ipMax    = (int) ($this->settings['security']['forgot_password_rate_limit_max_per_ip'] ?? 5);
+        $ipWindow = (int) ($this->settings['security']['forgot_password_rate_limit_window_per_ip'] ?? 900);
+        $emailMax    = (int) ($this->settings['security']['forgot_password_rate_limit_max_per_email'] ?? 3);
+        $emailWindow = (int) ($this->settings['security']['forgot_password_rate_limit_window_per_email'] ?? 3600);
+
+        // IP-Bucket: sichtbarer Stop bei Ueberlauf.
+        if (!$this->rateLimitService->isAllowed($ipAddress, 'forgot-password', $ipMax, $ipWindow)) {
             ViewHelper::flash('danger', 'Zu viele Anfragen. Bitte versuchen Sie es später erneut.');
             return $this->redirect($response, '/forgot-password');
         }
-        $this->rateLimitService->recordAttempt($ipAddress, 'forgot-password');
 
         $body = $request->getParsedBody();
-        $email = trim($body['email'] ?? '');
+        $email = strtolower(trim($body['email'] ?? ''));
 
-        // Immer gleiche Nachricht (kein Information-Leak)
+        // Immer gleiche Nachricht (kein Information-Leak).
         $successMessage = 'Falls ein Account mit dieser E-Mail existiert, wurde ein Link zum Zurücksetzen gesendet.';
 
         if ($email === '') {
+            // Ungueltige Eingabe: IP-Attempt buchen, damit Leeranfragen das IP-Budget zaehlen.
+            $this->rateLimitService->recordAttempt($ipAddress, 'forgot-password');
             ViewHelper::flash('danger', 'Bitte geben Sie Ihre E-Mail-Adresse ein.');
             return $this->redirect($response, '/forgot-password');
         }
 
-        $user = $this->userRepository->findByEmail($email);
-        if ($user !== null) {
-            $token = SecurityHelper::generateToken();
-            $this->userRepository->createPasswordReset($user->getId(), $token);
+        // Email-Bucket: Ueberlauf wird silent behandelt — gleiche Erfolgsmeldung, keine Mail,
+        // kein Audit-Eintrag. Der Attempt wird trotzdem gebucht, damit das Postfach weiter gesperrt bleibt.
+        $emailAllowed = $this->rateLimitService->isAllowedForEmail($email, 'forgot-password', $emailMax, $emailWindow);
+        $this->rateLimitService->recordAttemptForEmail($ipAddress, $email, 'forgot-password');
 
-            $resetUrl = ($this->settings['app']['url'] ?? '') . '/reset-password/' . $token;
-            $this->emailService->sendPasswordResetLink($user->getEmail(), $user->getVorname(), $resetUrl);
+        if ($emailAllowed) {
+            $user = $this->userRepository->findByEmail($email);
+            if ($user !== null) {
+                $token = SecurityHelper::generateToken();
+                $this->userRepository->createPasswordReset($user->getId(), $token);
 
-            $this->auditService->log(
-                'update',
-                'users',
-                $user->getId(),
-                description: 'Passwort-Reset angefordert'
-            );
+                $resetUrl = ($this->settings['app']['url'] ?? '') . '/reset-password/' . $token;
+                $this->emailService->sendPasswordResetLink($user->getEmail(), $user->getVorname(), $resetUrl);
+
+                $this->auditService->log(
+                    'update',
+                    'users',
+                    $user->getId(),
+                    description: 'Passwort-Reset angefordert'
+                );
+            }
         }
 
         ViewHelper::flash('info', $successMessage);
@@ -505,8 +525,10 @@ class AuthController extends BaseController
         $args = $this->routeArgs($request);
         $ipAddress = $this->getClientIp($request);
 
-        // Rate-Limiting: Max. 10 Versuche pro IP in 15 Minuten
-        if (!$this->rateLimitService->isAllowed($ipAddress, 'reset-password', 10, 900)) {
+        // Rate-Limiting: Versuche pro IP (Default 10 pro 15 Minuten, ueber Settings anhebbar).
+        $rlMax    = (int) ($this->settings['security']['reset_password_rate_limit_max'] ?? 10);
+        $rlWindow = (int) ($this->settings['security']['reset_password_rate_limit_window'] ?? 900);
+        if (!$this->rateLimitService->isAllowed($ipAddress, 'reset-password', $rlMax, $rlWindow)) {
             ViewHelper::flash('danger', 'Zu viele Versuche. Bitte versuchen Sie es später erneut.');
             return $this->redirect($response, '/login');
         }

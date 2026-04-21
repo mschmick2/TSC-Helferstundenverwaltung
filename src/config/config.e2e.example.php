@@ -55,6 +55,15 @@ return [
         'lockout_duration' => 60,
         'csrf_token_lifetime' => 3600,
         'require_2fa' => false,
+        // Forgot-Password-Buckets bleiben strikt, damit die E2E-Spec
+        // (tests/e2e/specs/09-password-reset-rate-limit.spec.ts) den Schutz
+        // im kurzen Zeitfenster eines Test-Runs sichtbar machen kann.
+        'forgot_password_rate_limit_max_per_ip' => 5,
+        'forgot_password_rate_limit_window_per_ip' => 900,
+        'forgot_password_rate_limit_max_per_email' => 3,
+        'forgot_password_rate_limit_window_per_email' => 3600,
+        'reset_password_rate_limit_max' => 10,
+        'reset_password_rate_limit_window' => 900,
     ],
 
     'mail' => [
