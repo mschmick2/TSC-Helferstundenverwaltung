@@ -152,7 +152,68 @@ class AdminController extends BaseController
             $errors[] = 'Einladungsgültigkeit muss mindestens 1 Tag betragen.';
         }
 
+        if (isset($s['cron_min_interval_seconds']) && (int) $s['cron_min_interval_seconds'] < 60) {
+            $errors[] = 'Scheduler-Mindestintervall muss mindestens 60 Sekunden betragen (sonst riskierst du Mehrfach-Mails).';
+        }
+
         return $errors;
+    }
+
+    /**
+     * Cron-Token rotieren (POST /admin/settings/cron-token).
+     *
+     * Der Klartext-Token wird serverseitig erzeugt, SHA-256-gehasht in der DB
+     * abgelegt und EINMALIG als Flash-Message angezeigt. Wer den Token nicht
+     * sofort kopiert, muss neu rotieren — wir behalten ihn nirgends im Klartext.
+     */
+    public function rotateCronToken(Request $request, Response $response): Response
+    {
+        $user   = $request->getAttribute('user');
+        $action = (string) ($request->getParsedBody()['action'] ?? 'rotate');
+
+        if ($action === 'remove') {
+            $this->settingsService->set('cron_external_token_hash', '', $user->getId());
+            $this->auditService->log(
+                action: 'config_change',
+                tableName: 'settings',
+                description: 'Cron-Token entfernt — externer Pinger deaktiviert',
+                metadata: ['setting_key' => 'cron_external_token_hash', 'operation' => 'remove']
+            );
+            ViewHelper::flash('warning', 'Cron-Token wurde entfernt. Der externe Pinger ist jetzt deaktiviert.');
+            return $this->redirect($response, '/admin/settings');
+        }
+
+        // Neuer Token: 32 Bytes Zufall = 64 hex Zeichen, gut fuer HTTP-Header.
+        $plain = bin2hex(random_bytes(32));
+        $hash  = hash('sha256', $plain);
+
+        $this->settingsService->set('cron_external_token_hash', $hash, $user->getId());
+        $this->auditService->log(
+            action: 'config_change',
+            tableName: 'settings',
+            description: 'Cron-Token rotiert',
+            metadata: ['setting_key' => 'cron_external_token_hash', 'operation' => 'rotate']
+        );
+
+        // Klartext-Token in separater Session-Variable — das Settings-View rendert
+        // sie EINMALIG als prominenten Block und loescht sie danach. Wir packen den
+        // Token bewusst NICHT in die Flash-Message, weil die HTML-eskapiert wird
+        // und der user-select-all-Helfer dadurch verloren geht.
+        //
+        // TTL 5 Minuten: Normalerweise greift die View-Seite direkt nach dem
+        // Redirect und loescht die Variable. Falls der Admin den Redirect
+        // abbricht (Logout, Browser-Tab zu) wuerde der Klartext sonst bis zum
+        // Session-Ende im Session-Store liegen — das fangen wir hier ab.
+        $_SESSION['_cron_token_plain']     = $plain;
+        $_SESSION['_cron_token_plain_exp'] = time() + 300;
+
+        ViewHelper::flash(
+            'success',
+            'Neuer Cron-Token erzeugt. Bitte JETZT kopieren und im externen Pinger '
+            . 'hinterlegen — er wird nach dem Verlassen dieser Seite nicht mehr angezeigt.'
+        );
+
+        return $this->redirect($response, '/admin/settings');
     }
 
     /**
@@ -175,6 +236,11 @@ class AdminController extends BaseController
                 'label' => 'Erinnerungen',
                 'icon' => 'bi-bell',
                 'keys' => ['reminder_days', 'reminder_enabled'],
+            ],
+            'notifications' => [
+                'label' => 'Benachrichtigungen / Scheduler',
+                'icon' => 'bi-broadcast',
+                'keys' => ['notifications_enabled', 'cron_min_interval_seconds', 'cron_last_run_at'],
             ],
             'target_hours' => [
                 'label' => 'Soll-Stunden',

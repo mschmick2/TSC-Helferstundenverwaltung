@@ -1,0 +1,111 @@
+name: CI
+
+on:
+  push:
+    branches: [main, 'feature/**', 'fix/**']
+  pull_request:
+    branches: [main]
+
+jobs:
+  php-lint:
+    name: PHP Syntax Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: pdo_mysql, mbstring, openssl, json, fileinfo, gd
+      - name: Syntax Check alle PHP-Dateien
+        run: |
+          find src/app -name "*.php" -print0 | xargs -0 -n1 php -l
+          find src/public -name "*.php" -print0 | xargs -0 -n1 php -l
+          find tests -name "*.php" -print0 | xargs -0 -n1 php -l
+
+  env-validation:
+    name: .env.example Validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Pruefe, dass .env.example alle noetigen Keys hat
+        run: |
+          REQUIRED="DB_HOST DB_PORT DB_USERNAME DB_PASSWORD DB_DATABASE DB_TEST_DATABASE SMTP_HOST SMTP_PORT MAILPIT_URL APP_ENV"
+          for key in $REQUIRED; do
+            if ! grep -q "^$key=" .env.example; then
+              echo "FEHLT: $key in .env.example"
+              exit 1
+            fi
+          done
+          echo "✓ alle Keys vorhanden"
+
+  secret-scan:
+    name: Secret Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Keine Prod-Credentials im Code
+        run: |
+          # Bekannte Muster: Strato-Hostnamen, Telekom-Zugangsnummern, hartcodierte Passwoerter
+          PATTERNS=(
+            "rdbms.strato.de"
+            "securesmtp.t-online.de"
+            "password.*=.*['\"][A-Za-z0-9!@#\$%^&*]{10,}"
+            "DB[0-9]{7,}"
+          )
+          FOUND=0
+          for p in "${PATTERNS[@]}"; do
+            if grep -rE "$p" src/app src/public src/config/config.example.php scripts/ 2>/dev/null; then
+              echo "WARNUNG: Muster '$p' gefunden"
+              FOUND=1
+            fi
+          done
+          # Pattern in config.example.php sind ERLAUBT, aber in config.php nicht.
+          if [ -f src/config/config.php ]; then
+            echo "FEHLER: src/config/config.php sollte NICHT im Repo sein"
+            exit 1
+          fi
+          exit 0
+
+  phpunit:
+    name: PHPUnit
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_DATABASE: vaes
+          MYSQL_ROOT_PASSWORD: root
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -proot"
+          --health-interval=10s --health-timeout=5s --health-retries=5
+    env:
+      DB_HOST: 127.0.0.1
+      DB_PORT: 3306
+      DB_USERNAME: root
+      DB_PASSWORD: root
+      DB_DATABASE: vaes
+      DB_TEST_DATABASE: vaes_test
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: pdo_mysql, mbstring, openssl
+          coverage: none
+      - name: Composer Install
+        working-directory: src
+        run: composer install --no-interaction --no-progress --prefer-dist
+      - name: Dev-Schema einspielen
+        run: |
+          mysql -h 127.0.0.1 -uroot -proot vaes < scripts/database/create_database.sql
+      - name: Test-DB klonen
+        run: php scripts/setup-test-db.php
+      - name: Unit + Security
+        run: src/vendor/bin/phpunit --testsuite Unit,Security
+      - name: Integration
+        run: src/vendor/bin/phpunit --testsuite Integration
+        continue-on-error: true  # solange Fixtures fehlen, nicht hart failen

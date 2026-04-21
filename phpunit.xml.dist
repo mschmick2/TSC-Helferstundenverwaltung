@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:noNamespaceSchemaLocation="https://schema.phpunit.de/10.5/phpunit.xsd"
+         bootstrap="tests/bootstrap.php"
+         colors="true"
+         cacheDirectory=".phpunit.cache"
+         executionOrder="depends,defects"
+         failOnRisky="true"
+         failOnWarning="true"
+         stopOnFailure="false">
+    <testsuites>
+        <testsuite name="Unit">
+            <directory>tests/Unit</directory>
+        </testsuite>
+        <testsuite name="Integration">
+            <directory>tests/Integration</directory>
+        </testsuite>
+        <testsuite name="Feature">
+            <directory>tests/Feature</directory>
+        </testsuite>
+        <testsuite name="Security">
+            <directory>tests/Security</directory>
+        </testsuite>
+    </testsuites>
+    <source>
+        <include>
+            <directory suffix=".php">src/app</directory>
+        </include>
+        <exclude>
+            <directory>src/app/Views</directory>
+        </exclude>
+    </source>
+    <php>
+        <env name="APP_ENV" value="testing"/>
+        <env name="DB_HOST" value="127.0.0.1"/>
+        <env name="DB_PORT" value="3306"/>
+        <env name="DB_USERNAME" value="root"/>
+        <env name="DB_PASSWORD" value=""/>
+        <env name="DB_DATABASE" value="vaes"/>
+        <env name="DB_TEST_DATABASE" value="vaes_test"/>
+        <env name="SMTP_HOST" value="127.0.0.1"/>
+        <env name="SMTP_PORT" value="1025"/>
+        <env name="SMTP_USERNAME" value=""/>
+        <env name="SMTP_PASSWORD" value=""/>
+        <env name="SMTP_ENCRYPTION" value=""/>
+        <env name="SMTP_FROM_ADDRESS" value="noreply@vaes.test"/>
+        <env name="SMTP_FROM_NAME" value="VAES Test"/>
+        <env name="MAILPIT_URL" value="http://127.0.0.1:8025"/>
+        <env name="APP_BASE_URL" value="http://localhost:8000"/>
+    </php>
+</phpunit>

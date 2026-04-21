@@ -2,8 +2,8 @@
 
 ## Vereins-Arbeitsstunden-Erfassungssystem
 
-**Version:** 1.1.0  
-**Stand:** 2025-02-09
+**Version:** 1.2.0
+**Stand:** 2026-04-20
 
 ---
 
@@ -389,6 +389,36 @@ E:\TSC-Helferstundenverwaltung\
 ---
 
 ## 7. Konfiguration
+
+### Benachrichtigungen / Cron-Pinger
+
+VAES laeuft auf Strato ohne System-Cron. Damit Erinnerungs-Mails (Event-,
+Aufgaben-, Dialog- und Abschluss-Erinnerungen) zuverlaessig rausgehen, muss
+ein externer HTTP-Pinger den Endpunkt `POST /cron/run` regelmaessig aufrufen.
+
+Vollstaendige Anleitung — Token rotieren, Pinger einrichten, Diagnose-Codes:
+siehe [`docs/NOTIFICATIONS.md`](NOTIFICATIONS.md).
+
+Kurz-Setup nach Erstinstallation:
+
+1. **Verwaltung → Einstellungen → Benachrichtigungen / Scheduler** oeffnen.
+2. `notifications_enabled` auf **true** setzen (Kill-Switch aus).
+3. Button **„Cron-Token rotieren"** — Klartext-Token sofort kopieren (wird nur
+   einmal angezeigt).
+4. Bei einem Cron-Service (cron-job.org, EasyCron, GitHub Actions …) eintragen:
+   - URL: `https://<deine-domain>/cron/run`
+   - Methode: POST
+   - Header: `X-Cron-Token: <token>`
+   - Intervall: alle 5 Minuten
+
+Test-Aufruf manuell:
+
+```bash
+curl -X POST https://<deine-domain>/cron/run \
+     -H "X-Cron-Token: <token>" -i
+```
+
+Erwartete Antwort: `HTTP/1.1 200 OK` mit JSON-Body `{"ok":true,…}`.
 
 ### Versionsanzeige
 

@@ -1,199 +1,270 @@
-# CLAUDE.md - VAES Projektkontext
+# VAES — Master-Config fuer Claude Code
 
-## Projekt: Vereins-Arbeitsstunden-Erfassungssystem (VAES)
-## Repository: TSC-Helferstundenverwaltung
-
-**Version:** 1.3  
-**Technologie:** PHP 8.x, MySQL 8.4, Slim 4, Bootstrap 5  
-**Zielumgebung:** Strato Shared Webhosting  
-**Git:** https://github.com/mschmick2/TSC-Helferstundenverwaltung.git
+> **Zweck:** Vereins-Arbeitsstunden-Erfassungssystem (Helferstundenverwaltung) fuer TSC Mondial e.V.
+> **Diese Datei wird bei jeder Session zuerst geladen. Halte sie kompakt.**
 
 ---
 
-## 🎯 Projektziel
+## 1. Quick Reference
 
-Webbasiertes System zur Erfassung und Verwaltung von ehrenamtlichen Arbeitsstunden für Vereinsmitglieder mit Freigabe-Workflow, Dialog-System und vollständigem Audit-Trail.
+| Aspekt | Wert |
+|--------|------|
+| **Projektname** | VAES — Vereins-Arbeitsstunden-Erfassungssystem |
+| **Sprache / Runtime** | PHP 8.1+ (Ziel 8.3) |
+| **Framework** | Slim 4 (Micro-Framework) + PHP-DI 7 |
+| **Architektur** | MVC + Repository/Service-Pattern |
+| **Datenbank** | MySQL 8.4 (Mindestanforderung: 8.0, SKIP LOCKED noetig), PDO + Prepared Statements |
+| **Frontend** | Bootstrap 5, Vanilla JS (ES6+), Fetch API |
+| **Hosting** | Strato Shared Webhosting (Apache) |
+| **Deployment** | FTP/SFTP — KEIN SSH, KEINE Cron-Jobs, KEIN Node.js |
+| **Lokale Dev** | `cd src/public && php -S localhost:8000` |
+| **Tests** | PHPUnit 10.5 (`src/vendor/bin/phpunit`) |
+| **Git-Workflow** | Feature-Branches → main, Conventional Commits Pflicht |
+| **Repo** | https://github.com/mschmick2/TSC-Helferstundenverwaltung |
+| **Version** | 1.4.0 |
 
 ---
 
-## 📁 Projektstruktur
+## 2. Projekt-Pfade
 
 ```
 E:\TSC-Helferstundenverwaltung\
-├── CLAUDE.md                 # Diese Datei
-├── README.md                 # Projekt-Readme
+├── CLAUDE.md                         # Diese Datei (Master)
+├── README.md
 ├── .gitignore
 │
-├── docs/                     # Dokumentation
-│   ├── REQUIREMENTS.md       # Vollständige Anforderungen
-│   ├── ARCHITECTURE.md       # Technische Architektur
-│   ├── Setup-Anleitung.md
+├── .claude/                          # Harness
+│   ├── CLAUDE.md                     # Stack-Supplement
+│   ├── settings.local.json           # Permissions
+│   ├── lessons-learned.md            # Wachsendes Wissensarchiv
+│   ├── architect.md … dokumentar.md  # Gates G1-G9
+│   ├── roles/                        # Legacy (bleibt fuer Referenz)
+│   ├── agents/                       # Deep-Dive-Rollen
+│   │   ├── developer.md
+│   │   ├── reviewer.md
+│   │   └── security.md
+│   └── rules/                        # On-demand-Regeln
+│       ├── 01-security.md
+│       ├── 02-dsgvo.md
+│       ├── 03-framework.md
+│       ├── 04-database.md
+│       ├── 05-frontend.md
+│       ├── 06-git.md
+│       ├── 07-audit.md
+│       └── 08-ux-layout.md
+│
+├── docs/
+│   ├── REQUIREMENTS.md               # Anforderungsspezifikation v1.3
+│   ├── ARCHITECTURE.md
+│   ├── Benutzerhandbuch.md
+│   ├── Funktionsbeschreibung.md
 │   └── Pflichtenheft_VAES_v1.3.docx
 │
-├── .claude/                  # Claude Code Konfiguration
-│   └── roles/                # Rollendefinitionen
-│       ├── developer.md
-│       ├── reviewer.md
-│       ├── tester.md
-│       └── security-auditor.md
-│
-├── scripts/                  # Entwicklungs-Scripts
-│   ├── backup.ps1
-│   └── database/
-│       └── create_database.sql
-│
-├── tests/                    # Test-Prozeduren
-│   ├── Unit/
-│   ├── Integration/
-│   └── README.md
-│
-└── src/                      # Quellcode
-    ├── public/               # Web-Root
-    │   ├── index.php
-    │   ├── css/
-    │   ├── js/
-    │   └── .htaccess
-    ├── app/                  # Anwendungslogik
-    │   ├── Controllers/
-    │   ├── Models/
-    │   ├── Views/
-    │   ├── Middleware/
-    │   └── Services/
-    ├── config/               # Konfiguration
-    ├── vendor/               # Composer
-    └── storage/              # Logs, Cache
+├── scripts/database/                 # create_database.sql, Migrationen
+├── tests/                            # PHPUnit (Unit/ + Integration/)
+└── src/
+    ├── composer.json
+    ├── vendor/
+    ├── config/                       # config.php (NICHT im Git)
+    ├── public/                       # Web-Root (index.php, .htaccess, css/, js/)
+    ├── storage/                      # Logs, Cache
+    └── app/                          # NEUER Code
+        ├── Controllers/
+        ├── Services/
+        ├── Repositories/
+        ├── Models/
+        ├── Middleware/
+        ├── Helpers/
+        ├── Exceptions/
+        └── Views/
 ```
 
 ---
 
-## 🛠️ Technologie-Stack
+## 3. Top 10 Regeln (immer aktiv)
 
-| Komponente | Technologie | Version |
-|------------|-------------|---------|
-| Backend | PHP | 8.x |
-| Framework | Slim | 4.x |
-| Datenbank | MySQL | 8.4 |
-| Frontend CSS | Bootstrap | 5.x |
-| Frontend JS | Vanilla JavaScript | ES6+ |
-| 2FA | OTPHP Library | - |
-| E-Mail | PHPMailer | - |
-| PDF | TCPDF | - |
-
----
-
-## 🔧 Entwicklungsrichtlinien
-
-### Coding Standards
-
-- **PHP:** PSR-12 Coding Standard
-- **Namespaces:** `App\Controllers`, `App\Models`, `App\Services`
-- **Dateibenennung:** PascalCase für Klassen, snake_case für Konfiguration
-- **Datenbank:** Prepared Statements IMMER verwenden
-- **Kommentare:** PHPDoc für alle öffentlichen Methoden
-
-### Sicherheitsrichtlinien
-
-- Alle Benutzereingaben validieren und escapen
-- Passwörter mit `password_hash()` (bcrypt, cost 12)
-- CSRF-Token für alle POST-Requests
-- SQL-Injection: NUR Prepared Statements
-- XSS: Output mit `htmlspecialchars()` escapen
-
-### Git Workflow
-
-```bash
-# Feature-Branch erstellen
-git checkout -b feature/[feature-name]
-
-# Commits mit aussagekräftigen Messages
-git commit -m "feat: [Beschreibung]"
-git commit -m "fix: [Beschreibung]"
-git commit -m "docs: [Beschreibung]"
-
-# Pull Request erstellen
-git push origin feature/[feature-name]
-```
+1. **Prepared Statements** fuer JEDEN DB-Zugriff (PDO, named params). Niemals Konkatenation.
+2. **Output-Escaping** mit `htmlspecialchars($v, ENT_QUOTES, 'UTF-8')` bei jeder User-Daten-Ausgabe.
+3. **CSRF-Token** auf allen POST/PUT/DELETE via `CsrfMiddleware`. `hash_equals()` zum Vergleich.
+4. **Auth-Check** am Anfang jeder geschuetzten Route (`AuthMiddleware` + `RoleMiddleware`).
+5. **Soft-Delete** statt Hard-Delete (`deleted_at` + `deleted_by`). NIE physisch loeschen.
+6. **Audit-Log ist APPEND-ONLY** — DB-Trigger verhindern UPDATE/DELETE. Jede Aenderung wird protokolliert.
+7. **KEINE Selbstgenehmigung** — Pruefer/Admin darf eigene Antraege niemals selbst freigeben/ablehnen/rueckfragen.
+8. **Dialog-Integritaet** — Bei Statusaenderungen bleibt der komplette Dialog-Verlauf erhalten, auch bei "Zurueck zur Ueberarbeitung" oder Reaktivierung.
+9. **Secrets** in `src/config/config.php` (nicht im Git, `.gitignore`). Zugangsdaten NIEMALS committen.
+10. **Strato-Kompatibilitaet** — Kein SSH, keine Cron-Jobs, kein Node.js, keine Shell-Execs in Produktion.
 
 ---
 
-## 📋 Rollen für Claude Code
+## 4. 9-Rollen-Pipeline
 
-Verwende die entsprechende Rolle je nach Aufgabe:
+Jede Aenderung durchlaeuft diese Gates. Die Kurz-Notation fuer interne Logs lautet
+`[Gate] G[N]: [bestanden/blockiert]. Findings: [Liste]. [Next], bitte G[N+1] pruefen.`
+— **fuer die Meldung an den Nutzer** immer die verstaendliche Form aus Abschnitt 10
+verwenden (Was ist passiert, was bedeutet das, was kommt als naechstes).
 
-| Rolle | Datei | Verwendung |
-|-------|-------|------------|
-| **Developer** | `.claude/roles/developer.md` | Feature-Entwicklung, Code schreiben |
-| **Reviewer** | `.claude/roles/reviewer.md` | Code-Review, Best Practices prüfen |
-| **Tester** | `.claude/roles/tester.md` | Tests schreiben, Testfälle definieren |
-| **Security Auditor** | `.claude/roles/security-auditor.md` | Sicherheitsprüfung |
+| Gate | Rolle | Datei | Skippable? |
+|------|-------|-------|------------|
+| G1 | Architect | `.claude/architect.md` | Nein |
+| G2 | Coder | `.claude/coder.md` | Nein |
+| G3 | Reviewer | `.claude/reviewer.md` | Nein |
+| G3.5 | Layout (UX/UI) | `.claude/layout.md` | Ja — nur bei UI-Aenderung |
+| G4 | Security | `.claude/security.md` | Nein |
+| G5 | DSGVO | `.claude/dsgvo.md` | Ja — nur wenn PII beruehrt |
+| G6 | Auditor | `.claude/auditor.md` | Nein |
+| G7 | Tester | `.claude/tester.md` | Nein |
+| G8 | Integrator | `.claude/integrator.md` | Nein |
+| G9 | Dokumentar | `.claude/dokumentar.md` | Nein |
 
-### Rolle aktivieren
-
-```
-@role developer
-```
-oder
-```
-Lies .claude/roles/developer.md und agiere entsprechend.
-```
-
----
-
-## 🚀 Schnellstart für Entwicklung
-
-### 1. Datenbank einrichten
-```sql
--- In phpMyAdmin ausführen:
--- scripts/database/create_database.sql
-```
-
-### 2. Konfiguration
-```bash
-cp src/config/config.example.php src/config/config.php
-# Datenbankzugangsdaten eintragen
-```
-
-### 3. Composer installieren
-```bash
-cd src
-composer install
-```
-
-### 4. Lokaler Test
-```bash
-cd src/public
-php -S localhost:8000
-```
+Skips IMMER im Commit dokumentieren: `Skips: G3.5 uebersprungen — keine UI-Aenderung.`
 
 ---
 
-## 📚 Wichtige Dokumente
+## 5. Rules nachladen — wann was?
 
-| Dokument | Pfad | Beschreibung |
-|----------|------|--------------|
-| Requirements | `docs/REQUIREMENTS.md` | Vollständige Anforderungen |
-| Architektur | `docs/ARCHITECTURE.md` | Technische Architektur |
-| Pflichtenheft | `docs/Pflichtenheft_VAES_v1.3.docx` | Formales Pflichtenheft |
-| DB-Schema | `scripts/database/create_database.sql` | Datenbank-Struktur |
+Nicht alle Rules auf einmal laden. Kontext-Budget schonen.
 
----
-
-## ⚠️ Wichtige Regeln
-
-1. **Keine Selbstgenehmigung:** Prüfer dürfen eigene Anträge NICHT genehmigen
-2. **Dialog bleibt erhalten:** Bei Statusänderungen IMMER kompletten Dialog behalten
-3. **Soft-Delete:** NIEMALS physisch löschen, nur `deleted_at` setzen
-4. **Audit-Trail:** JEDE Änderung muss protokolliert werden
-5. **Strato-Kompatibilität:** Kein SSH, keine Cron-Jobs, kein Node.js
+| Rule | Primaergate | Sekundaer |
+|------|-------------|-----------|
+| `01-security.md` | G4 (security) | G2 (coder) bei User-Input |
+| `02-dsgvo.md` | G5 (dsgvo) | G1 (architect) bei neuen PII-Feldern |
+| `03-framework.md` | G2 (coder) | G1 (architect) bei neuen Routes/Klassen |
+| `04-database.md` | G2 (coder) | G1 (architect) bei Schema-Aenderung |
+| `05-frontend.md` | G2 (coder) | G3 (reviewer) bei UI-Code |
+| `06-git.md` | G9 (dokumentar) | G8 (integrator) beim Deploy |
+| `07-audit.md` | G6 (auditor) | G2 (coder) bei Audit-Log-Aufrufen |
+| `08-ux-layout.md` | G3.5 (layout) | G2 (coder) bei UI-Code |
 
 ---
 
-## 🔗 Backup
+## 6. Domain-Lifecycle — WorkEntry (6 Status)
 
-**Quelle:** `E:\TSC-Helferstundenverwaltung`  
-**Ziel:** `Y:\software_mondial\TSC-Helferstundenverwaltung`  
-**Frequenz:** Stündlich (Windows Task Scheduler)
+```
+           [ entwurf ] ←─────┐
+                │             │
+           einreichen         │ zurueck_zur_ueberarbeitung
+                │             │
+                v             │
+         [ eingereicht ] ─────┤
+                │             │
+     ┌──────────┼────────┐    │
+rueckfrage  freigeben  ablehnen
+     │          │        │    │
+     v          v        v    │
+[in_klaerung]  │    [abgelehnt]
+     │          │
+     ├──────────┤
+     v          v
+  [ freigegeben ]   [ storniert ] ──┐
+     (Endstatus)                     │
+                                  reaktivieren
+                                     v
+                                [ entwurf ]
+```
+
+**Endzustaende:** `freigegeben`, `abgelehnt`. `storniert` kann zu `entwurf` reaktiviert werden.
+**Korrektur nach Freigabe:** Pruefer/Admin koennen freigegebene Antraege mit Begruendung korrigieren (Audit-Trail-pflichtig).
+
+Erlaubte Uebergaenge pro Status siehe `src/app/Services/WorkflowService.php`.
 
 ---
 
-*Letzte Aktualisierung: 2025-02-09*
+## 7. Verbotene Befehle
+
+- `git push --force` auf `main`
+- `git commit --no-verify`
+- `DELETE FROM audit_log` / `UPDATE audit_log` (DB-Trigger blockiert dies)
+- `DELETE FROM work_entries` (Soft-Delete verwenden)
+- Credentials im Repo committen (siehe Incident 273de47)
+- Node.js / Cron / Shell-Execs in Produktion (Strato unterstuetzt das nicht)
+
+---
+
+## 8. Bekannte Sicherheitsschuld
+
+| Nr | Thema | Status |
+|----|-------|--------|
+| 1 | Session-Cookie: `Secure` + `SameSite=Strict` in Produktion pruefen | erledigt 2026-04-20 (Modul 7 I3: `config.example.php` empfiehlt `SameSite=Strict`, `Secure` bereits automatisch per HTTPS-Erkennung) |
+| 2 | Rate-Limiting fuer Passwort-Reset-Endpunkt pruefen | offen |
+| 3 | CSP-Header pruefen (Strato `.htaccess`) | offen |
+
+Neue Eintraege bei G4-Findings hier ergaenzen.
+
+---
+
+## 9. Rollen-Agents (Deep-Dive)
+
+Ergaenzen die Gates um technische Detailtiefe:
+
+- `.claude/agents/developer.md` — PHP 8.x / Slim 4 / PSR-12 Coding-Standards
+- `.claude/agents/reviewer.md` — Detaillierte Review-Checkliste
+- `.claude/agents/security.md` — OWASP-Threat-Model PHP-spezifisch
+
+Die Legacy-Rollen unter `.claude/roles/` bleiben als Referenz, werden aber nicht mehr aktiv geladen. Neue Arbeit orientiert sich an `.claude/agents/`.
+
+---
+
+## 10. Berichte in Ingenieurs-Sprache
+
+Status-, Fehler- und Prozess-Berichte sollen lesen wie ein kurzer Ingenieurs-Bericht,
+nicht wie Compiler-Output. Der Nutzer muss aus der Meldung sofort verstehen koennen:
+**was ist passiert, was bedeutet das, was kommt als naechstes.**
+
+### Gate-Berichte
+
+Die Kurz-Notation `[Gate] G[N]: [bestanden/blockiert]. Findings: [Liste].` darf
+intern (Commit-Trailer, Log) bleiben. **Fuer den Nutzer** immer in Klartext uebersetzen:
+
+- ❌ `G4: blockiert. Findings: [CSRF ausgesetzt, XSS in L:203].`
+- ✅ `Security-Gate haengt. Zwei Probleme: (1) am Ablehnen-Button fehlt der CSRF-Schutz,
+  (2) im Dialog-View wird User-Text nicht escaped (XSS-Risiko). Beides fixe ich
+  vor dem Commit — dauert ~10 Minuten.`
+
+### Fehler-Berichte
+
+- ❌ `PDOException SQLSTATE[42S02] at WorkEntryRepository.php:87`
+- ✅ `DB-Fehler im WorkEntryRepository: Query schlaegt fehl, weil die Tabelle
+  `work_entries_archive` nicht existiert. Sieht aus wie eine fehlende Migration —
+  ich pruefe, welche Datei da fehlt.`
+
+### Test-Ergebnisse
+
+- ❌ `Test failed: expected X, got Y`
+- ✅ `Der Test erwartet genau einen execute()-Call, bekommt aber zwei — weil der
+  Service mit 10%-Wahrscheinlichkeit einen Cleanup-Call einschiebt. Das Test-Setup
+  ist flaky, nicht der Produktionscode. Fix ist im Test-Mock.`
+
+### Regeln
+
+1. **Ergebnis zuerst, Detail danach.** Ein Satz der Kernaussage, dann Begruendung.
+2. **Datei/Zeile nur als Wegweiser**, nicht als Ersatz fuer die Erklaerung. Wenn
+   eine Zeilenangabe auftaucht, muss daneben stehen, *was* dort passiert.
+3. **Fachbegriffe ja, Code-Kuerzel nein.** `CSRF-Token`, `Prepared Statement`,
+   `Foreign Key` sind praezise und okay. `L:87`, `rc=3`, `42S02` ohne Uebersetzung
+   nicht.
+4. **Keine nackten Status-Token** wie `bestanden/blockiert` als ganze Antwort.
+   Immer dazu schreiben, was *genau* bestanden wurde und welcher Schritt jetzt
+   ansteht.
+5. **Verstaendlich fuer einen mitlesenden Menschen**, der nicht direkt am Code
+   sitzt. Wenn der Nutzer 30 Sekunden spaeter noch wissen soll, was lief, muss
+   die Meldung ohne Code-Blick tragen.
+
+Gilt fuer: Gate-Handoffs, Test-Ausgaben, Fehler-Analysen, Commit-Zusammenfassungen
+und alle Zwischen-Antworten an den Nutzer.
+
+---
+
+## Bei /compact BEHALTEN (Absolute Essentials)
+
+1. VAES = Helferstunden-Verein-System, PHP 8.1+/Slim 4/MySQL 8.4/Bootstrap 5, Strato Shared Hosting.
+2. Neue Code-Heimat: `src/app/` mit PSR-4 (`App\*`). Views in `src/app/Views/`.
+3. Audit-Log ist APPEND-ONLY (DB-Trigger). Jede Business-Aenderung protokolliert via `AuditService::log()`.
+4. KEINE Selbstgenehmigung — Pruefer darf eigene Antraege nicht freigeben/ablehnen/rueckfragen.
+5. Soft-Delete via `deleted_at` + `deleted_by`, niemals physisches DELETE.
+6. Dialog-Verlauf bleibt bei allen Statuswechseln vollstaendig erhalten.
+7. Jeder Change durchlaeuft 9 Gates (G1-G9), Skips im Commit dokumentiert.
+8. Strato-Grenzen: kein SSH, kein Cron, kein Node in Produktion. Deployment via FTP.
+
+---
+
+*Letzte Aktualisierung: 2026-04-17 — Harness-Migration v2*

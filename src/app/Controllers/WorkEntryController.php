@@ -17,6 +17,7 @@ use App\Repositories\UserRepository;
 use App\Repositories\WorkEntryRepository;
 use App\Services\AuditService;
 use App\Services\EmailService;
+use App\Services\EntryLockService;
 use App\Services\SettingsService;
 use App\Services\WorkflowService;
 use Psr\Http\Message\ResponseInterface as Response;
@@ -39,7 +40,8 @@ class WorkEntryController extends BaseController
         private UserRepository $userRepo,
         private SettingsService $settingsService,
         private LoggerInterface $logger,
-        private array $settings
+        private array $settings,
+        private ?EntryLockService $lockService = null
     ) {
     }
 
@@ -248,12 +250,16 @@ class WorkEntryController extends BaseController
 
         $categories = $this->categoryRepo->findAllActive();
 
+        // Modul 7 I1: Pessimistic Lock fuer Multisession-Schutz
+        $lockInfo = $this->tryAcquireLock($request, $entry->getId(), $user->getId());
+
         return $this->render($response, 'entries/edit', [
             'title' => 'Eintrag bearbeiten',
             'entry' => $entry,
             'categories' => $categories,
             'user' => $user,
             'fieldConfig' => $this->settingsService->getFieldConfig(),
+            'lock' => $lockInfo,
             'breadcrumbs' => [
                 ['label' => 'Dashboard', 'url' => '/'],
                 ['label' => 'Arbeitsstunden', 'url' => '/entries'],
@@ -261,6 +267,42 @@ class WorkEntryController extends BaseController
                 ['label' => 'Bearbeiten'],
             ],
         ]);
+    }
+
+    /**
+     * Lock-Versuch mit Fallback-Semantik fuers Edit-View.
+     * Rueckgabe:
+     *   ['owned' => true,  'expires_at' => '...']   — User darf editieren.
+     *   ['owned' => false, 'held_by' => '...',
+     *    'expires_at' => '...']                     — Read-Only-Modus.
+     *   ['owned' => true,  'expires_at' => null]    — Lock-Service nicht
+     *                                                 verfuegbar (Tests).
+     *
+     * @return array<string, mixed>
+     */
+    private function tryAcquireLock(Request $request, int $entryId, int $userId): array
+    {
+        if ($this->lockService === null) {
+            return ['owned' => true, 'expires_at' => null];
+        }
+
+        $sessionId = $request->getAttribute('session_id');
+        $sessionId = is_int($sessionId) ? $sessionId : null;
+
+        $result = $this->lockService->tryAcquire($entryId, $userId, $sessionId);
+
+        if ($result['success']) {
+            return [
+                'owned'      => true,
+                'expires_at' => $result['lock']['expires_at'] ?? null,
+            ];
+        }
+
+        return [
+            'owned'      => false,
+            'held_by'    => (string) ($result['held_by']['name'] ?? 'Unbekannt'),
+            'expires_at' => $result['held_by']['expires_at'] ?? null,
+        ];
     }
 
     /**
@@ -288,6 +330,18 @@ class WorkEntryController extends BaseController
         }
 
         $data = (array) $request->getParsedBody();
+
+        // Modul 7 I1: Lock muss beim User liegen, bevor wir schreiben.
+        if ($this->lockService !== null) {
+            $sessionId = $request->getAttribute('session_id');
+            $sessionId = is_int($sessionId) ? $sessionId : null;
+            $lockAttempt = $this->lockService->tryAcquire($entry->getId(), $user->getId(), $sessionId);
+            if (!$lockAttempt['success']) {
+                $holder = (string) ($lockAttempt['held_by']['name'] ?? 'einem anderen Nutzer');
+                ViewHelper::flash('error', 'Dieser Eintrag wird gerade von ' . $holder . ' bearbeitet. Bitte spaeter erneut versuchen.');
+                return $this->redirect($response, '/entries/' . $entry->getId());
+            }
+        }
 
         try {
             $validated = $this->validateEntry($data);
@@ -323,6 +377,12 @@ class WorkEntryController extends BaseController
             } else {
                 ViewHelper::flash('success', 'Eintrag aktualisiert.');
             }
+
+            // Modul 7 I1: Lock nach erfolgreichem Update freigeben.
+            $this->lockService?->release($entry->getId(), $user->getId());
+
+            // Modul 7 I2: andere Tabs informieren, dass der Eintrag neu ist.
+            ViewHelper::broadcast('entry:updated', ['id' => $entry->getId()]);
 
             return $this->redirect($response, '/entries');
         } catch (ValidationException $e) {
@@ -376,6 +436,106 @@ class WorkEntryController extends BaseController
 
         ViewHelper::flash('success', 'Eintrag gelöscht.');
         return $this->redirect($response, '/entries');
+    }
+
+    // =========================================================================
+    // Modul 7 I1: Pessimistic-Lock AJAX-Endpunkte
+    // =========================================================================
+
+    /**
+     * Heartbeat — verlaengert den Lock des aktuellen Users. Wird vom Frontend
+     * alle 60 Sekunden aufgerufen, solange der Edit-Tab offen ist.
+     *
+     * Antwort:
+     *   200 {"ok": true,  "expires_at": "..."}            — Lock laeuft weiter.
+     *   409 {"ok": false, "reason": "held_by_other",
+     *        "held_by": "Vorname Nachname"}               — Fremder Lock aktiv.
+     */
+    public function lockHeartbeat(Request $request, Response $response): Response
+    {
+        $user = $this->getUser($request);
+        $args = $this->routeArgs($request);
+        $entryId = (int) ($args['id'] ?? 0);
+
+        if ($this->lockService === null || $entryId <= 0) {
+            return $this->jsonResponse($response, ['ok' => false, 'reason' => 'unavailable'], 503);
+        }
+
+        $entry = $this->entryRepo->findById($entryId);
+        if ($entry === null || !$entry->isEditable() || !$this->isOwnerOrCreator($entry, $user)) {
+            return $this->jsonResponse($response, ['ok' => false, 'reason' => 'forbidden'], 403);
+        }
+
+        $sessionId = $request->getAttribute('session_id');
+        $sessionId = is_int($sessionId) ? $sessionId : null;
+        $result = $this->lockService->tryAcquire($entryId, $user->getId(), $sessionId);
+
+        if ($result['success']) {
+            return $this->jsonResponse($response, [
+                'ok'         => true,
+                'expires_at' => $result['lock']['expires_at'] ?? null,
+            ], 200);
+        }
+
+        return $this->jsonResponse($response, [
+            'ok'         => false,
+            'reason'     => 'held_by_other',
+            'held_by'    => (string) ($result['held_by']['name'] ?? 'Unbekannt'),
+            'expires_at' => $result['held_by']['expires_at'] ?? null,
+        ], 409);
+    }
+
+    /**
+     * Status — reiner Lese-Check ohne Lock-Uebernahme, fuer Read-Only-Clients.
+     *
+     * Antwort:
+     *   200 {"ok": true, "held_by_other": false}                       — Lock frei.
+     *   200 {"ok": true, "held_by_other": true,
+     *        "held_by": "...", "expires_at": "..."}                    — noch gesperrt.
+     */
+    public function lockStatus(Request $request, Response $response): Response
+    {
+        $user = $this->getUser($request);
+        $args = $this->routeArgs($request);
+        $entryId = (int) ($args['id'] ?? 0);
+
+        if ($this->lockService === null || $entryId <= 0) {
+            return $this->jsonResponse($response, ['ok' => false, 'reason' => 'unavailable'], 503);
+        }
+
+        $status = $this->lockService->checkStatus($entryId, $user->getId());
+        return $this->jsonResponse($response, array_merge(['ok' => true], $status), 200);
+    }
+
+    /**
+     * Release — gibt den eigenen Lock frei. Wird vom Frontend beim Verlassen
+     * der Seite via navigator.sendBeacon() aufgerufen.
+     */
+    public function lockRelease(Request $request, Response $response): Response
+    {
+        $user = $this->getUser($request);
+        $args = $this->routeArgs($request);
+        $entryId = (int) ($args['id'] ?? 0);
+
+        if ($this->lockService === null || $entryId <= 0) {
+            return $this->jsonResponse($response, ['ok' => false], 204);
+        }
+
+        $this->lockService->release($entryId, $user->getId());
+
+        return $this->jsonResponse($response, ['ok' => true], 200);
+    }
+
+    /**
+     * Helfer: JSON-Response mit Status-Code.
+     *
+     * @param array<string, mixed> $payload
+     */
+    private function jsonResponse(Response $response, array $payload, int $status): Response
+    {
+        $response = $response->withHeader('Content-Type', 'application/json')->withStatus($status);
+        $response->getBody()->write(json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR));
+        return $response;
     }
 
     // =========================================================================

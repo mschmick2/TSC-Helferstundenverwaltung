@@ -1,51 +1,46 @@
 # VAES Test-Prozeduren
 
-Dieses Verzeichnis enthält alle Test-Prozeduren für das VAES-System.
+Dieses Verzeichnis enthaelt alle automatisierten und dokumentierten Tests fuer das VAES-System.
 
 ## Verzeichnisstruktur
 
 ```
 tests/
-├── Unit/                 # Unit-Tests (einzelne Funktionen/Klassen)
-│   ├── Models/
-│   ├── Services/
-│   └── Helpers/
+├── Unit/                      # Unit-Tests (isolierte Komponenten)
+│   ├── Models/                # UserTest, WorkEntryTest, RoleTest, CategoryTest
+│   ├── Services/              # AuthServiceTest, WorkflowServiceTest, RateLimitServiceTest, SettingsServiceTest
+│   └── Helpers/               # SecurityHelperTest, ViewHelperTest, VersionHelperTest
 │
-├── Integration/          # Integrationstests (Zusammenspiel mehrerer Komponenten)
-│   ├── Auth/
-│   ├── Workflow/
-│   └── Database/
+├── Integration/               # Integrationstests (Zusammenspiel mehrerer Komponenten)
+│   ├── Auth/                  # AuthFlowTest
+│   ├── Email/                 # EmailTest (erfordert MailHog)
+│   └── Workflow/              # WorkflowIntegrationTest
 │
-├── Functional/           # Funktionale Tests (End-to-End)
-│   ├── Login/
-│   ├── WorkEntry/
-│   └── Reporting/
+├── Support/                   # Test-Hilfsklassen
+│   └── MailHogHelper.php      # MailHog REST-API-Client
 │
-├── fixtures/             # Test-Daten
-│   ├── users.json
-│   ├── categories.json
-│   └── work_entries.json
-│
-└── README.md             # Diese Datei
+├── bootstrap.php              # PHPUnit-Setup (Autoloader, Session-Init)
+├── MANUAL_TESTS.md            # Manuelle Testszenarien (Browser-basiert)
+└── README.md                  # Diese Datei
 ```
 
 ## Test-Framework
 
-Empfohlen: **PHPUnit** (https://phpunit.de)
+**PHPUnit 10.5** (bereits via Composer installiert)
 
-### Installation
+### PHPUnit-Konfiguration
 
-```bash
-composer require --dev phpunit/phpunit ^10
-```
-
-### phpunit.xml
+Die Konfiguration liegt im **Projekt-Root** (nicht in `src/`): `phpunit.xml`
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
-<phpunit bootstrap="vendor/autoload.php"
+<phpunit bootstrap="tests/bootstrap.php"
          colors="true"
-         verbose="true">
+         cacheDirectory=".phpunit.cache"
+         executionOrder="depends,defects"
+         failOnRisky="true"
+         failOnWarning="true"
+         stopOnFailure="false">
     <testsuites>
         <testsuite name="Unit">
             <directory>tests/Unit</directory>
@@ -53,88 +48,119 @@ composer require --dev phpunit/phpunit ^10
         <testsuite name="Integration">
             <directory>tests/Integration</directory>
         </testsuite>
-        <testsuite name="Functional">
-            <directory>tests/Functional</directory>
-        </testsuite>
     </testsuites>
+    <coverage>
+        <include>
+            <directory suffix=".php">src/app</directory>
+        </include>
+        <exclude>
+            <directory>src/app/Views</directory>
+        </exclude>
+    </coverage>
+    <php>
+        <env name="APP_ENV" value="testing"/>
+    </php>
 </phpunit>
 ```
 
-## Tests ausführen
+## Tests ausfuehren
+
+**Wichtig:** Alle Befehle vom **Projekt-Root-Verzeichnis** ausfuehren (nicht aus `src/`).
 
 ```bash
-# Alle Tests
-./vendor/bin/phpunit
+# Alle Tests (Unit + Integration)
+vendor/bin/phpunit
 
 # Nur Unit-Tests
-./vendor/bin/phpunit --testsuite Unit
+vendor/bin/phpunit --testsuite Unit
+
+# Nur Integrationstests
+vendor/bin/phpunit --testsuite Integration
 
 # Einzelne Test-Datei
-./vendor/bin/phpunit tests/Unit/Models/UserTest.php
+vendor/bin/phpunit tests/Unit/Models/UserTest.php
 
-# Mit Coverage-Report
-./vendor/bin/phpunit --coverage-html coverage/
+# Einzelne Test-Methode
+vendor/bin/phpunit --filter test_self_approval_is_prevented
+
+# Mit Coverage-Report (erfordert Xdebug oder PCOV)
+vendor/bin/phpunit --coverage-html coverage/
 ```
+
+## Aktuelle Test-Abdeckung (212 Tests)
+
+| Bereich | Dateien | Tests |
+|---------|---------|-------|
+| Models (User, WorkEntry, Role, Category) | 4 | 47 |
+| Services (Auth, Workflow, RateLimit, Settings) | 4 | 77 |
+| Helpers (Security, View, Version) | 3 | 65 |
+| Integration (Auth-Flow, Workflow-Lifecycle) | 2 | 23 |
+| Integration (Email, erfordert MailHog) | 1 | 8 |
+| **Gesamt** | **14** | **220** |
 
 ## Test-Namenskonventionen
 
-| Typ | Dateiname | Klassenname |
-|-----|-----------|-------------|
-| Unit | `UserTest.php` | `UserTest` |
-| Integration | `AuthFlowTest.php` | `AuthFlowTest` |
-| Functional | `LoginProcessTest.php` | `LoginProcessTest` |
+| Typ | Dateiname | Methodenname |
+|-----|-----------|--------------|
+| Unit | `{Klasse}Test.php` | `test_{beschreibung_snake_case}` |
+| Integration | `{Feature}Test.php` | `test_{szenario_snake_case}` |
 
-## Beispiel Unit-Test
-
-```php
-<?php
-// tests/Unit/Models/UserTest.php
-
-namespace Tests\Unit\Models;
-
-use PHPUnit\Framework\TestCase;
-use App\Models\User;
-
-class UserTest extends TestCase
-{
-    public function test_user_has_full_name(): void
-    {
-        $user = new User([
-            'vorname' => 'Max',
-            'nachname' => 'Mustermann'
-        ]);
-        
-        $this->assertEquals('Max Mustermann', $user->getFullName());
-    }
-    
-    public function test_user_can_have_multiple_roles(): void
-    {
-        $user = new User();
-        $user->addRole('mitglied');
-        $user->addRole('erfasser');
-        
-        $this->assertTrue($user->hasRole('mitglied'));
-        $this->assertTrue($user->hasRole('erfasser'));
-        $this->assertFalse($user->hasRole('administrator'));
-    }
-}
-```
-
-## Test-Datenbank
-
-Für Integrationstests wird eine separate Test-Datenbank empfohlen:
+## Mock-Pattern
 
 ```php
-// config/config.test.php
-return [
-    'database' => [
-        'name' => 'vaes_test',
-        // ...
-    ],
-];
+// Standard: createMock() mit method() / expects()
+$this->userRepo = $this->createMock(UserRepository::class);
+$this->userRepo->method('findByEmail')->willReturn($user);
+$this->userRepo->expects($this->once())->method('updateStatus');
 ```
 
-### Test-Datenbank einrichten
+## Deployment-Struktur beachten
+
+Die Anwendung hat zwei Verzeichnisstrukturen:
+
+| | Entwicklung (lokal) | Testserver |
+|---|---|---|
+| **Web-Root** | `src/public/` | `/var/www/html/TSC-Helferstundenverwaltung/` |
+| **URL** | `http://localhost:8000` | `https://192.168.3.98/helferstunden` |
+| **Struktur** | Verschachtelt (`src/public/index.php`) | Flat (`index.php` neben `vendor/`) |
+| **base_path** | `` (leer) | `/helferstunden` |
+| **SSL** | Kein | Selbstsigniertes Zertifikat |
+
+Die `index.php` erkennt die Struktur automatisch:
+```php
+$appRoot = is_dir(__DIR__ . '/vendor') ? __DIR__ : dirname(__DIR__);
+```
+
+## E-Mail-Integrationstests (MailHog)
+
+Die E-Mail-Tests erfordern einen laufenden **MailHog**-Server. MailHog faengt E-Mails ab und stellt sie ueber eine REST-API zur Verfuegung.
+
+### MailHog starten
+
+```bash
+# Via Docker (empfohlen)
+docker run -d -p 1025:1025 -p 8025:8025 mailhog/mailhog
+
+# Oder direkt (wenn installiert)
+mailhog
+```
+
+- SMTP-Port: **1025** (Tests senden hierueber)
+- Web-UI / API: **http://localhost:8025**
+
+### E-Mail-Tests ausfuehren
+
+```bash
+# Nur E-Mail-Tests
+vendor/bin/phpunit tests/Integration/Email/
+
+# Einzelner Test
+vendor/bin/phpunit --filter test_can_send_and_receive_email
+```
+
+Tests werden automatisch uebersprungen (`markTestSkipped`), wenn MailHog nicht erreichbar ist. Auf dem Testserver (Telekom SMTP) werden diese Tests daher uebersprungen.
+
+## Test-Datenbank (fuer zukuenftige DB-Integrationstests)
 
 ```bash
 # Datenbank erstellen
@@ -144,34 +170,13 @@ mysql -u root -e "CREATE DATABASE vaes_test;"
 mysql -u root vaes_test < scripts/database/create_database.sql
 ```
 
-## Manuelle Test-Checklisten
+## Weitere Testdokumentation
 
-Für Features, die schwer automatisiert zu testen sind:
-
-### Login-Tests
-- [ ] Normaler Login mit korrektem Passwort
-- [ ] Login mit falschem Passwort (Fehlermeldung)
-- [ ] Login nach 5 Fehlversuchen (Sperrung)
-- [ ] 2FA mit TOTP (Authenticator-App)
-- [ ] 2FA mit E-Mail-Code
-- [ ] Session-Timeout nach Inaktivität
-
-### Workflow-Tests
-- [ ] Antrag erstellen (Entwurf)
-- [ ] Antrag einreichen
-- [ ] Antrag zurückziehen
-- [ ] Prüfer stellt Rückfrage
-- [ ] Mitglied beantwortet Rückfrage
-- [ ] Prüfer gibt frei
-- [ ] Prüfer lehnt ab
-- [ ] Prüfer gibt zurück zur Überarbeitung
-
-### Multisession-Tests
-- [ ] Login von zwei Geräten gleichzeitig
-- [ ] Gleicher Antrag in zwei Tabs öffnen
-- [ ] Bearbeitungssperre wird angezeigt
-- [ ] Automatische Aktualisierung bei Tab-Wechsel
+| Dokument | Pfad | Beschreibung |
+|----------|------|--------------|
+| Manuelle Tests | `tests/MANUAL_TESTS.md` | Browser-basierte Testszenarien (100+) |
+| Testprotokoll | `docs/Testprotokoll_VAES.md` | Rollenbasiertes Testprotokoll & Automatisierungsplan |
 
 ---
 
-*Stand: 2025-02-09*
+*Stand: 2026-02-11*

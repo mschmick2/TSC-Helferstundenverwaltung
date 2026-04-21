@@ -104,14 +104,16 @@ class CategoryRepository
     public function create(array $data): int
     {
         $stmt = $this->pdo->prepare(
-            "INSERT INTO categories (name, description, sort_order, is_active)
-             VALUES (:name, :description, :sort_order, :is_active)"
+            "INSERT INTO categories (name, description, color, sort_order, is_active, is_contribution)
+             VALUES (:name, :description, :color, :sort_order, :is_active, :is_contribution)"
         );
         $stmt->execute([
             'name' => $data['name'],
             'description' => $data['description'] ?? null,
+            'color' => $data['color'] ?? \App\Models\Category::DEFAULT_COLOR,
             'sort_order' => (int) ($data['sort_order'] ?? 0),
             'is_active' => isset($data['is_active']) ? (int) $data['is_active'] : 1,
+            'is_contribution' => isset($data['is_contribution']) ? (int) $data['is_contribution'] : 0,
         ]);
 
         return (int) $this->pdo->lastInsertId();
@@ -124,19 +126,42 @@ class CategoryRepository
     {
         $stmt = $this->pdo->prepare(
             "UPDATE categories
-             SET name = :name, description = :description,
-                 sort_order = :sort_order, is_active = :is_active
+             SET name = :name, description = :description, color = :color,
+                 sort_order = :sort_order, is_active = :is_active,
+                 is_contribution = :is_contribution
              WHERE id = :id AND deleted_at IS NULL"
         );
         $stmt->execute([
             'name' => $data['name'],
             'description' => $data['description'] ?? null,
+            'color' => $data['color'] ?? \App\Models\Category::DEFAULT_COLOR,
             'sort_order' => (int) ($data['sort_order'] ?? 0),
             'is_active' => (int) ($data['is_active'] ?? 1),
+            'is_contribution' => (int) ($data['is_contribution'] ?? 0),
             'id' => $id,
         ]);
 
         return $stmt->rowCount() > 0;
+    }
+
+    /**
+     * Nur Beigabe-Kategorien (fuer Event-Task-Dropdown)
+     *
+     * @return Category[]
+     */
+    public function findContributions(): array
+    {
+        $stmt = $this->pdo->query(
+            "SELECT * FROM categories
+             WHERE is_contribution = TRUE AND is_active = TRUE AND deleted_at IS NULL
+             ORDER BY sort_order ASC, name ASC"
+        );
+
+        $categories = [];
+        while ($row = $stmt->fetch()) {
+            $categories[] = Category::fromArray($row);
+        }
+        return $categories;
     }
 
     /**

@@ -19,9 +19,12 @@ $appRoot = is_dir(__DIR__ . '/vendor') ? __DIR__ : dirname(__DIR__);
 // Autoloader laden
 require $appRoot . '/vendor/autoload.php';
 
+// Config-Datei: standardmaessig config.php, via VAES_CONFIG_FILE umschaltbar (Modul 8 E2E).
+$configFile = getenv('VAES_CONFIG_FILE') ?: $appRoot . '/config/config.php';
+
 // Session konfigurieren und starten (zentral, einmalig)
 if (session_status() === PHP_SESSION_NONE) {
-    $sessionConfig = require $appRoot . '/config/config.php';
+    $sessionConfig = require $configFile;
     $sessionSettings = $sessionConfig['session'] ?? [];
     $sessionBasePath = $sessionConfig['app']['base_path'] ?? '';
     session_name($sessionSettings['name'] ?? 'VAES_SESSION');

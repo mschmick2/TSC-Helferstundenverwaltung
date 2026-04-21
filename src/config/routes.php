@@ -6,13 +6,20 @@ use App\Controllers\AdminController;
 use App\Controllers\AuditController;
 use App\Controllers\AuthController;
 use App\Controllers\CategoryController;
+use App\Controllers\CronController;
 use App\Controllers\DashboardController;
+use App\Controllers\EventAdminController;
+use App\Controllers\EventTemplateController;
+use App\Controllers\IcalController;
+use App\Controllers\MemberEventController;
+use App\Controllers\OrganizerEventController;
 use App\Controllers\ReportController;
 use App\Controllers\TargetHoursController;
 use App\Controllers\UserController;
 use App\Controllers\WorkEntryController;
 use App\Middleware\AuthMiddleware;
 use App\Middleware\CsrfMiddleware;
+use App\Middleware\OpportunisticSchedulerMiddleware;
 use App\Middleware\RoleMiddleware;
 use Slim\App;
 use Slim\Routing\RouteCollectorProxy;
@@ -41,15 +48,25 @@ return function (App $app): void {
         // Passwort zurücksetzen
         $group->get('/reset-password/{token}', [AuthController::class, 'showResetPassword']);
         $group->post('/reset-password/{token}', [AuthController::class, 'resetPassword']);
+
+        // iCal-Subscription-Feed (Token-Auth, KEINE Session)
+        $group->get('/ical/subscribe/{token:[a-f0-9]{64}}', [IcalController::class, 'subscribe']);
     })->add(CsrfMiddleware::class);
+
+    // =========================================================================
+    // Cron-Pinger (Strato-Cron-Ersatz, eigene Token-Auth, KEIN CSRF, KEINE Session)
+    // =========================================================================
+    $app->post('/cron/run', [CronController::class, 'run']);
 
     // =========================================================================
     // Geschützte Routen (Login erforderlich)
     // =========================================================================
     $app->group('', function (RouteCollectorProxy $group) {
-        // Dashboard
-        $group->get('/', [DashboardController::class, 'index']);
-        $group->get('/dashboard', [DashboardController::class, 'index']);
+        // Dashboard — opportunistischer Scheduler-Trigger (Cron-Backup)
+        $group->get('/', [DashboardController::class, 'index'])
+            ->add(OpportunisticSchedulerMiddleware::class);
+        $group->get('/dashboard', [DashboardController::class, 'index'])
+            ->add(OpportunisticSchedulerMiddleware::class);
 
         // API: Ungelesene Dialog-Nachrichten Anzahl
         $group->get('/api/unread-dialog-count', [DashboardController::class, 'unreadCount']);
@@ -71,6 +88,11 @@ return function (App $app): void {
         $group->get('/entries/{id:[0-9]+}/edit', [WorkEntryController::class, 'edit']);
         $group->post('/entries/{id:[0-9]+}', [WorkEntryController::class, 'update']);
         $group->post('/entries/{id:[0-9]+}/delete', [WorkEntryController::class, 'delete']);
+
+        // Modul 7 I1: Pessimistic-Lock-AJAX
+        $group->post('/entries/{id:[0-9]+}/lock/heartbeat', [WorkEntryController::class, 'lockHeartbeat']);
+        $group->post('/entries/{id:[0-9]+}/lock/release', [WorkEntryController::class, 'lockRelease']);
+        $group->get('/entries/{id:[0-9]+}/lock/status', [WorkEntryController::class, 'lockStatus']);
 
         // Workflow-Aktionen (Eigentümer)
         $group->post('/entries/{id:[0-9]+}/submit', [WorkEntryController::class, 'submit']);
@@ -133,6 +155,7 @@ return function (App $app): void {
         $group->get('/settings', [AdminController::class, 'settings']);
         $group->post('/settings', [AdminController::class, 'updateSettings']);
         $group->post('/settings/test-email', [AdminController::class, 'testEmail']);
+        $group->post('/settings/cron-token', [AdminController::class, 'rotateCronToken']);
 
         // Audit-Trail
         $group->get('/audit', [AuditController::class, 'index']);
@@ -145,6 +168,114 @@ return function (App $app): void {
         $group->post('/targets/bulk', [TargetHoursController::class, 'bulkUpdate']);
     })
         ->add(new RoleMiddleware(['administrator']))
+        ->add(CsrfMiddleware::class)
+        ->add(AuthMiddleware::class);
+
+    // =========================================================================
+    // Event-Admin-Routen (event_admin + administrator, Modul 6 I1)
+    // =========================================================================
+    $app->group('/admin', function (RouteCollectorProxy $group) {
+        // Events
+        $group->get('/events', [EventAdminController::class, 'index']);
+        $group->get('/events/create', [EventAdminController::class, 'create']);
+        $group->post('/events', [EventAdminController::class, 'store']);
+        $group->get('/events/{id:[0-9]+}', [EventAdminController::class, 'show']);
+        $group->get('/events/{id:[0-9]+}/edit', [EventAdminController::class, 'edit']);
+        $group->post('/events/{id:[0-9]+}', [EventAdminController::class, 'update']);
+        $group->post('/events/{id:[0-9]+}/publish', [EventAdminController::class, 'publish']);
+        $group->post('/events/{id:[0-9]+}/cancel', [EventAdminController::class, 'cancel']);
+        $group->post('/events/{id:[0-9]+}/complete', [EventAdminController::class, 'complete']);
+        $group->post('/events/{id:[0-9]+}/delete', [EventAdminController::class, 'delete']);
+
+        // Event-Tasks
+        $group->post('/events/{id:[0-9]+}/tasks', [EventAdminController::class, 'addTask']);
+        $group->post('/events/{eventId:[0-9]+}/tasks/{taskId:[0-9]+}/delete',
+            [EventAdminController::class, 'deleteTask']);
+
+        // Event-Templates (I1: CRUD; I4: Task-Editor, Versionierung, Ableitung)
+        $group->get('/event-templates', [EventTemplateController::class, 'index']);
+        $group->post('/event-templates', [EventTemplateController::class, 'store']);
+        $group->get('/event-templates/{id:[0-9]+}', [EventTemplateController::class, 'show']);
+        $group->get('/event-templates/{id:[0-9]+}/edit', [EventTemplateController::class, 'edit']);
+        $group->post('/event-templates/{id:[0-9]+}/delete', [EventTemplateController::class, 'delete']);
+        $group->post('/event-templates/{id:[0-9]+}/tasks', [EventTemplateController::class, 'addTask']);
+        $group->post('/event-templates/{id:[0-9]+}/tasks/{taskId:[0-9]+}/update',
+            [EventTemplateController::class, 'updateTask']);
+        $group->post('/event-templates/{id:[0-9]+}/tasks/{taskId:[0-9]+}/delete',
+            [EventTemplateController::class, 'deleteTask']);
+        $group->post('/event-templates/{id:[0-9]+}/save-as-new-version',
+            [EventTemplateController::class, 'saveAsNewVersion']);
+        $group->get('/event-templates/{id:[0-9]+}/derive',
+            [EventTemplateController::class, 'deriveForm']);
+        $group->post('/event-templates/{id:[0-9]+}/derive',
+            [EventTemplateController::class, 'deriveStore']);
+    })
+        ->add(new RoleMiddleware(['event_admin', 'administrator']))
+        ->add(CsrfMiddleware::class)
+        ->add(AuthMiddleware::class);
+
+    // =========================================================================
+    // Mitglieder-Events-Routen (Modul 6 I2, alle angemeldeten User)
+    // =========================================================================
+    $app->group('', function (RouteCollectorProxy $group) {
+        // Kalender-Ansichten (I5) — muessen VOR /events/{id} stehen
+        $group->get('/events/calendar', [MemberEventController::class, 'calendar']);
+        $group->get('/my-events/calendar', [MemberEventController::class, 'myCalendar']);
+
+        // API fuer FullCalendar (JSON-Feed)
+        $group->get('/api/events/calendar', [MemberEventController::class, 'calendarJson']);
+        $group->get('/api/my-events/calendar', [MemberEventController::class, 'myCalendarJson']);
+
+        // iCal-Settings + Token-Regenerate (authenticated)
+        $group->get('/my-events/ical', [MemberEventController::class, 'icalSettings']);
+        $group->post('/my-events/ical/regenerate', [MemberEventController::class, 'regenerateIcalToken']);
+
+        // Event-Einzel-iCal-Download
+        $group->get('/events/{id:[0-9]+}.ics', [IcalController::class, 'downloadEvent']);
+
+        $group->get('/events', [MemberEventController::class, 'index']);
+        $group->get('/events/{id:[0-9]+}', [MemberEventController::class, 'show']);
+        $group->post(
+            '/events/{eventId:[0-9]+}/tasks/{taskId:[0-9]+}/assign',
+            [MemberEventController::class, 'assign']
+        );
+
+        $group->get('/my-events', [MemberEventController::class, 'myAssignments']);
+        $group->post(
+            '/my-events/assignments/{id:[0-9]+}/withdraw',
+            [MemberEventController::class, 'withdraw']
+        );
+        $group->post(
+            '/my-events/assignments/{id:[0-9]+}/cancel',
+            [MemberEventController::class, 'requestCancellation']
+        );
+    })
+        ->add(CsrfMiddleware::class)
+        ->add(AuthMiddleware::class);
+
+    // =========================================================================
+    // Organisator-Routen (Modul 6 I2, jeder angemeldete User kann - Owner-Check
+    // erfolgt serverseitig via EventAssignmentService/Guards)
+    // =========================================================================
+    $app->group('/organizer', function (RouteCollectorProxy $group) {
+        $group->get('/events', [OrganizerEventController::class, 'index']);
+        $group->post(
+            '/assignments/{id:[0-9]+}/approve-time',
+            [OrganizerEventController::class, 'approveTime']
+        );
+        $group->post(
+            '/assignments/{id:[0-9]+}/reject-time',
+            [OrganizerEventController::class, 'rejectTime']
+        );
+        $group->post(
+            '/assignments/{id:[0-9]+}/approve-cancel',
+            [OrganizerEventController::class, 'approveCancel']
+        );
+        $group->post(
+            '/assignments/{id:[0-9]+}/reject-cancel',
+            [OrganizerEventController::class, 'rejectCancel']
+        );
+    })
         ->add(CsrfMiddleware::class)
         ->add(AuthMiddleware::class);
 

@@ -115,6 +115,13 @@ use App\Helpers\ViewHelper;
                                                class="form-control" min="0"
                                                value="<?= $cat->getSortOrder() ?>">
                                     </div>
+                                    <div class="mb-3">
+                                        <label for="edit-color-<?= $cat->getId() ?>" class="form-label">Farbe (Kalender)</label>
+                                        <input type="color" name="color" id="edit-color-<?= $cat->getId() ?>"
+                                               class="form-control form-control-color" style="width: 60px;"
+                                               value="<?= ViewHelper::e($cat->getColor()) ?>"
+                                               title="Farbe fuer Kalender-Darstellung">
+                                    </div>
                                 </div>
                                 <div class="modal-footer">
                                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
@@ -180,6 +187,12 @@ use App\Helpers\ViewHelper;
                         <label for="create-sort" class="form-label">Sortierung</label>
                         <input type="number" name="sort_order" id="create-sort"
                                class="form-control" min="0" value="0">
+                    </div>
+                    <div class="mb-3">
+                        <label for="create-color" class="form-label">Farbe (Kalender)</label>
+                        <input type="color" name="color" id="create-color"
+                               class="form-control form-control-color" style="width: 60px;"
+                               value="#0d6efd" title="Farbe fuer Kalender-Darstellung">
                     </div>
                 </div>
                 <div class="modal-footer">

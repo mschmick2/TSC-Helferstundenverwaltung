@@ -12,7 +12,7 @@ return [
     // ==========================================================================
     'app' => [
         'name' => 'VAES',
-        'version' => '1.3.0',
+        'version' => '1.4.0',
         'url' => 'https://192.168.3.98/helferstunden',  // Volle URL inkl. Unterpfad (fuer E-Mail-Links)
         'base_path' => '/helferstunden',  // Unterpfad fuer Unterverzeichnis-Installation, '' fuer Root
         'debug' => false,  // Auf Produktion: IMMER false!
@@ -50,7 +50,15 @@ return [
         'domain' => '',      // Leer = aktuelle Domain
         'secure' => true,    // Nur ueber HTTPS (wird in index.php auto-erkannt)
         'httponly' => true,   // Nicht per JavaScript zugreifbar
-        'samesite' => 'Lax',
+        // Modul 7 I3: Produktions-Empfehlung ist 'Strict'. Damit werden Session-
+        // Cookies bei Cross-Site-Navigationen (Klick von fremder Domain auf
+        // VAES-URL) NICHT mitgesendet. Das verhindert bestimmte CSRF-artige
+        // Angriffe auch ohne Token. Nebenwirkung: Wer einen Deep-Link zu VAES
+        // anklickt und noch nicht eingeloggt ist, landet zuerst auf /login -
+        // das ist in einer reinen Vereinsverwaltung akzeptabel.
+        // Auf 'Lax' zurueckschalten, falls externe Auth-Rueckleitungen (OAuth o.ae.)
+        // ergaenzt werden.
+        'samesite' => 'Strict',
     ],
     
     // ==========================================================================
@@ -62,6 +70,10 @@ return [
         'lockout_duration' => 900,  // 15 Minuten in Sekunden
         'csrf_token_lifetime' => 3600,
         'require_2fa' => true,
+        // IP-Rate-Limit fuer POST /login (Default: 20 Versuche pro IP / 15 Minuten).
+        // In E2E-Umgebungen hoeher setzen, damit serielle Tests nicht gegen das Limit laufen.
+        'login_rate_limit_max' => 20,
+        'login_rate_limit_window' => 900,
     ],
     
     // ==========================================================================
@@ -69,7 +81,7 @@ return [
     //
     // Telekom / T-Online:
     //   host: securesmtp.t-online.de, port: 587, encryption: tls
-    //   username: Zugangsnummer (z.B. ***REMOVED***) ODER vollstaendige E-Mail
+    //   username: Zugangsnummer (z.B. 123456789012) ODER vollstaendige E-Mail
     //   password: E-Mail-Passwort (NICHT das Telekom-Login-Passwort)
     //   from.address: MUSS eine bei T-Online registrierte Adresse sein
     //                 z.B. zugangsnummer@t-online.de

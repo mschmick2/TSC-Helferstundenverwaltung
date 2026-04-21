@@ -6,6 +6,7 @@ namespace App\Controllers;
 
 use App\Models\User;
 use App\Repositories\DialogReadStatusRepository;
+use App\Repositories\WorkEntryRepository;
 use App\Services\TargetHoursService;
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
@@ -18,6 +19,7 @@ class DashboardController extends BaseController
     public function __construct(
         private TargetHoursService $targetHoursService,
         private DialogReadStatusRepository $dialogReadStatusRepo,
+        private WorkEntryRepository $workEntryRepo,
         private array $settings
     ) {
     }
@@ -53,6 +55,7 @@ class DashboardController extends BaseController
             'targetHoursEnabled' => $this->targetHoursService->isEnabled(),
             'targetComparison' => null,
             'unreadDialogs' => $this->dialogReadStatusRepo->findUnreadDialogsForUser($user->getId(), $user->canReview()),
+            'pendingReviewCount' => $user->canReview() ? $this->workEntryRepo->countForReview($user->getId()) : 0,
         ];
 
         if ($data['targetHoursEnabled']) {

@@ -299,6 +299,49 @@ class UserRepository
      *
      * @return array{users: User[], total: int}
      */
+    /**
+     * Einfache Liste aller aktiven Mitglieder (fuer Dropdowns / Auswahl-UI).
+     * Keine Paginierung. Blendet System-User aus (mitgliedsnummer='SYSTEM').
+     *
+     * @return User[]
+     */
+    public function findAllActive(): array
+    {
+        $stmt = $this->pdo->query(
+            "SELECT u.* FROM users u
+             WHERE u.deleted_at IS NULL AND u.is_active = TRUE
+               AND u.mitgliedsnummer <> 'SYSTEM'
+             ORDER BY u.nachname ASC, u.vorname ASC"
+        );
+
+        $users = [];
+        while ($row = $stmt->fetch(\PDO::FETCH_ASSOC)) {
+            $users[] = User::fromArray($row);
+        }
+        return $users;
+    }
+
+    /**
+     * ID des technischen System-Users fuer Auto-Generate (Event-Abschluss).
+     * Wird durch Migration 003 angelegt.
+     *
+     * @throws \RuntimeException wenn System-User fehlt
+     */
+    public function getSystemUserId(): int
+    {
+        $stmt = $this->pdo->prepare(
+            "SELECT id FROM users WHERE mitgliedsnummer = 'SYSTEM' LIMIT 1"
+        );
+        $stmt->execute();
+        $id = $stmt->fetchColumn();
+        if ($id === false) {
+            throw new \RuntimeException(
+                'System-User nicht gefunden. Migration 003_system_user.sql einspielen.'
+            );
+        }
+        return (int) $id;
+    }
+
     public function findAllPaginated(
         int $page = 1,
         int $perPage = 20,
@@ -586,5 +629,61 @@ class UserRepository
         $stmt->execute(['name' => $name]);
         $data = $stmt->fetch();
         return $data !== false ? $data : null;
+    }
+
+    // =========================================================================
+    // iCal-Token (Modul 6 I5 — persoenliches Abo unter /ical/subscribe/{token})
+    // =========================================================================
+
+    /**
+     * User anhand iCal-Subscribe-Token finden.
+     * Constant-Time-Vergleich nicht noetig (UNIQUE-Index + Hex-64-Zeichen macht
+     * Timing-Angriffe praktisch irrelevant), aber wir normalisieren den Input.
+     */
+    public function findByIcalToken(string $token): ?User
+    {
+        $token = strtolower(trim($token));
+        if (!preg_match('/^[a-f0-9]{64}$/', $token)) {
+            return null;
+        }
+        $stmt = $this->pdo->prepare(
+            "SELECT * FROM users WHERE ical_token = :token AND deleted_at IS NULL AND is_active = 1"
+        );
+        $stmt->execute(['token' => $token]);
+        $data = $stmt->fetch();
+        if ($data === false) {
+            return null;
+        }
+        $user = User::fromArray($data);
+        $user->setRoles($this->getUserRoleNames((int) $data['id']));
+        return $user;
+    }
+
+    /**
+     * Aktuellen iCal-Token eines Users lesen (NULL wenn noch nie erzeugt).
+     */
+    public function getIcalToken(int $userId): ?string
+    {
+        $stmt = $this->pdo->prepare(
+            "SELECT ical_token FROM users WHERE id = :id AND deleted_at IS NULL"
+        );
+        $stmt->execute(['id' => $userId]);
+        $token = $stmt->fetchColumn();
+        return is_string($token) && $token !== '' ? $token : null;
+    }
+
+    /**
+     * Token setzen/rotieren. Token = 64 Hex-Zeichen (bin2hex(random_bytes(32))).
+     */
+    public function setIcalToken(int $userId, string $token): bool
+    {
+        if (!preg_match('/^[a-f0-9]{64}$/', $token)) {
+            throw new \InvalidArgumentException('iCal-Token muss 64 Hex-Zeichen haben.');
+        }
+        $stmt = $this->pdo->prepare(
+            "UPDATE users SET ical_token = :token WHERE id = :id AND deleted_at IS NULL"
+        );
+        $stmt->execute(['token' => $token, 'id' => $userId]);
+        return $stmt->rowCount() > 0;
     }
 }
