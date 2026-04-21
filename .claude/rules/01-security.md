@@ -208,17 +208,29 @@ $target = __DIR__ . '/../storage/uploads/' . $finalName;
 
 ---
 
-## HTTP-Header (Strato `.htaccess`)
+## HTTP-Header (Strato `.htaccess` + PHP-Middleware)
 
+Header werden **doppelt** gesetzt — `.htaccess` fuer Apache, `SecurityHeadersMiddleware`
+fuer lokalen Dev-Server (`php -S` liest `.htaccess` nicht). Beide Seiten muessen
+synchron bleiben.
+
+**Apache (`src/public/.htaccess`):**
 ```apache
 <IfModule mod_headers.c>
-    Header set X-Frame-Options "SAMEORIGIN"
-    Header set X-Content-Type-Options "nosniff"
-    Header set Referrer-Policy "strict-origin-when-cross-origin"
-    Header set Permissions-Policy "geolocation=(), microphone=()"
-    Header set Strict-Transport-Security "max-age=63072000; includeSubDomains"
+    Header always set X-Frame-Options "SAMEORIGIN"
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+    Header always set Permissions-Policy "geolocation=(), microphone=(), camera=(), payment=(), usb=()"
+    Header always set Strict-Transport-Security "max-age=63072000; includeSubDomains"
+    Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; font-src 'self' https://cdn.jsdelivr.net; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'; upgrade-insecure-requests"
 </IfModule>
 ```
+
+**PHP (`src/app/Middleware/SecurityHeadersMiddleware.php`):** identische Policy,
+HSTS nur wenn HTTPS erkannt (HTTPS-Server oder `X-Forwarded-Proto=https`).
+
+**Offener Punkt:** `'unsafe-inline'` in `script-src` bleibt, bis die Inline-
+Skripte mit Per-Request-Nonce umgebaut sind (eigene Iteration).
 
 ---
 
