@@ -185,7 +185,7 @@ Erlaubte Uebergaenge pro Status siehe `src/app/Services/WorkflowService.php`.
 | Nr | Thema | Status |
 |----|-------|--------|
 | 1 | Session-Cookie: `Secure` + `SameSite=Strict` in Produktion pruefen | erledigt 2026-04-20 (Modul 7 I3: `config.example.php` empfiehlt `SameSite=Strict`, `Secure` bereits automatisch per HTTPS-Erkennung) |
-| 2 | Rate-Limiting fuer Passwort-Reset-Endpunkt pruefen | offen |
+| 2 | Rate-Limiting fuer Passwort-Reset-Endpunkt pruefen | erledigt 2026-04-21 (Zwei-Bucket-Schutz fuer `/forgot-password`: IP sichtbar, Email silent gegen verteilte Flood-Angriffe; Migration 008 `rate_limits.email`; Config-Keys statt Hardcoded; E2E-Spec 09 als Nachweis) |
 | 3 | CSP-Header pruefen (Strato `.htaccess`) | offen |
 
 Neue Eintraege bei G4-Findings hier ergaenzen.

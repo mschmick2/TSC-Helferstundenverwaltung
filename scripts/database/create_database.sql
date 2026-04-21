@@ -451,16 +451,22 @@ CREATE TABLE audit_log (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- =============================================================================
--- TABELLE: rate_limits (IP-basiertes Rate-Limiting)
+-- TABELLE: rate_limits (IP- und Email-basiertes Rate-Limiting)
+-- =============================================================================
+-- `ip_address` ist Pflicht und deckt klassische Brute-Force-Szenarien ab.
+-- `email` ist optional und dient fuer den Email-Empfaenger-Bucket beim
+-- /forgot-password (Anti-Flood). Historische Eintraege lassen email=NULL.
 -- =============================================================================
 
 CREATE TABLE rate_limits (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     ip_address VARCHAR(45) NOT NULL,
+    email VARCHAR(255) NULL,
     endpoint VARCHAR(100) NOT NULL,
     attempted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
-    INDEX idx_rate_limits_lookup (ip_address, endpoint, attempted_at)
+    INDEX idx_rate_limits_lookup (ip_address, endpoint, attempted_at),
+    INDEX idx_rate_limits_email_lookup (email, endpoint, attempted_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- =============================================================================

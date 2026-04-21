@@ -28,6 +28,8 @@ Darueber hinausgehende Daten benoetigen Einwilligung (Art. 6 Abs. 1 lit. a).
 | `users.totp_secret` | Auth | waehrend Mitgliedschaft | 2FA |
 | `sessions.*` | Technisch | Session-TTL | Session-Management |
 | `login_attempts.*` | Sicherheit | 90 Tage | Brute-Force-Schutz |
+| `rate_limits.ip_address` | Sicherheit (IP) | max. 2× groesstes Fenster (Cleanup in `RateLimitService::cleanup()`) | IP-Rate-Limiting (Login / Forgot-Password / Reset-Password) |
+| `rate_limits.email` | Sicherheit (PII, optional) | max. 2× groesstes Fenster; wird beim Cleanup mit der Zeile entfernt | Email-Bucket fuer Forgot-Password (Anti-Flood auf Opferpostfach) |
 | `work_entries.description` | Inhalt | s.o. | Antragsinhalt |
 | `dialog_messages.message` | Inhalt | s.o. | Rueckfragen-Dialog |
 | `audit_log.*` | Revisionssicher | 10 Jahre | Nachvollziehbarkeit |
