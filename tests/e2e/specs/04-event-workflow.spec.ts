@@ -140,13 +140,19 @@ test.describe('Event-Komplettflow — Admin legt an, Alice uebernimmt, Admin sch
 
     // Die Listenansicht zeigt keine Beschreibung. Wir oeffnen den obersten
     // Eintrag (sort=created_at&dir=DESC → der frisch erzeugte steht oben)
-    // und pruefen die Herkunfts-Zeile.
+    // und pruefen die Herkunfts-Zeile sowie den Status-Badge.
+    const topRow = page.locator('tbody tr').first();
+    await expect(topRow.locator('.badge').first()).toContainText('Eingereicht');
+
     const topId = await list.topEntryId();
     await page.goto(`/entries/${topId}`);
 
     // EventCompletionService schreibt:
     //   'Automatisch erzeugt aus Event "<title>" / Aufgabe "<task>"'
-    // Als robusten Anker nehmen wir den einmaligen Event-Titel.
+    // Als robusten Anker nehmen wir den einmaligen Event-Titel. Der
+    // Origin-Satz bestaetigt zusaetzlich, dass der Eintrag tatsaechlich
+    // vom EventCompletionService kommt und nicht aus dem manuellen Flow.
+    await expect(page.locator('body')).toContainText('Automatisch erzeugt aus Event');
     await expect(page.locator('body')).toContainText(eventTitle);
     await expect(page.locator('body')).toContainText(taskTitle);
   });
