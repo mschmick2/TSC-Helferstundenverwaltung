@@ -1,8 +1,8 @@
 # Modul 8 — E2E-Test-Suite (Playwright, headed)
 
-> **Stand:** 2026-04-20
+> **Stand:** 2026-04-21 — abgeschlossen.
 > **Zweck:** Schliesst die groesste offene Luecke im Testprotokoll (`docs/Testprotokoll_VAES.md §13.2`): Kein einziger Browser-Test, keine echten HTTP-Roundtrips, kein Layout-Regress-Schutz.
-> **Scope dieser Runde:** **Alle 5 Inkremente (I1–I5) werden umgesetzt.** Am Ende ~28 Tests, 5 Commits, lauffaehig headed (lokal) und headless (CI-ready).
+> **Scope:** Plan urspruenglich fuer fuenf Inkremente (I1–I5) geschrieben. In der Umsetzung um drei Ergaenzungen gewachsen (Event-Storno, variabler Slot-Approval, Spec-04-Haertung); der Multitab-Teil des urspruenglichen I5 ist als I8 ausgerollt. Endstand: **38 E2E-Tests, 8 Commits**, lauffaehig headed (lokal) und headless (CI-ready).
 
 ---
 
@@ -140,7 +140,9 @@ scripts/
 
 ---
 
-### 3.5 Inkrement 5 (I5) — Multitab / Multisession
+### 3.5 Inkrement 8 (I8) — Multitab / Multisession
+
+> **Hinweis:** Urspruenglich als I5 geplant. Weil sich in der Umsetzung drei kleinere Inkremente dazwischengeschoben haben (I5 Event-Storno, I6 variabler Slot-Approval, I7 Spec-04-Haertung — siehe §3.6), ist dieser Multitab-Teil am Ende als I8 gelandet.
 
 **Ziel:** Modul 7 in der Praxis zeigen. Zwei `BrowserContext`-Instanzen = zwei unabhaengige Sessions (zwei User gleichzeitig) oder zwei Tabs innerhalb derselben Session.
 
@@ -175,7 +177,22 @@ scripts/
 
 **Alle I5-Tests laufen zwingend headed** — der User hat das explizit gewuenscht, und Fehlersuche ist visuell einfacher.
 
-**Commit:** `feat(tests): Modul 8 I5 - E2E Multitab/Multisession (Modul 7 in action)`
+**Commit:** `feat(tests): Modul 8 I8 - E2E Multitab/Multisession (Modul 7 in action)`
+
+---
+
+### 3.6 Nachtraegliche Ergaenzungen (I5–I7)
+
+Waehrend der Umsetzung sind drei Inkremente dazugekommen, die im urspruenglichen Plan nicht vorgesehen waren. Sie fuellen Luecken, die beim Durchspielen von I4 sichtbar wurden.
+
+**I5 — Event-Storno mit Ersatz-Vorschlag** (Commit `d7e133e`)
+Deckt den Flow ab, wenn ein Mitglied eine uebernommene Aufgabe zurueckgibt und dabei einen Ersatz-Kandidaten vorschlaegt. Vier serielle Tests in `06-event-cancel.spec.ts`: Uebernahme, Storno mit Ersatz, Review-Queue-Darstellung beim Event-Admin, Genehmigung + Sichtbarkeit beim Mitglied.
+
+**I6 — Organizer-Entscheidung bei `slot_mode=variabel`** (Commit `d7e133e`, gleicher Commit wie I5)
+Mitglied schlaegt ein Zeitfenster vor, Event-Admin entscheidet. Vier serielle Tests in `07-event-variable-slot.spec.ts`. Neue POM-Methoden `MemberEventsPage.assignToTaskWithProposal()` und `OrganizerEventsPage.expectTimeReview()`.
+
+**I7 — Spec-04-Haertung: Status-Badge + Origin-Check** (Commit `c9fabe7`)
+Zwei zusaetzliche Assertions im Event-Komplettflow-Spec — Badge "Eingereicht" in der Listenzeile und Text "Automatisch erzeugt aus Event" im Detail-Body. Urspruenglich als eigene Spec `08-event-completion.spec.ts` begonnen und als Duplikat zu Spec 04 Test 5 verworfen; die zwei ergaenzenden Checks sind daraus direkt in Spec 04 gewandert. Die Lessons-Learned daraus haben ihren Weg in `tester.md` (G7-E2E-Hygiene) gefunden.
 
 ---
 
@@ -208,14 +225,17 @@ Bewusst **nicht** Teil von I1–I5:
 
 ## 6. Status-Tabelle
 
-| Inkr | Status | Commit |
-|------|--------|--------|
-| I1 — Infrastruktur + Login-Smoke | geplant | — |
-| I2 — Antrag-Workflow | geplant | — |
-| I3 — Admin-Flows | geplant | — |
-| I4 — Event-Komplettflow | geplant | — |
-| I5 — Multitab / Multisession | geplant | — |
+| Inkrement | Status | Commit |
+|-----------|--------|--------|
+| I1 — Infrastruktur + Login-Smoke | umgesetzt | `78c67e5` |
+| I2 — Antrag-Workflow | umgesetzt | `b02269f` |
+| I3 — Admin-Flows | umgesetzt | `9f649a0` |
+| I4 — Event-Komplettflow | umgesetzt | `1194ede` |
+| I5 — Event-Storno + Ersatz-Vorschlag (Plan-Ergaenzung) | umgesetzt | `d7e133e` |
+| I6 — Organizer-Entscheidung `slot_mode=variabel` (Plan-Ergaenzung) | umgesetzt | `d7e133e` |
+| I7 — Spec-04-Haertung (Status-Badge + Origin) (Plan-Ergaenzung) | umgesetzt | `c9fabe7` |
+| I8 — Multitab / Multisession (urspr. I5 im Plan) | umgesetzt | `5b07242` |
 
 ---
 
-*Letzte Aktualisierung: 2026-04-20 — Plan erstellt, vor Umsetzung zur Freigabe an Nutzer.*
+*Letzte Aktualisierung: 2026-04-21 — Modul 8 abgeschlossen, Plan an Umsetzung angeglichen.*
