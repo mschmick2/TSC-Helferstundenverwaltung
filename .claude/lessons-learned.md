@@ -492,4 +492,52 @@ $subscribeUrl = $appUrl . '/ical/subscribe/' . $token;
 
 ---
 
+### 2026-04-21 — E2E-Spec als Duplikat geschrieben, weil Bestands-Coverage uebersehen
+
+**Kontext:**
+Modul 8 Inkrement 7 sollte "E2E Event-Abschluss + Auto-WorkEntry-Generierung" als neue Spec `08-event-completion.spec.ts` liefern. Ein Explore-Agent-Scan zu Session-Anfang meldete "Backend komplett, nur E2E-Test-Gap" — die Spec wurde geschrieben und gruente standalone, flakte im Gesamtlauf wegen Cross-Spec-Daten (siehe folgender Eintrag). Beim Debuggen fiel auf, dass `04-event-workflow.spec.ts` Test 5 ("ALICE sieht automatisch erzeugten Antrag in /entries") denselben Flow bereits durchspielt — Event mit vergangener Laufzeit, fixer Slot, ALICE uebernimmt, Admin schliesst ab, Detail-Body enthaelt Event-Titel.
+
+**Problem / Ueberraschung:**
+Der Explore-Agent hat den Flow gesucht als "Event-Completion-Test" — die Bestands-Spec heisst aber "Event-Komplettflow" und die Test-Beschreibung spricht von "automatisch erzeugtem Antrag", nicht von "Completion". Naming-Divergenz hat die Duplikat-Erkennung unterlaufen. Konsequenz: eine komplette neue Spec (134 Zeilen + Debug-Zeit) wurde geschrieben, bevor die Duplikation auffiel.
+
+**Loesung:**
+- Spec 08 geloescht (c9fabe7 vorausgehend bereinigt).
+- Die beiden echten Delta-Assertions (Status-Badge "Eingereicht" in der Liste, Origin-Satz "Automatisch erzeugt aus Event" im Detail) wandern in Spec 04 Test 5.
+- Volle Suite 33/33 headless, Spec 04 5/5 headed gruen.
+
+**Praevention:**
+- Vor JEDER neuen E2E-Spec IMMER grep auf die Service-/Route-Bestandteile im ganzen `tests/e2e/specs/`-Baum, nicht nur nach dem Spec-Titel. Beispiel: fuer Event-Completion `grep -rE "complete\(\)|EventCompletionService|Automatisch erzeugt"`.
+- Der Explore-Agent-Prompt muss ausdruecklich fragen "welche **Flows** decken die bestehenden Specs bereits ab?", nicht "gibt es eine Spec namens X?".
+- `.claude/tester.md` bekommt einen E2E-Hygiene-Abschnitt mit expliziter Coverage-Suche als G7-Kriterium (diese Session ergaenzt).
+
+---
+
+### 2026-04-21 — Cross-Spec-Daten sprengen `tbody tr.first()`-Selektor
+
+**Kontext:**
+Die inzwischen geloeschte `08-event-completion.spec.ts` Test 4 navigierte ALICE auf `/entries` (ohne Query-Parameter) und pruefte `page.locator('tbody tr').first().locator('.badge')` auf "Eingereicht". Standalone gruen in 9.4s, im Gesamtlauf schlug die Assertion fehl — erste Zeile war Entry `2026-00001` mit Status "Freigegeben" aus Spec 02.
+
+**Problem / Ueberraschung:**
+`WorkEntry`-Listing sortiert per Default nach `work_date DESC`. Wenn mehrere Eintraege am selben Tag angelegt werden (Test-Fall: alle heute), ist der Tie-Break nicht stabil spezifiziert — MySQL faellt auf Physical-Order (≈ `id ASC`) zurueck, der neu generierte Eintrag steht damit hinten. Der Flake war also nicht "flaky im Sinne von Zeit/Zufall", sondern deterministisch falsch auf Cross-Spec-Datenbestand.
+
+Im Projekt existiert bereits `WorkEntryListPage.goto()`, die explizit `/entries?sort=created_at&dir=DESC` aufruft — exakt aus diesem Grund. Die neue Spec hat den Page-Object-Kontrakt umgangen und `page.goto('/entries')` direkt verwendet.
+
+**Loesung:**
+Im vorausgehenden Aufraeumen landeten die Assertions in Spec 04, die Page-Object-Kontrakt benutzt. Generelle Regel fuer neue Specs:
+```ts
+// RICHTIG — Page-Object, enthaelt den stabilisierenden Query-String
+await list.goto();
+const topRow = page.locator('tbody tr').first();
+
+// FALSCH — defaultet auf work_date DESC, Tie-Break instabil
+await page.goto('/entries');
+const topRow = page.locator('tbody tr').first();
+```
+
+**Praevention:**
+- `.claude/tester.md` E2E-Hygiene-Abschnitt listet Page-Object-Pflicht fuer Listen-Navigation als Gate-G7-Kriterium (diese Session ergaenzt).
+- Bei Listen-Tests immer zuerst pruefen: Welches Sort-Verhalten garantiert der neueste Eintrag oben? Wenn der Default nicht passt, Query-String setzen — nicht den Test-Erfolg dem Zufall ueberlassen.
+
+---
+
 <!-- Neue Eintraege hier unten anfuegen, nicht oben. Append-Only. -->

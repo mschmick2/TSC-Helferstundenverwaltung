@@ -55,6 +55,64 @@ PHPUnit-Tests (Unit + Integration) fuer die Aenderung. Happy Path, negative Test
 - `try { ... } catch { $this->assertTrue(true); }` — Exception explizit erwarten
 - Tests, die bei jedem Run schlagen oder passieren abhaengig von Zeit/Zufall
 
+## E2E-Tests (Playwright, `tests/e2e/`)
+
+Seit Modul 8 gibt es zusaetzlich Playwright-E2E-Specs. Fuer sie gelten
+besondere Hygiene-Regeln, die beim blinden Spec-Schreiben schon zu
+Duplikat- und Flake-Problemen gefuehrt haben (siehe `lessons-learned.md`
+Eintraege 2026-04-21).
+
+### Vor einer neuen Spec
+
+- [ ] **Bestands-Coverage pruefen** — nicht nach Spec-Titel, sondern nach
+      Flow-Bestandteilen. Pflicht-Grep:
+      `grep -rE "<ServiceName>|<kritische-URL>|<charakteristischer-Satz>" tests/e2e/specs/`
+      Beispiel: vor einem "Event-Abschluss"-Test zuerst
+      `grep -rE "complete\(\)|EventCompletionService|Automatisch erzeugt"` laufen lassen.
+      Naming-Divergenz ist der haeufigste Grund fuer Duplikate — Specs tragen
+      oft einen Flow-Namen, nicht den Service-Namen.
+- [ ] **Page-Object suchen, bevor ein neuer Selector geschrieben wird.**
+      Wenn fuer die gepruefte Seite bereits ein POM existiert (z.B.
+      `WorkEntryListPage`), MUSS dessen `goto()` verwendet werden —
+      POM-Methoden enthalten oft stabilisierende Query-Parameter (Sortierung,
+      Filter), die ein direkter `page.goto(url)` umgeht.
+
+### Row-/List-Assertions
+
+- [ ] **Listen-Sortierung ist nie "zufaellig neueste zuerst".** Default der
+      `/entries`-Liste ist `work_date DESC`, Tie-Break bei gleichem Datum ist
+      Physical-Order (~`id ASC`). Fuer "neuester Eintrag oben" explizit
+      `?sort=created_at&dir=DESC` setzen — genau dafuer existiert
+      `WorkEntryListPage.goto()`.
+- [ ] **Cross-Spec-Datenbestand einkalkulieren.** E2E-DB wird pro Run genau
+      einmal aufgebaut (`globalSetup`), nicht pro Spec. Ein Test, der
+      "erste Tabellenzeile" prueft, bekommt im Gesamtlauf die Altlast
+      frueherer Specs, nicht den frisch erzeugten Eintrag.
+
+### Stabilitaet
+
+- [ ] **Keine negierten URL-Predikate in `waitForURL`.** Im Headed-/SlowMo-Modus
+      kann die URL-Subscription den Redirect verpassen. Stattdessen positives
+      DOM-Signal: z.B. `expect(page.locator('a[href$="/logout"]')).toHaveCount(1, { timeout: 15_000 })`.
+      Siehe `LoginPage.loginAs()`.
+- [ ] **Serial-Mode bewusst setzen.** Tests, die Entry-IDs oder Event-IDs
+      ueber `let`-Variablen teilen, brauchen `test.describe.configure({ mode: 'serial' })`.
+- [ ] **Keine `await page.waitForTimeout(...)`.** Bei Timing-Abhaengigkeiten
+      `expect(...).toHaveCount/toBeVisible` mit Timeout nutzen.
+
+### Lauf-Disziplin
+
+- [ ] **Standalone + Full-Suite**. Nach jedem Spec-Change beides laufen lassen:
+      ```
+      npx playwright test --project=headless tests/e2e/specs/<spec>
+      npx playwright test --project=headless
+      ```
+      Ein standalone-gruener Test, der im Gesamtlauf flakt, ist der typische
+      Cross-Spec-Daten-Fall — kein "flakes halt", sondern deterministischer Bug.
+- [ ] **Headed-Lauf fuer neue User-Interaktion.** Wenn die Spec neue
+      UI-Klicks enthaelt, mindestens einmal `--project=headed` laufen lassen —
+      SlowMo deckt Timing-Annahmen auf, die headless verschluckt.
+
 ## Uebergabe an integrator (G8)
 
 Format: `Tester-Gate G7: bestanden. Neue Tests: [Anzahl]. Coverage: [Bereich]. Findings: [Liste]. Integrator, bitte G8 pruefen.`
