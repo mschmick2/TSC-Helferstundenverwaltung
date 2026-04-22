@@ -119,6 +119,7 @@ return function (App $app): void {
         $group->post('/entries/{id:[0-9]+}/approve', [WorkEntryController::class, 'approve']);
         $group->post('/entries/{id:[0-9]+}/reject', [WorkEntryController::class, 'reject']);
         $group->post('/entries/{id:[0-9]+}/return', [WorkEntryController::class, 'returnForRevision']);
+        $group->post('/entries/{id:[0-9]+}/return-to-draft', [WorkEntryController::class, 'returnToDraft']);
         $group->post('/entries/{id:[0-9]+}/correct', [WorkEntryController::class, 'correct']);
     })
         ->add(new RoleMiddleware(['pruefer', 'administrator']))

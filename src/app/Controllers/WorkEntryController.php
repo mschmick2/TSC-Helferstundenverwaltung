@@ -814,6 +814,33 @@ class WorkEntryController extends BaseController
     }
 
     /**
+     * Eintrag zur Überarbeitung an Mitglied zurück (→ entwurf)
+     */
+    public function returnToDraft(Request $request, Response $response): Response
+    {
+        $user = $this->getUser($request);
+        $args = $this->routeArgs($request);
+        $entry = $this->entryRepo->findById((int) $args['id']);
+
+        if (!$entry) {
+            ViewHelper::flash('error', 'Eintrag nicht gefunden.');
+            return $this->redirect($response, '/review');
+        }
+
+        $data = (array) $request->getParsedBody();
+        $reason = trim($data['reason'] ?? '');
+
+        try {
+            $this->workflowService->returnToDraft($entry, $user, $reason);
+            ViewHelper::flash('success', 'Antrag zur Überarbeitung an das Mitglied zurückgegeben.');
+        } catch (BusinessRuleException | AuthorizationException $e) {
+            ViewHelper::flash('error', $e->getMessage());
+        }
+
+        return $this->redirect($response, '/review');
+    }
+
+    /**
      * Korrektur an freigegebenem Eintrag
      */
     public function correct(Request $request, Response $response): Response

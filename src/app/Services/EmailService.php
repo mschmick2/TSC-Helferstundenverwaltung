@@ -256,6 +256,43 @@ class EmailService
     }
 
     /**
+     * Benachrichtigung an Mitglied: Antrag zur Überarbeitung zurückgegeben
+     *
+     * Anders als sendEntryReturnedForRevision (Rueckfrage): das Mitglied soll
+     * inhaltlich nacharbeiten und neu einreichen, der Antrag ist wieder im
+     * Entwurfszustand.
+     */
+    public function sendEntryReturnedToDraft(
+        string $email,
+        string $vorname,
+        string $entryNumber,
+        string $reason,
+        string $entryUrl
+    ): bool {
+        $subject = "VAES - Antrag {$entryNumber} zur Überarbeitung";
+        $html = $this->wrapInTemplate("
+            <h2>Antrag zur Überarbeitung zurückgegeben</h2>
+            <p>Hallo {$this->e($vorname)},</p>
+            <p>Ihr Antrag <strong>{$this->e($entryNumber)}</strong> wurde zur Überarbeitung an Sie zurückgegeben.</p>
+            <p style='background: #f8f9fa; padding: 15px; border-radius: 6px; border-left: 4px solid #fd7e14;'>
+                <strong>Begründung:</strong><br>
+                {$this->e($reason)}
+            </p>
+            <p>Der Antrag ist jetzt wieder im Status <strong>Entwurf</strong>. Bitte passen Sie
+            die Angaben an und reichen Sie den Antrag erneut ein. Der Dialog-Verlauf bleibt erhalten.</p>
+            <p style='text-align: center; margin: 30px 0;'>
+                <a href='{$this->e($entryUrl)}'
+                   style='background: #0d6efd; color: white; padding: 12px 30px;
+                          text-decoration: none; border-radius: 6px; font-weight: bold;'>
+                    Antrag bearbeiten
+                </a>
+            </p>
+        ");
+
+        return $this->send($email, $subject, $html);
+    }
+
+    /**
      * Benachrichtigung an Mitglied: Korrektur an freigegebenem Antrag
      */
     public function sendEntryCorrected(
