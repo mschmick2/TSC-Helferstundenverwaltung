@@ -503,7 +503,10 @@ class WorkEntryController extends BaseController
             return $this->jsonResponse($response, ['ok' => false, 'reason' => 'unavailable'], 503);
         }
 
-        $status = $this->lockService->checkStatus($entryId, $user->getId());
+        $sessionId = $request->getAttribute('session_id');
+        $sessionId = is_int($sessionId) ? $sessionId : null;
+
+        $status = $this->lockService->checkStatus($entryId, $user->getId(), $sessionId);
         return $this->jsonResponse($response, array_merge(['ok' => true], $status), 200);
     }
 
@@ -521,7 +524,10 @@ class WorkEntryController extends BaseController
             return $this->jsonResponse($response, ['ok' => false], 204);
         }
 
-        $this->lockService->release($entryId, $user->getId());
+        $sessionId = $request->getAttribute('session_id');
+        $sessionId = is_int($sessionId) ? $sessionId : null;
+
+        $this->lockService->release($entryId, $user->getId(), $sessionId);
 
         return $this->jsonResponse($response, ['ok' => true], 200);
     }
