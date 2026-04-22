@@ -25,28 +25,36 @@ use App\Models\EventTask;
 </div>
 
 <?php
-// Modul 6 I7b2 Phase 1: Controller liefert bei Flag=1 und vorhandener
-// Baumstruktur bereits $treeEditorEnabled / $hasTreeStructure / $treeData.
-// Das rekursive Accordion-Partial folgt in Phase 2 — bis dahin fallen wir
-// auf die bestehende flache Karten-Liste zurueck und zeigen in dev/test
-// einen Hinweis, damit Tester sehen, dass der Daten-Flow aus dem Controller
-// korrekt greift.
+// Modul 6 I7b2: Mitglieder-Accordion bei Flag=1 und vorhandener
+// Baumstruktur. Sonst (Flag=0 oder flache Event-Aufgaben) die
+// bestehende Karten-Ansicht unveraendert. Controller liefert bereits
+// $treeEditorEnabled / $hasTreeStructure / $treeData (Phase 1).
 $showAccordion = !empty($treeEditorEnabled) && !empty($hasTreeStructure);
 ?>
 
 <h2 class="h5 mb-3"><i class="bi bi-list-task"></i> Aufgaben und Beigaben</h2>
 
 <?php if ($showAccordion): ?>
-    <div class="alert alert-secondary d-flex align-items-center gap-2 mb-3" role="alert">
-        <i class="bi bi-info-circle" aria-hidden="true"></i>
-        <span class="small">
-            Hinweis: Hierarchische Baumansicht wird in I7b2 Phase 2 nachgeliefert.
-            Aktuell zeigen wir die flache Liste.
-        </span>
-    </div>
-<?php endif; ?>
-
-<?php if (empty($tasks)): ?>
+    <?php if (empty($treeData)): ?>
+        <p class="text-muted">Noch keine Aufgaben definiert.</p>
+    <?php else: ?>
+        <div class="task-group-accordion">
+            <?php
+            // Container-Closure-Rekursion (G9-I7b1-Muster): use-by-reference
+            // fuer Self-Call, kapselt $node/$depth pro Aufruf, kein Scope-Leak
+            // wie bei naked-include im foreach.
+            $renderAccordionNode = function (array $node, int $depth) use (
+                &$renderAccordionNode, $taskMeta, $event, $user
+            ): void {
+                include __DIR__ . '/_task_group_accordion.php';
+            };
+            foreach ($treeData as $rootNode) {
+                $renderAccordionNode($rootNode, 0);
+            }
+            ?>
+        </div>
+    <?php endif; ?>
+<?php elseif (empty($tasks)): ?>
     <p class="text-muted">Noch keine Aufgaben definiert.</p>
 <?php else: ?>
     <div class="row g-2">

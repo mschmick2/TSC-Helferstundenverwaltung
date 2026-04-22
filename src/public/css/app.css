@@ -216,3 +216,132 @@ main {
         white-space: normal;
     }
 }
+
+/* =========================================================================
+ * Mitglieder-Accordion — hierarchische Aufgaben-Anzeige (Modul 6 I7b2)
+ * =========================================================================
+ * Basiert auf nativem <details>/<summary>, ohne JS fuer die Falt-Mechanik.
+ * Filter-Toggle-Styles (display-none-Regeln) kommen in I7b2 Phase 3 dazu.
+ */
+
+.task-group-accordion {
+    margin-top: 0.5rem;
+}
+
+.task-group-accordion-group {
+    border-left: 2px solid var(--bs-gray-300, #dee2e6);
+    padding-left: 0.75rem;
+    margin-bottom: 0.75rem;
+}
+
+.task-group-accordion-group.depth-1 { margin-left: 0.75rem; }
+.task-group-accordion-group.depth-2 { margin-left: 1.5rem; }
+.task-group-accordion-group.depth-3 { margin-left: 2.25rem; }
+.task-group-accordion-group.depth-4 { margin-left: 3rem; }
+
+/* <summary>-Standardmarker verstecken, eigenes Dreieck rendern */
+.task-group-accordion-group > summary {
+    cursor: pointer;
+    padding: 0.5rem 0;
+    list-style: none;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.task-group-accordion-group > summary::-webkit-details-marker {
+    display: none;
+}
+.task-group-accordion-group > summary::marker {
+    display: none;
+    content: "";
+}
+
+.task-group-accordion-group > summary::before {
+    content: "\25B8";                /* rechtes Dreieck */
+    display: inline-block;
+    width: 1rem;
+    margin-right: 0.25rem;
+    color: var(--bs-gray-600, #6c757d);
+    transition: transform 0.15s ease;
+    flex-shrink: 0;
+}
+
+.task-group-accordion-group[open] > summary::before {
+    transform: rotate(90deg);
+}
+
+.task-group-accordion-group > summary:hover {
+    background-color: var(--bs-gray-100, #f8f9fa);
+    border-radius: 0.25rem;
+}
+
+.task-group-accordion-group > summary:focus-visible {
+    outline: 2px solid var(--bs-primary);
+    outline-offset: 2px;
+    border-radius: 0.25rem;
+}
+
+.task-group-accordion-title {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+.task-group-accordion-badges {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.task-group-accordion-group-description {
+    padding-left: 1.25rem;
+    margin-bottom: 0.5rem;
+}
+
+.task-group-accordion-children {
+    padding-top: 0.25rem;
+}
+
+/* Leaf-Element: vertikale Akzent-Leiste, eigenstaendige Karte */
+.task-group-accordion-leaf {
+    border-left: 3px solid var(--bs-primary);
+    padding: 0.5rem 0.75rem;
+    margin: 0.5rem 0;
+    background-color: var(--bs-body-bg, #fff);
+    border-radius: 0 0.25rem 0.25rem 0;
+}
+
+.task-group-accordion-leaf.depth-1 { margin-left: 0.75rem; }
+.task-group-accordion-leaf.depth-2 { margin-left: 1.5rem; }
+.task-group-accordion-leaf.depth-3 { margin-left: 2.25rem; }
+.task-group-accordion-leaf.depth-4 { margin-left: 3rem; }
+
+.task-group-accordion-leaf-header {
+    margin-bottom: 0.25rem;
+}
+
+.task-group-accordion-leaf-meta {
+    line-height: 1.5;
+}
+
+.task-group-accordion-leaf-description {
+    white-space: pre-wrap;
+}
+
+/* Touch-Targets Mobile (>= 44x44). Summary und Leaf-Action-Buttons
+ * muessen mit dem Finger sauber treffbar sein. */
+@media (max-width: 768px) {
+    .task-group-accordion-group > summary {
+        min-height: 2.75rem;
+        padding: 0.625rem 0;
+    }
+    .task-group-accordion-leaf-actions .btn {
+        min-height: 2.75rem;
+    }
+}
