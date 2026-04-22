@@ -540,4 +540,71 @@ const topRow = page.locator('tbody tr').first();
 
 ---
 
+### 2026-04-22 — ASCII-Retransliteration per Regex zerstoert Woerter wie "neue", "dass"
+
+**Kontext:**
+Erstellung einer DOCX-Version des Benutzerhandbuchs aus `docs/Benutzerhandbuch.md`.
+Die Markdown-Quelle ist durchgehend ASCII-transliteriert (`ae`, `oe`, `ue`, `ss`
+statt `ä`, `ö`, `ü`, `ß`), weil sie ueber die Jahre aus CLI-Eingaben und
+Harness-Regeln gewachsen ist. Die DOCX-Ausgabe soll aber korrekte deutsche
+Typografie haben.
+
+**Problem / Ueberraschung:**
+Der naive erste Wurf ersetzte pauschal per Regex `ue→ü`, `ae→ä`, `oe→ö`,
+`ss→ß`. Resultat in einer Stichprobe von 20 Absaetzen: >50 kaputte Woerter.
+
+- `ue → ü` zerstoert *neue* → *nü*, *aktuell* → *aktüll*, *manuell* → *manüll*,
+  *individuelle* → *individülle*, *Grauer* → *Grürer*, *Blauer* → *Blürer*.
+- `ss → ß` zerstoert *dass* → *daß*, *muss* → *muß*, *passiert* → *paßiert*,
+  *lassen* → *laßen*, *Session* → *Seßion*, *password* → *paßword*,
+  *Permissions* → *Permißions*, *Assignment* → *Aßignment*.
+- `oe → ö` zerstoert *Poet*, *Coexistenz*, *Proest* (wenn Substring
+  irgendwo im Text).
+- `ae → ä` trifft seltener, aber z.B. *Rafael*, *Israel* waren in der
+  Stichprobe.
+
+Syntax-Check (`python -c`) sah sauber aus, Unit-Tests gibt es fuer diesen
+Konverter nicht — erst das Oeffnen der DOCX-Datei macht die Zerstoerung
+sichtbar.
+
+**Loesung:**
+`tools/md-to-docx/build-handbuch-docx.py` mit **expliziter Wort-Whitelist**:
+
+```python
+WORD_MAP: dict[str, str] = {
+    "abschliessen": "abschließen",
+    "Abhaengig": "Abhängig",
+    # ... 300+ Eintraege, einmalig manuell aus --audit-Lauf erstellt ...
+    "zurueckzusetzen": "zurückzusetzen",
+}
+
+_WORD_RE = re.compile(r"[A-Za-z][A-Za-z]+")
+
+def retransliterate(text: str) -> str:
+    return _WORD_RE.sub(
+        lambda m: WORD_MAP.get(m.group(0), m.group(0)),
+        text,
+    )
+```
+
+Der Script-`--audit`-Modus listet alle Kandidaten-Token (`ae/oe/ue/ss`-haltig),
+die noch NICHT in der Map sind — einmal durchlaufen, Map komplettieren,
+dann erst echter Export-Lauf.
+
+Ergebnis: 228 ä, 107 ö, 369 ü, 16 Ä, 23 Ö, 19 Ü, 20 ß — null Fehltreffer.
+
+**Praevention:**
+- Fuer ASCII→Umlaut-Retransliteration in deutschen Texten IMMER eine
+  explizite Wort-Whitelist bauen, nie pauschale Regex.
+- Vor dem ersten Echt-Lauf: Audit-Modus (Liste der ungemappten Kandidaten)
+  nutzen — so entsteht die Whitelist in einem Rutsch, ohne dass man durch
+  die DOCX-Datei hetzen muss, um Schaden zu finden.
+- Wiederverwendbares Tool unter [tools/md-to-docx/](../tools/md-to-docx/)
+  ablegen; die Map waechst inkrementell, wenn das Handbuch neue Begriffe
+  bekommt.
+- Gilt analog fuer andere ASCII-Transliterationen (Franzoesisch, Polnisch,
+  Tschechisch) — auch dort sind Muster wie `oe`, `ss`, `cz` ambig.
+
+---
+
 <!-- Neue Eintraege hier unten anfuegen, nicht oben. Append-Only. -->
