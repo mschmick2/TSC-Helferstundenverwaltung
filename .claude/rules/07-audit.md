@@ -158,7 +158,31 @@ $this->audit->log(
         'format'    => 'csv',
     ],
 );
+
+// Reorder einer Geschwister-Liste (z.B. TaskTreeService::reorderSiblings,
+// CategoryService-Sortierung). Reorder hat keinen einzelnen Record-Traeger —
+// der Zustand ist in der Reihenfolge mehrerer Zeilen codiert.
+$this->audit->log(
+    action: 'update',
+    tableName: 'event_tasks',  // konkrete Tabelle, NICHT die uebergeordnete Entity
+    recordId: null,            // kein einzelnes Record — bewusst null
+    description: 'Reihenfolge der Aufgaben geaendert',
+    metadata: [
+        'event_id'        => $eventId,
+        'parent_task_id'  => $parentId,           // null = Top-Level
+        'children_order'  => [12, 7, 9, 4],       // Task-IDs in neuer Reihenfolge
+        'operation'       => 'reorder',
+    ],
+);
 ```
+
+> **Reorder-Konvention** (festgelegt im G1-Delta-Review von Modul 6 I7a,
+> 2026-04-22): bei jeder Reorder-Operation `tableName` = konkrete Tabelle,
+> `recordId` = `null`, vollstaendige Information in `metadata`. Begruendung:
+> Reorder beruehrt einen Set von Rows, nicht eine einzelne — eine
+> stellvertretende `recordId` (z.B. die des Parents oder Events) waere
+> irrefuehrend. Auditoren-Suche identifiziert Reorder-Eintraege ueber
+> `metadata->operation = 'reorder'` und `metadata->parent_task_id`.
 
 ---
 

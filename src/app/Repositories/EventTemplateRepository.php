@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Repositories;
 
+use App\Helpers\TreeWalkLimits;
 use App\Models\EventTemplate;
 use App\Models\EventTemplateTask;
 use PDO;
@@ -164,20 +165,25 @@ class EventTemplateRepository
     {
         $stmt = $this->pdo->prepare(
             "INSERT INTO event_template_tasks
-             (template_id, category_id, title, description, task_type, slot_mode,
+             (template_id, parent_template_task_id, is_group,
+              category_id, title, description, task_type, slot_mode,
               default_offset_minutes_start, default_offset_minutes_end,
               capacity_mode, capacity_target, hours_default, sort_order)
              VALUES
-             (:template_id, :category_id, :title, :description, :task_type, :slot_mode,
+             (:template_id, :parent_id, :is_group,
+              :category_id, :title, :description, :task_type, :slot_mode,
               :off_start, :off_end, :capacity_mode, :capacity_target, :hours_default, :sort_order)"
         );
         $stmt->execute([
             'template_id' => $templateId,
+            'parent_id'   => $data['parent_template_task_id'] ?? null,
+            'is_group'    => isset($data['is_group']) && $data['is_group'] ? 1 : 0,
             'category_id' => $data['category_id'] ?? null,
             'title' => $data['title'],
             'description' => $data['description'] ?? null,
             'task_type' => $data['task_type'] ?? 'aufgabe',
-            'slot_mode' => $data['slot_mode'] ?? 'fix',
+            // slot_mode null-aware: explizites null (Gruppe) bleibt erhalten
+            'slot_mode' => array_key_exists('slot_mode', $data) ? $data['slot_mode'] : 'fix',
             'off_start' => $data['default_offset_minutes_start'] ?? null,
             'off_end' => $data['default_offset_minutes_end'] ?? null,
             'capacity_mode' => $data['capacity_mode'] ?? 'unbegrenzt',
@@ -186,6 +192,148 @@ class EventTemplateRepository
             'sort_order' => (int) ($data['sort_order'] ?? 0),
         ]);
         return (int) $this->pdo->lastInsertId();
+    }
+
+    /**
+     * Aktive Geschwister-Vorlagen einer Ebene im Template-Baum.
+     *
+     * @return EventTemplateTask[]
+     */
+    public function findTaskChildren(int $templateId, ?int $parentTaskId): array
+    {
+        if ($parentTaskId === null) {
+            $stmt = $this->pdo->prepare(
+                "SELECT * FROM event_template_tasks
+                 WHERE template_id = :tid AND parent_template_task_id IS NULL
+                 ORDER BY sort_order ASC, id ASC"
+            );
+            $stmt->execute(['tid' => $templateId]);
+        } else {
+            $stmt = $this->pdo->prepare(
+                "SELECT * FROM event_template_tasks
+                 WHERE template_id = :tid AND parent_template_task_id = :pid
+                 ORDER BY sort_order ASC, id ASC"
+            );
+            $stmt->execute(['tid' => $templateId, 'pid' => $parentTaskId]);
+        }
+        $rows = [];
+        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+            $rows[] = EventTemplateTask::fromArray($row);
+        }
+        return $rows;
+    }
+
+    public function countActiveTaskChildren(int $templateTaskId): int
+    {
+        $stmt = $this->pdo->prepare(
+            "SELECT COUNT(*) FROM event_template_tasks
+             WHERE parent_template_task_id = :pid"
+        );
+        $stmt->execute(['pid' => $templateTaskId]);
+        return (int) $stmt->fetchColumn();
+    }
+
+    /**
+     * Tiefe einer Template-Vorlage relativ zur Wurzel (Top-Level = 0).
+     */
+    public function getTaskDepth(int $templateTaskId): int
+    {
+        $depth = 0;
+        $current = $templateTaskId;
+        for ($i = 0; $i < TreeWalkLimits::SAFETY_DEPTH_CAP; $i++) {
+            $stmt = $this->pdo->prepare(
+                "SELECT parent_template_task_id FROM event_template_tasks WHERE id = :id"
+            );
+            $stmt->execute(['id' => $current]);
+            $row = $stmt->fetch(PDO::FETCH_ASSOC);
+            if ($row === false || $row['parent_template_task_id'] === null) {
+                return $depth;
+            }
+            $current = (int) $row['parent_template_task_id'];
+            $depth++;
+        }
+        return $depth;
+    }
+
+    public function isTaskDescendantOf(int $taskId, int $candidateAncestor): bool
+    {
+        $current = $taskId;
+        for ($i = 0; $i < TreeWalkLimits::SAFETY_DEPTH_CAP; $i++) {
+            $stmt = $this->pdo->prepare(
+                "SELECT parent_template_task_id FROM event_template_tasks WHERE id = :id"
+            );
+            $stmt->execute(['id' => $current]);
+            $row = $stmt->fetch(PDO::FETCH_ASSOC);
+            if ($row === false || $row['parent_template_task_id'] === null) {
+                return false;
+            }
+            $parent = (int) $row['parent_template_task_id'];
+            if ($parent === $candidateAncestor) {
+                return true;
+            }
+            $current = $parent;
+        }
+        return false;
+    }
+
+    public function moveTask(int $templateTaskId, ?int $newParentId, int $newSortOrder): bool
+    {
+        $stmt = $this->pdo->prepare(
+            "UPDATE event_template_tasks
+             SET parent_template_task_id = :pid, sort_order = :ord
+             WHERE id = :id"
+        );
+        $stmt->execute([
+            'pid' => $newParentId,
+            'ord' => $newSortOrder,
+            'id'  => $templateTaskId,
+        ]);
+        return $stmt->rowCount() > 0;
+    }
+
+    public function convertTaskToGroup(int $templateTaskId): bool
+    {
+        $stmt = $this->pdo->prepare(
+            "UPDATE event_template_tasks
+             SET is_group = 1,
+                 slot_mode = NULL,
+                 default_offset_minutes_start = NULL,
+                 default_offset_minutes_end = NULL,
+                 capacity_mode = 'unbegrenzt',
+                 capacity_target = NULL,
+                 hours_default = 0,
+                 task_type = 'aufgabe'
+             WHERE id = :id"
+        );
+        $stmt->execute(['id' => $templateTaskId]);
+        return $stmt->rowCount() > 0;
+    }
+
+    public function convertTaskToLeaf(int $templateTaskId, array $leafData): bool
+    {
+        $stmt = $this->pdo->prepare(
+            "UPDATE event_template_tasks
+             SET is_group = 0,
+                 task_type = :task_type,
+                 slot_mode = :slot_mode,
+                 default_offset_minutes_start = :off_start,
+                 default_offset_minutes_end = :off_end,
+                 capacity_mode = :capacity_mode,
+                 capacity_target = :capacity_target,
+                 hours_default = :hours_default
+             WHERE id = :id"
+        );
+        $stmt->execute([
+            'task_type'       => $leafData['task_type'] ?? 'aufgabe',
+            'slot_mode'       => $leafData['slot_mode'] ?? 'fix',
+            'off_start'       => $leafData['default_offset_minutes_start'] ?? null,
+            'off_end'         => $leafData['default_offset_minutes_end'] ?? null,
+            'capacity_mode'   => $leafData['capacity_mode'] ?? 'unbegrenzt',
+            'capacity_target' => $leafData['capacity_target'] ?? null,
+            'hours_default'   => $leafData['hours_default'] ?? 0.0,
+            'id'              => $templateTaskId,
+        ]);
+        return $stmt->rowCount() > 0;
     }
 
     public function softDelete(int $templateId, int $deletedBy): bool
@@ -231,7 +379,8 @@ class EventTemplateRepository
             'title' => $data['title'],
             'description' => $data['description'] ?? null,
             'task_type' => $data['task_type'] ?? 'aufgabe',
-            'slot_mode' => $data['slot_mode'] ?? 'fix',
+            // null-aware: explizites null (Gruppe) bleibt erhalten
+            'slot_mode' => array_key_exists('slot_mode', $data) ? $data['slot_mode'] : 'fix',
             'off_start' => $data['default_offset_minutes_start'] ?? null,
             'off_end' => $data['default_offset_minutes_end'] ?? null,
             'capacity_mode' => $data['capacity_mode'] ?? 'unbegrenzt',
@@ -289,26 +438,52 @@ class EventTemplateRepository
     }
 
     /**
-     * Alle Tasks einer Template-Version in ein Ziel-Template kopieren.
-     * Wird von saveAsNewVersion verwendet.
+     * Alle Tasks einer Template-Version in ein Ziel-Template kopieren —
+     * inklusive Hierarchie. Eine flache Quell-Tabelle (alle parent_template_task_id
+     * NULL) wird in einer Schicht kopiert; bei Baumstrukturen werden die
+     * neuen parent-IDs Schicht fuer Schicht aufgebaut.
+     *
+     * Wird von saveAsNewVersion verwendet. Liefert die Anzahl kopierter Knoten.
      */
     public function copyTasks(int $fromTemplateId, int $toTemplateId): int
     {
-        $stmt = $this->pdo->prepare(
-            "INSERT INTO event_template_tasks
-                (template_id, category_id, title, description, task_type, slot_mode,
-                 default_offset_minutes_start, default_offset_minutes_end,
-                 capacity_mode, capacity_target, hours_default, sort_order)
-             SELECT :to_tid, category_id, title, description, task_type, slot_mode,
-                    default_offset_minutes_start, default_offset_minutes_end,
-                    capacity_mode, capacity_target, hours_default, sort_order
-             FROM event_template_tasks
-             WHERE template_id = :from_tid"
-        );
-        $stmt->execute([
-            'to_tid'   => $toTemplateId,
-            'from_tid' => $fromTemplateId,
-        ]);
-        return $stmt->rowCount();
+        return $this->copyTaskSubtree($fromTemplateId, $toTemplateId, null, null);
+    }
+
+    private function copyTaskSubtree(
+        int $fromTemplateId,
+        int $toTemplateId,
+        ?int $oldParentId,
+        ?int $newParentId
+    ): int {
+        $children = $this->findTaskChildren($fromTemplateId, $oldParentId);
+        $count = 0;
+        foreach ($children as $child) {
+            $newId = $this->addTask($toTemplateId, [
+                'parent_template_task_id'      => $newParentId,
+                'is_group'                     => $child->isGroup(),
+                'category_id'                  => $child->getCategoryId(),
+                'title'                        => $child->getTitle(),
+                'description'                  => $child->getDescription(),
+                'task_type'                    => $child->getTaskType(),
+                'slot_mode'                    => $child->getSlotMode(),
+                'default_offset_minutes_start' => $child->getDefaultOffsetMinutesStart(),
+                'default_offset_minutes_end'   => $child->getDefaultOffsetMinutesEnd(),
+                'capacity_mode'                => $child->getCapacityMode(),
+                'capacity_target'              => $child->getCapacityTarget(),
+                'hours_default'                => $child->getHoursDefault(),
+                'sort_order'                   => $child->getSortOrder(),
+            ]);
+            $count++;
+            if ($child->isGroup() && $child->getId() !== null) {
+                $count += $this->copyTaskSubtree(
+                    $fromTemplateId,
+                    $toTemplateId,
+                    $child->getId(),
+                    $newId
+                );
+            }
+        }
+        return $count;
     }
 }
