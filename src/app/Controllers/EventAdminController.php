@@ -5,17 +5,22 @@ declare(strict_types=1);
 namespace App\Controllers;
 
 use App\Exceptions\BusinessRuleException;
+use App\Exceptions\ValidationException;
 use App\Helpers\ViewHelper;
 use App\Models\Event;
 use App\Repositories\CategoryRepository;
 use App\Repositories\EventOrganizerRepository;
 use App\Repositories\EventRepository;
+use App\Repositories\EventTaskAssignmentRepository;
 use App\Repositories\EventTaskRepository;
 use App\Repositories\EventTemplateRepository;
 use App\Repositories\UserRepository;
 use App\Services\AuditService;
 use App\Services\EventCompletionService;
 use App\Services\SchedulerService;
+use App\Services\SettingsService;
+use App\Services\TaskTreeAggregator;
+use App\Services\TaskTreeService;
 use DateInterval;
 use DateTimeImmutable;
 use Psr\Http\Message\ResponseInterface as Response;
@@ -39,7 +44,11 @@ class EventAdminController extends BaseController
         private EventCompletionService $completionService,
         private EventTemplateRepository $templateRepo,
         private array $settings,
-        private ?SchedulerService $scheduler = null
+        private ?SchedulerService $scheduler = null,
+        private ?TaskTreeService $treeService = null,
+        private ?TaskTreeAggregator $treeAggregator = null,
+        private ?EventTaskAssignmentRepository $assignmentRepo = null,
+        private ?SettingsService $settingsService = null
     ) {
     }
 
@@ -668,6 +677,363 @@ class EventAdminController extends BaseController
             return 'Mindestens ein Organisator muss ausgewaehlt sein.';
         }
         return null;
+    }
+
+    // =========================================================================
+    // Tree-Editor (Modul 6 I7b1) — hinter Settings-Flag events.tree_editor_enabled
+    // =========================================================================
+
+    /**
+     * GET /admin/events/{eventId}/tasks/tree — liefert den aggregierten Tree als JSON.
+     */
+    public function showTaskTree(Request $request, Response $response): Response
+    {
+        $eventId = (int) $this->routeArgs($request)['eventId'];
+
+        if (!$this->treeEditorEnabled()) {
+            return $response->withStatus(404);
+        }
+
+        $user = $request->getAttribute('user');
+        $this->assertEventEditPermission($user, $eventId, $this->organizerRepo);
+
+        $event = $this->eventRepo->findById($eventId);
+        if ($event === null) {
+            return $response->withStatus(404);
+        }
+
+        $flatTasks = $this->loadEventTasks($eventId);
+        $assignmentCounts = $this->assignmentRepo->countActiveByEvent($eventId);
+        $tree = $this->treeAggregator->buildTree($flatTasks, $assignmentCounts);
+
+        return $this->json($response, [
+            'event_id' => $eventId,
+            'tree'     => $tree,
+        ]);
+    }
+
+    /**
+     * POST /admin/events/{eventId}/tasks/node — neuen Knoten anlegen.
+     */
+    public function createTaskNode(Request $request, Response $response): Response
+    {
+        $eventId = (int) $this->routeArgs($request)['eventId'];
+
+        if (!$this->treeEditorEnabled()) {
+            return $response->withStatus(404);
+        }
+
+        $user = $request->getAttribute('user');
+        $this->assertEventEditPermission($user, $eventId, $this->organizerRepo);
+        $actorId = (int) $user->getId();
+
+        $data = (array) $request->getParsedBody();
+
+        try {
+            $newId = $this->treeService->createNode($eventId, $data, $actorId);
+        } catch (ValidationException $e) {
+            return $this->treeErrorResponse($request, $response, $eventId, 422, $e->getErrors());
+        } catch (BusinessRuleException $e) {
+            return $this->treeErrorResponse($request, $response, $eventId, 409, [$e->getMessage()]);
+        }
+
+        if ($this->wantsJson($request)) {
+            return $this->json($response, ['id' => $newId, 'status' => 'ok'], 201);
+        }
+        ViewHelper::flash('success', 'Aufgabe angelegt.');
+        return $this->redirect($response, '/admin/events/' . $eventId);
+    }
+
+    /**
+     * POST /admin/events/{eventId}/tasks/{taskId}/move — Knoten verschieben.
+     */
+    public function moveTaskNode(Request $request, Response $response): Response
+    {
+        $args     = $this->routeArgs($request);
+        $eventId  = (int) $args['eventId'];
+        $taskId   = (int) $args['taskId'];
+
+        if (!$this->treeEditorEnabled()) {
+            return $response->withStatus(404);
+        }
+
+        $user = $request->getAttribute('user');
+        $this->assertEventEditPermission($user, $eventId, $this->organizerRepo);
+        $actorId = (int) $user->getId();
+
+        $data = (array) $request->getParsedBody();
+        $newParentId = array_key_exists('new_parent_id', $data) && $data['new_parent_id'] !== null && $data['new_parent_id'] !== ''
+            ? (int) $data['new_parent_id']
+            : null;
+        $newSortOrder = (int) ($data['new_sort_order'] ?? 0);
+
+        try {
+            $this->treeService->move($taskId, $newParentId, $newSortOrder, $actorId);
+        } catch (ValidationException $e) {
+            return $this->treeErrorResponse($request, $response, $eventId, 422, $e->getErrors());
+        } catch (BusinessRuleException $e) {
+            return $this->treeErrorResponse($request, $response, $eventId, 409, [$e->getMessage()]);
+        }
+
+        return $this->treeSuccessResponse($request, $response, $eventId, 'Aufgabe verschoben.');
+    }
+
+    /**
+     * POST /admin/events/{eventId}/tasks/reorder — Geschwister neu sortieren.
+     */
+    public function reorderTasks(Request $request, Response $response): Response
+    {
+        $eventId = (int) $this->routeArgs($request)['eventId'];
+
+        if (!$this->treeEditorEnabled()) {
+            return $response->withStatus(404);
+        }
+
+        $user = $request->getAttribute('user');
+        $this->assertEventEditPermission($user, $eventId, $this->organizerRepo);
+        $actorId = (int) $user->getId();
+
+        $data = (array) $request->getParsedBody();
+        $parentId = array_key_exists('parent_id', $data) && $data['parent_id'] !== null && $data['parent_id'] !== ''
+            ? (int) $data['parent_id']
+            : null;
+        $orderedIds = array_map('intval', (array) ($data['ordered_task_ids'] ?? []));
+
+        try {
+            $this->treeService->reorderSiblings($eventId, $parentId, $orderedIds, $actorId);
+        } catch (ValidationException $e) {
+            return $this->treeErrorResponse($request, $response, $eventId, 422, $e->getErrors());
+        } catch (BusinessRuleException $e) {
+            return $this->treeErrorResponse($request, $response, $eventId, 409, [$e->getMessage()]);
+        }
+
+        return $this->treeSuccessResponse($request, $response, $eventId, 'Reihenfolge gespeichert.');
+    }
+
+    /**
+     * POST /admin/events/{eventId}/tasks/{taskId}/convert — Shape-Wechsel
+     * (Gruppe <-> Aufgabe). Dispatch per target-Parameter.
+     */
+    public function convertTaskNode(Request $request, Response $response): Response
+    {
+        $args    = $this->routeArgs($request);
+        $eventId = (int) $args['eventId'];
+        $taskId  = (int) $args['taskId'];
+
+        if (!$this->treeEditorEnabled()) {
+            return $response->withStatus(404);
+        }
+
+        $user = $request->getAttribute('user');
+        $this->assertEventEditPermission($user, $eventId, $this->organizerRepo);
+        $actorId = (int) $user->getId();
+
+        $data   = (array) $request->getParsedBody();
+        $target = $data['target'] ?? null;
+
+        try {
+            match ($target) {
+                'group' => $this->treeService->convertToGroup($taskId, $actorId),
+                'leaf'  => $this->treeService->convertToLeaf($taskId, $data, $actorId),
+                default => throw new ValidationException(['target' => 'Unbekannter Convert-Zielwert (erwartet: group|leaf).']),
+            };
+        } catch (ValidationException $e) {
+            return $this->treeErrorResponse($request, $response, $eventId, 422, $e->getErrors());
+        } catch (BusinessRuleException $e) {
+            return $this->treeErrorResponse($request, $response, $eventId, 409, [$e->getMessage()]);
+        }
+
+        return $this->treeSuccessResponse(
+            $request,
+            $response,
+            $eventId,
+            $target === 'group' ? 'Knoten in Gruppe konvertiert.' : 'Knoten in Aufgabe konvertiert.'
+        );
+    }
+
+    /**
+     * POST /admin/events/{eventId}/tasks/{taskId}/delete — Soft-Delete.
+     */
+    public function deleteTaskNode(Request $request, Response $response): Response
+    {
+        $args    = $this->routeArgs($request);
+        $eventId = (int) $args['eventId'];
+        $taskId  = (int) $args['taskId'];
+
+        if (!$this->treeEditorEnabled()) {
+            return $response->withStatus(404);
+        }
+
+        $user = $request->getAttribute('user');
+        $this->assertEventEditPermission($user, $eventId, $this->organizerRepo);
+        $actorId = (int) $user->getId();
+
+        try {
+            $this->treeService->softDeleteNode($taskId, $actorId);
+        } catch (ValidationException $e) {
+            return $this->treeErrorResponse($request, $response, $eventId, 422, $e->getErrors());
+        } catch (BusinessRuleException $e) {
+            return $this->treeErrorResponse($request, $response, $eventId, 409, [$e->getMessage()]);
+        }
+
+        return $this->treeSuccessResponse($request, $response, $eventId, 'Aufgabe geloescht.');
+    }
+
+    /**
+     * GET /admin/events/{eventId}/tasks/{taskId}/edit — Task-Daten + Breadcrumb-Pfad.
+     * Liefert JSON; das HTML-Modal-Partial kommt in Phase 3.
+     */
+    public function editTaskNode(Request $request, Response $response): Response
+    {
+        $args    = $this->routeArgs($request);
+        $eventId = (int) $args['eventId'];
+        $taskId  = (int) $args['taskId'];
+
+        if (!$this->treeEditorEnabled()) {
+            return $response->withStatus(404);
+        }
+
+        $user = $request->getAttribute('user');
+        $this->assertEventEditPermission($user, $eventId, $this->organizerRepo);
+
+        $task = $this->taskRepo->findById($taskId);
+        if ($task === null || $task->getEventId() !== $eventId) {
+            return $response->withStatus(404);
+        }
+
+        $flatTasks = $this->loadEventTasks($eventId);
+        $ancestorPath = $this->treeAggregator->getAncestorPath($taskId, $flatTasks);
+
+        return $this->json($response, [
+            'task' => [
+                'id'              => $task->getId(),
+                'event_id'        => $task->getEventId(),
+                'parent_task_id'  => $task->getParentTaskId(),
+                'is_group'        => $task->isGroup() ? 1 : 0,
+                'category_id'     => $task->getCategoryId(),
+                'title'           => $task->getTitle(),
+                'description'     => $task->getDescription(),
+                'task_type'       => $task->getTaskType(),
+                'slot_mode'       => $task->getSlotMode(),
+                'start_at'        => $task->getStartAt(),
+                'end_at'          => $task->getEndAt(),
+                'capacity_mode'   => $task->getCapacityMode(),
+                'capacity_target' => $task->getCapacityTarget(),
+                'hours_default'   => $task->getHoursDefault(),
+                'sort_order'      => $task->getSortOrder(),
+            ],
+            'ancestor_path' => $ancestorPath,
+        ]);
+    }
+
+    /**
+     * POST /admin/events/{eventId}/tasks/{taskId} — Attribute aktualisieren
+     * (ohne Shape-Wechsel; is_group wird vom Service defensiv entfernt).
+     */
+    public function updateTaskNode(Request $request, Response $response): Response
+    {
+        $args    = $this->routeArgs($request);
+        $eventId = (int) $args['eventId'];
+        $taskId  = (int) $args['taskId'];
+
+        if (!$this->treeEditorEnabled()) {
+            return $response->withStatus(404);
+        }
+
+        $user = $request->getAttribute('user');
+        $this->assertEventEditPermission($user, $eventId, $this->organizerRepo);
+        $actorId = (int) $user->getId();
+
+        $data = (array) $request->getParsedBody();
+
+        try {
+            $this->treeService->updateNode($taskId, $data, $actorId);
+        } catch (ValidationException $e) {
+            return $this->treeErrorResponse($request, $response, $eventId, 422, $e->getErrors());
+        } catch (BusinessRuleException $e) {
+            return $this->treeErrorResponse($request, $response, $eventId, 409, [$e->getMessage()]);
+        }
+
+        return $this->treeSuccessResponse($request, $response, $eventId, 'Aufgabe aktualisiert.');
+    }
+
+    // =========================================================================
+    // Tree-Editor — private Helfer
+    // =========================================================================
+
+    /**
+     * Flag-Check. Die DB-Settings liegen im gleichen Schluessel, den auch
+     * TaskTreeService::assertEnabled() liest — hier nur Lese-Seite.
+     */
+    private function treeEditorEnabled(): bool
+    {
+        if ($this->settingsService === null) {
+            return false;
+        }
+        $value = $this->settingsService->getString('events.tree_editor_enabled', '0');
+        return $value === '1' || $value === 'true';
+    }
+
+    /**
+     * Alle aktiven Tasks eines Events flach laden. Wird von showTaskTree()
+     * und editTaskNode() gebraucht (Aggregator + getAncestorPath).
+     */
+    private function loadEventTasks(int $eventId): array
+    {
+        $tasks = $this->taskRepo->findByEvent($eventId);
+        $rows = [];
+        foreach ($tasks as $task) {
+            $rows[] = [
+                'id'              => $task->getId(),
+                'event_id'        => $task->getEventId(),
+                'parent_task_id'  => $task->getParentTaskId(),
+                'is_group'        => $task->isGroup() ? 1 : 0,
+                'category_id'     => $task->getCategoryId(),
+                'title'           => $task->getTitle(),
+                'description'     => $task->getDescription(),
+                'task_type'       => $task->getTaskType(),
+                'slot_mode'       => $task->getSlotMode(),
+                'start_at'        => $task->getStartAt(),
+                'end_at'          => $task->getEndAt(),
+                'capacity_mode'   => $task->getCapacityMode(),
+                'capacity_target' => $task->getCapacityTarget(),
+                'hours_default'   => $task->getHoursDefault(),
+                'sort_order'      => $task->getSortOrder(),
+            ];
+        }
+        return $rows;
+    }
+
+    private function wantsJson(Request $request): bool
+    {
+        return str_contains($request->getHeaderLine('Accept'), 'application/json');
+    }
+
+    private function treeSuccessResponse(
+        Request $request,
+        Response $response,
+        int $eventId,
+        string $flashMessage
+    ): Response {
+        if ($this->wantsJson($request)) {
+            return $this->json($response, ['status' => 'ok']);
+        }
+        ViewHelper::flash('success', $flashMessage);
+        return $this->redirect($response, '/admin/events/' . $eventId);
+    }
+
+    private function treeErrorResponse(
+        Request $request,
+        Response $response,
+        int $eventId,
+        int $status,
+        array $errors
+    ): Response {
+        if ($this->wantsJson($request)) {
+            return $this->json($response, ['status' => 'error', 'errors' => $errors], $status);
+        }
+        ViewHelper::flash('danger', implode(' ', array_map('strval', $errors)));
+        return $this->redirect($response, '/admin/events/' . $eventId);
     }
 
     // =========================================================================

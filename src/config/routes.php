@@ -196,6 +196,26 @@ return function (App $app): void {
         $group->post('/events/{eventId:[0-9]+}/tasks/{taskId:[0-9]+}/delete',
             [EventAdminController::class, 'deleteTask']);
 
+        // Aufgabenbaum-Editor (Modul 6 I7b1) — hinter Settings-Flag
+        // events.tree_editor_enabled. Zugriff zusaetzlich durch
+        // assertEventEditPermission pro Action auf Organizer-Ebene gefiltert.
+        $group->get('/events/{eventId:[0-9]+}/tasks/tree',
+            [EventAdminController::class, 'showTaskTree']);
+        $group->post('/events/{eventId:[0-9]+}/tasks/node',
+            [EventAdminController::class, 'createTaskNode']);
+        $group->post('/events/{eventId:[0-9]+}/tasks/reorder',
+            [EventAdminController::class, 'reorderTasks']);
+        $group->post('/events/{eventId:[0-9]+}/tasks/{taskId:[0-9]+}/move',
+            [EventAdminController::class, 'moveTaskNode']);
+        $group->post('/events/{eventId:[0-9]+}/tasks/{taskId:[0-9]+}/convert',
+            [EventAdminController::class, 'convertTaskNode']);
+        $group->post('/events/{eventId:[0-9]+}/tasks/{taskId:[0-9]+}/tree-delete',
+            [EventAdminController::class, 'deleteTaskNode']);
+        $group->get('/events/{eventId:[0-9]+}/tasks/{taskId:[0-9]+}/edit',
+            [EventAdminController::class, 'editTaskNode']);
+        $group->post('/events/{eventId:[0-9]+}/tasks/{taskId:[0-9]+}',
+            [EventAdminController::class, 'updateTaskNode']);
+
         // Event-Templates (I1: CRUD; I4: Task-Editor, Versionierung, Ableitung)
         $group->get('/event-templates', [EventTemplateController::class, 'index']);
         $group->post('/event-templates', [EventTemplateController::class, 'store']);

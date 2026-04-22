@@ -223,6 +223,20 @@ return [
         );
     },
 
+    // --- Modul 6 I7a/I7b1: Aufgabenbaum --------------------------------------
+    \App\Services\TaskTreeService::class => function (ContainerInterface $c): \App\Services\TaskTreeService {
+        return new \App\Services\TaskTreeService(
+            $c->get(PDO::class),
+            $c->get(EventTaskRepository::class),
+            $c->get(SettingsRepository::class),
+            $c->get(AuditService::class)
+        );
+    },
+
+    \App\Services\TaskTreeAggregator::class => function (): \App\Services\TaskTreeAggregator {
+        return new \App\Services\TaskTreeAggregator();
+    },
+
     // --- Modul 6 I5: Kalender + iCal -----------------------------------------
     \App\Services\IcalService::class => function (): \App\Services\IcalService {
         return new \App\Services\IcalService();
@@ -560,7 +574,11 @@ return [
             $c->get(\App\Services\EventCompletionService::class),
             $c->get(EventTemplateRepository::class),
             $c->get('settings'),
-            $c->get(SchedulerService::class)
+            $c->get(SchedulerService::class),
+            $c->get(\App\Services\TaskTreeService::class),
+            $c->get(\App\Services\TaskTreeAggregator::class),
+            $c->get(EventTaskAssignmentRepository::class),
+            $c->get(SettingsService::class)
         );
     },
 
