@@ -753,19 +753,7 @@ class EventAdminController extends BaseController
         $this->assertEventEditPermission($user, $eventId, $this->organizerRepo);
         $actorId = (int) $user->getId();
 
-        $data = (array) $request->getParsedBody();
-
-        // HTTP-Input → Service-Input: parent_task_id kommt aus Form-Hidden-
-        // Fields immer als String, der Service hat aber strikte ?int-Signatur
-        // (TaskTreeService::normalizeParentId). Hier einmalig casten, damit kein
-        // TypeError aus dem Controller-Aufruf wird. Leerer/0-String → null
-        // (= Top-Level-Knoten).
-        if (array_key_exists('parent_task_id', $data)) {
-            $pid = $data['parent_task_id'];
-            $data['parent_task_id'] = ($pid === null || $pid === '' || $pid === '0' || $pid === 0)
-                ? null
-                : (int) $pid;
-        }
+        $data = $this->normalizeTreeFormInputs((array) $request->getParsedBody());
 
         try {
             $newId = $this->treeService->createNode($eventId, $data, $actorId);
@@ -866,7 +854,7 @@ class EventAdminController extends BaseController
         $this->assertEventEditPermission($user, $eventId, $this->organizerRepo);
         $actorId = (int) $user->getId();
 
-        $data   = (array) $request->getParsedBody();
+        $data   = $this->normalizeTreeFormInputs((array) $request->getParsedBody());
         $target = $data['target'] ?? null;
 
         try {
@@ -989,7 +977,7 @@ class EventAdminController extends BaseController
         $this->assertEventEditPermission($user, $eventId, $this->organizerRepo);
         $actorId = (int) $user->getId();
 
-        $data = (array) $request->getParsedBody();
+        $data = $this->normalizeTreeFormInputs((array) $request->getParsedBody());
 
         try {
             $this->treeService->updateNode($taskId, $data, $actorId);
@@ -1005,6 +993,39 @@ class EventAdminController extends BaseController
     // =========================================================================
     // Tree-Editor — private Helfer
     // =========================================================================
+
+    /**
+     * HTTP-Form-Inputs in Service-taugliche Typen ueberfuehren. Zwei konkrete
+     * Probleme werden hier geloest:
+     *
+     *  1) parent_task_id kommt aus HTML-Hidden-Fields immer als String. Der
+     *     Service hat eine strikte ?int-Signatur (normalizeParentId) und wirft
+     *     unter declare(strict_types=1) einen TypeError bei String-Input.
+     *     "" / "0" / null / 0 → null (= Top-Level-Knoten), alles andere (int).
+     *
+     *  2) Datetime-Inputs (start_at, end_at) und optionale Integer-Felder
+     *     (category_id, capacity_target) liefern "" wenn leer gelassen. Der
+     *     Service-Null-Check (slot_mode=fix => start/end NOT NULL) unterscheidet
+     *     "" und null nicht — ohne Normalisierung landet "" als ungueltiger
+     *     DATETIME-String im INSERT und wirft eine PDOException statt einer
+     *     lesbaren ValidationException. "" → null, damit die Service-Validation
+     *     korrekt greift und der User die Message im Toast sieht.
+     */
+    private function normalizeTreeFormInputs(array $data): array
+    {
+        if (array_key_exists('parent_task_id', $data)) {
+            $pid = $data['parent_task_id'];
+            $data['parent_task_id'] = ($pid === null || $pid === '' || $pid === '0' || $pid === 0)
+                ? null
+                : (int) $pid;
+        }
+        foreach (['start_at', 'end_at', 'category_id', 'capacity_target'] as $field) {
+            if (array_key_exists($field, $data) && $data[$field] === '') {
+                $data[$field] = null;
+            }
+        }
+        return $data;
+    }
 
     /**
      * Flag-Check. Die DB-Settings liegen im gleichen Schluessel, den auch
