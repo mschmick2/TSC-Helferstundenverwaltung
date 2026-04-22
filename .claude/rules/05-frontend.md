@@ -253,6 +253,86 @@ const res = await fetch('/entries/' + id + '/approve', {
 
 ---
 
+## Rekursive Partials (Tree/Nested-Listen)
+
+Wenn eine View hierarchische Daten rendert (Aufgabenbaum, Templates-
+Tree, ggf. Mitglieder-Accordion): **NICHT** per naked include im
+foreach, weil das Container-`$node`/`$depth` ueberschreibt (Scope-Leak).
+
+**DO (Container-Closure mit use-by-reference):**
+```php
+<?php
+// Container (edit.php, show.php, ...)
+$renderTaskNode = function (array $node, int $depth) use (&$renderTaskNode, $csrfToken, $eventId): void {
+    include __DIR__ . '/_task_tree_node.php';
+};
+foreach ($treeData as $top) {
+    $renderTaskNode($top, 0);
+}
+?>
+```
+
+Partial ruft die Closure im Kinder-Loop:
+```php
+<?php foreach ($children as $child): ?>
+    <?php $renderTaskNode($child, $depth + 1); ?>
+<?php endforeach; ?>
+```
+
+**DON'T:**
+```php
+<?php foreach ($node['children'] as $child): ?>
+    <?php
+        $node = $child;        // ueberschreibt Container-$node
+        include __DIR__ . '/_task_tree_node.php';
+    ?>
+<?php endforeach; ?>
+```
+
+Invariants-Test (Projekt-Muster) prueft statisch, dass das Partial
+nicht sich selbst per naked include einbindet und dass der Container
+die Closure definiert.
+
+---
+
+## SortableJS — nested Listen
+
+Fuer verschachtelte Sortable-ULs (UL enthaelt LI, LI enthaelt UL, alle
+sortable) das **Minimal-Optionen-Set** nutzen und nur bei nachweislicher
+Regression erweitern:
+
+```javascript
+Sortable.create(ul, {
+    group: 'your-group',
+    handle: '[data-sortable-handle]',
+    animation: 150,
+    delay: 200,
+    delayOnTouchOnly: true,
+    touchStartThreshold: 5,
+    ghostClass: 'node--ghost',
+    chosenClass: 'node--chosen',
+    dragClass: 'node--drag',
+    // Pflicht fuer nested: Ghost unter body statt in Quell-UL.
+    fallbackOnBody: true,
+    // Leere Ziel-Listen (z.B. leere Gruppe) als Drop-Target akzeptieren.
+    emptyInsertThreshold: 12,
+    onEnd: handleSortEnd,
+});
+```
+
+**Verbotene Kombinationen** (aus I7b1-Erfahrung):
+- `invertSwap: true` + `swapThreshold: 0.65` zerlegt die Drop-Zone und
+  `onEnd` feuert nicht mehr. Ausschliesslich einzeln und mit
+  Regressions-Nachweis einbauen.
+- Ein explizites `draggable: 'li.xxx'` ist selten noetig; Default `>*`
+  reicht, solange die UL nur die gewuenschten Kinder enthaelt.
+
+Bei Drop-/Drag-Fehlern: zuerst `console.info` in
+`onChoose`/`onStart`/`onMove`/`onEnd` einbauen und diagnostizieren,
+eine Option pro Iteration aendern — nicht mehrere Options parallel.
+
+---
+
 ## Verbotenes
 
 - jQuery (Vanilla JS reicht)
@@ -264,3 +344,6 @@ const res = await fetch('/entries/' + id + '/approve', {
 - Formulare ohne CSRF-Token
 - `innerHTML = userInput` in JS (XSS) — `textContent` verwenden
 - Auto-Submit von Formularen bei Seitenaufruf
+- Naked-include-Rekursion in rekursiven Partials (Scope-Leak) —
+  immer Container-Closure mit `use(&...)` verwenden
+- `invertSwap: true` in SortableJS ohne expliziten Regressions-Grund

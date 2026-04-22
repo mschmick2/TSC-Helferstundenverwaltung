@@ -712,4 +712,159 @@ als Vorlage fuer kuenftige Migrationen mit Sicherheits-SIGNAL.
 
 ---
 
+### 2026-04-22 — Nested SortableJS-Konfiguration: Minimal ist das Maximum
+
+**Kontext:**
+Modul 6 I7b1 Phase 3 — Aufgabenbaum-Editor mit verschachtelten Listen
+(task-tree-root → task-node LI → task-tree-children → ...), beides als
+Sortable initialisiert mit gleichem `group: 'event-tasks'`.
+
+**Problem / Ueberraschung:**
+Drei Iterationen Options-Umlegen, bevor der Flow stabil lief:
+1. Default-Config (nur `group`, `handle`, `animation`): Drop-Targets in
+   verschachtelten ULs und leeren Gruppen wurden nicht erkannt.
+2. Option-Paket mit `fallbackOnBody: true`, `emptyInsertThreshold: 12`,
+   `swapThreshold: 0.65`, `invertSwap: true`, `draggable: '.task-node'`:
+   Drag-and-Drop komplett kaputt, `onEnd` feuerte gar nicht mehr — der
+   Ghost folgte dem Cursor, aber Drops wurden nie verarbeitet. Besonders
+   `invertSwap: true` kombiniert mit `swapThreshold: 0.65` bringt in
+   SortableJS 1.15.x die Drop-Zone-Geometrie zum Kollabieren.
+3. Minimal-Reset auf nur `fallbackOnBody: true` +
+   `emptyInsertThreshold: 12`: funktioniert stabil, inklusive leerer
+   Ziel-Gruppen.
+
+Blind-Fumfen mit Options war die falsche Strategie — erst
+Diagnose-Logs in onChoose/onStart/onMove/onEnd haetten den Rollback
+gezielt machen koennen.
+
+**Loesung:**
+- `fallbackOnBody: true` rendert den Ghost unter `document.body`, sodass
+  er aus der Quell-UL heraus in Ziel-ULs wandern kann.
+- `emptyInsertThreshold: 12` (px) aktiviert leere Ziel-Gruppen als
+  gueltige Drop-Targets — ohne diese Option sind sie zu klein (keine
+  Kinder-LIs = keine Hoehe).
+- Alles andere (`swapThreshold`, `invertSwap`, explizites `draggable`,
+  `delayOnTouchOnly`) NICHT setzen, solange der Default funktioniert.
+
+**Praevention:**
+- Bei SortableJS-Setup in neuen Tree-/Nested-Listen-UIs (I7c Templates-
+  Editor, I7b2 evtl. Mitglieder-Accordion): nur `fallbackOnBody` +
+  `emptyInsertThreshold` setzen. Weitere Options erst nach konkretem
+  Nachweis einbauen, welche Regression sie loesen.
+- Inline-Kommentar im JS dokumentiert, warum gerade diese zwei Options.
+- Bei Symptom "Drag geht nicht / Drop wird abgelehnt": zuerst
+  `console.info` in onChoose/onStart/onMove/onEnd einbauen, bevor
+  Options geaendert werden. Eine Iteration pro Change, nicht mehrere
+  Options gleichzeitig.
+
+→ Ergaenzung in `.claude/rules/05-frontend.md` (SortableJS-Pattern).
+
+---
+
+### 2026-04-22 — HTTP-String-vs-Service-strict-Type-Drift
+
+**Kontext:**
+Modul 6 I7b1 Phase 3 — EventAdminController ruft TaskTreeService fuer
+Tree-Mutationen. Der Service hat `declare(strict_types=1)` und strikte
+Parametertypen (`?int`, `int`, `float`, etc.).
+
+**Problem / Ueberraschung:**
+Vier Runtime-Bugs hintereinander, alle aus demselben Muster: HTTP-
+Form-Inputs kommen immer als String oder leerer String, der Service
+erwartet getypte Werte.
+
+1. `parent_task_id` als `"2"` → TypeError, weil `normalizeParentId(?int)`
+   keinen String akzeptiert → Fatal → Slim-HTML-500 → Modal-JS kann
+   nicht parsen → nackt "HTTP 500" im Toast.
+2. `start_at: ""`, `end_at: ""` → umgehen den Service-Null-Check
+   `($startAt === null || $endAt === null)` und landen als ungueltiger
+   DATETIME-String im INSERT → PDOException → 500.
+3. Analog fuer `category_id: ""`, `capacity_target: ""`.
+4. Aggregator-Schnittstelle: Controller gab Assoc-Arrays an `buildTree`,
+   der aber EventTask-Objekte erwartet → "Call to a member function
+   getParentTaskId() on array".
+
+Unit-Tests mit Mocks haetten das nicht gefangen — die mocken oft
+schon mit sauberen Typen. Auch die statischen Invariants-Tests (Regex
+gegen Code) pruefen Struktur, nicht Laufzeittypen.
+
+**Loesung:**
+- Ein zentraler Helper im Controller: `normalizeTreeFormInputs(array
+  $data): array`. Macht:
+  * `parent_task_id` zu `?int` (null bei '', '0', null, 0).
+  * Leere Strings in `start_at`, `end_at`, `category_id`,
+    `capacity_target` zu `null`.
+- Drei Actions rufen den Helper (create, update, convert). Die anderen
+  fuenf haben einfachere Payloads und typen direkt im Action-Body
+  (`(int) $data['new_parent_id']`, `array_map('intval', ...)`).
+- Aggregator-Schnittstelle: der `loadEventTasks`-Hilfer aus Phase 2
+  (der Arrays baute) wurde geloescht; Controller reicht Repository-
+  Objekte direkt an den Aggregator. Fuer JSON-Serialisierung gibt es
+  `serializeTreeForJson`, die einzige Stelle, an der Objekte in flache
+  Arrays umgewandelt werden.
+
+**Praevention:**
+- Rules `03-framework.md` sollte Pattern "HTTP-Input → Service-Input
+  im Controller normalisieren" aufnehmen, sobald I7b2 oder I7c den
+  Helper wiederverwendet (momentan I7b1-spezifisch).
+- Runtime-Coverage: Playwright-E2E (neu in Phase 4) faengt genau diese
+  Fehlerklasse zukuenftig. Die zwei Regressions-Tests
+  `test_create_child_flow` (parent_task_id als String) und
+  `test_validation_error_shown_in_toast` (leere Slot-Zeiten) sind
+  explizit als Regressionsabdeckung der Fixes markiert.
+- FeatureTestCase-Setup mit echter DB (Follow-up) wuerde die Lücken
+  zwischen Mock-Unit-Tests und Browser-E2E schliessen.
+
+→ Siehe `fix`-Commits `e142d9d`, `d7ff41c`, `c5f78a2` auf
+`feature/event-task-tree-i7b1`.
+
+---
+
+### 2026-04-22 — View-Rekursion via Container-Closure, nicht naked include
+
+**Kontext:**
+Modul 6 I7b1 Phase 3 — rekursive Render-Partials fuer den
+Aufgabenbaum (_task_tree_node.php, spaeter _task_tree_readonly.php).
+
+**Problem / Ueberraschung:**
+Die intuitive Loesung "Partial inkludiert sich selbst im foreach" ist
+PHP-spezifisch broken:
+
+```php
+<?php foreach ($node['children'] as $child): ?>
+    <?php
+        $node = $child;        // ueberschreibt Container-$node
+        $depth = $depth + 1;
+        include __DIR__ . '/_task_tree_node.php';
+    ?>
+<?php endforeach; ?>
+```
+
+Nach dem include ist `$node` im Container-Scope ueberschrieben und die
+foreach-Schleife sieht beim naechsten Iterations-Schritt den falschen
+Wert. Das ist der klassische Scope-Leak von PHP-includes. Der Prompt-
+Autor des Phase-3-Prompts hatte das selbst als "naked include ist
+fragil, Render-Funktion waere sauberer" angemerkt.
+
+**Loesung:**
+Container (edit.php, show.php) definiert eine Closure
+`$renderTaskNode = function(array $node, int $depth) use (&$renderTaskNode, ...): void`
+mit `use(&$renderTaskNode)` fuer den Self-Call. Die Closure kapselt
+den Scope — jeder Aufruf sieht seine eigenen `$node`/`$depth`-Bindings,
+keine Leaks zum Container. Das Partial ruft im Kinder-Loop nur noch
+`$renderTaskNode($child, $depth + 1)`, keinen weiteren include.
+
+**Praevention:**
+- Rules 05-frontend.md sollte einen Pattern-Absatz fuer rekursive
+  Partials bekommen (Closure + use-by-reference, kein naked include).
+- Invariants-Tests pruefen beide Partials auf das Muster (
+  `test_task_tree_node_partial_uses_container_closure`,
+  `test_task_tree_readonly_partial_uses_container_closure`), damit
+  kuenftige Refactorings nicht zurueck ins naked-include kippen.
+- Bei neuen rekursiven Partials (I7b2 Mitgliedersicht-Accordion, I7c
+  Templates-Tree): gleiches Muster uebernehmen.
+
+→ Partials `_task_tree_node.php`, `_task_tree_readonly.php` und die
+  Container-Closures in `edit.php`, `show.php` als Referenz.
+
 <!-- Neue Eintraege hier unten anfuegen, nicht oben. Append-Only. -->
