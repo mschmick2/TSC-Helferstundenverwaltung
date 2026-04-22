@@ -67,47 +67,25 @@
 
     function initSortables() {
         const lists = document.querySelectorAll('.task-tree-root, .task-tree-children');
-        // TODO(i7b1): Debug-Logs entfernen, sobald Drag-and-Drop stabil laeuft.
-        console.info('[task-tree] SortableJS init auf', lists.length, 'Listen.');
-
-        lists.forEach((ul, idx) => {
-            console.info('[task-tree] init list #' + idx,
-                'parent_task_id=', ul.dataset.parentTaskId,
-                'children=', ul.children.length);
-
+        lists.forEach(ul => {
             Sortable.create(ul, {
                 group: 'event-tasks',
                 handle: '[data-sortable-handle]',
                 animation: 150,
-                delay: 0,                 // kein Long-Press-Delay fuer Diagnose
+                delay: 200,                    // Mobile: Long-Press, kein Scroll-Konflikt
+                delayOnTouchOnly: true,
                 touchStartThreshold: 5,
                 ghostClass: 'task-node--ghost',
                 chosenClass: 'task-node--chosen',
                 dragClass: 'task-node--drag',
+                // fallbackOnBody und emptyInsertThreshold sind fuer nested
+                // Sortable-ULs noetig: erstere bindet den Ghost an document.body
+                // (sonst kommt der Drag nicht aus der Quell-Ebene raus), letztere
+                // macht leere Ziel-Gruppen (ohne Kinder, daher ohne Hoehe) ueber-
+                // haupt erst zum gueltigen Drop-Target.
                 fallbackOnBody: true,
                 emptyInsertThreshold: 12,
-
-                onChoose: (evt) => console.info('[task-tree] onChoose',
-                    'taskId=', evt.item.dataset.taskId),
-                onStart: (evt) => console.info('[task-tree] onStart',
-                    'taskId=', evt.item.dataset.taskId,
-                    'from=', evt.from.dataset.parentTaskId),
-                onMove: (evt) => {
-                    console.info('[task-tree] onMove',
-                        'to=', evt.to.dataset.parentTaskId,
-                        'related=', evt.related?.dataset?.taskId,
-                        'willInsertAfter=', evt.willInsertAfter);
-                    return true;
-                },
-                onEnd: (evt) => {
-                    console.info('[task-tree] onEnd',
-                        'taskId=', evt.item.dataset.taskId,
-                        'from=', evt.from.dataset.parentTaskId,
-                        'to=', evt.to.dataset.parentTaskId,
-                        'oldIndex=', evt.oldIndex,
-                        'newIndex=', evt.newIndex);
-                    handleSortEnd(evt);
-                },
+                onEnd: handleSortEnd,
             });
         });
     }

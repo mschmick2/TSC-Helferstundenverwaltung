@@ -1165,6 +1165,81 @@ In der Detailansicht pflegen Sie:
 
 Events koennen nur geloescht werden, solange keine Zuweisungen bestehen oder keine Arbeitsstunden aus ihnen erzeugt wurden. In allen anderen Faellen wird das Event **Abgesagt** -- bestehende Zuweisungen bleiben als Historie sichtbar.
 
+#### Aufgabenbaum-Editor (optional aktivierbar)
+
+Ab VAES 1.4.1 kann der Administrator unter **Systemeinstellungen** den Aufgabenbaum-Editor freischalten (`events.tree_editor_enabled = 1`). Ist das Flag gesetzt, erscheint auf der Seite **Event bearbeiten** unterhalb des Event-Formulars ein neuer Abschnitt **Aufgabenbaum**. Dort lassen sich Aufgaben in einer Hierarchie aus **Gruppen-Knoten** und **Aufgaben-Knoten** (Leaves) pflegen, statt wie bisher als flache Liste.
+
+**Zweck:** Groessere Events (Turnier, Festival, Saison-Abschluss) lassen sich in logische Bereiche (Gruppen) unterteilen -- z.B. *Thekendienst > Essensausgabe > Nachmittagsschicht* -- und Helfer-Stunden aggregieren automatisch pro Bereich.
+
+##### Struktur
+
+- **Gruppen-Knoten** (Ordner-Symbol) fassen weitere Knoten zusammen. Sie haben **keine** eigenen Slots, Kapazitaeten oder Helfer-Stunden -- diese Felder stehen nur auf Aufgaben-Knoten.
+- **Aufgaben-Knoten** (Clipboard-Symbol) sind konkrete Helfer-Taetigkeiten mit Slot-Modus, Kapazitaet und Stunden.
+
+##### Bedienung
+
+**Wichtig:** Jeder Knoten hat links ein kleines **Griff-Symbol** (drei kurze vertikale Linien, `⁝⁝`). **Nur an diesem Griff** laesst sich der Knoten per Drag & Drop an eine andere Position oder in eine andere Gruppe ziehen. Klicken auf den Titel oeffnet den Bearbeiten-Dialog, nicht das Verschieben.
+
+Tipp: Der Mauszeiger wird ueber dem Griff zu einer "Hand" (`grab`). Wenn der Zeiger nicht wechselt, sind Sie zu weit vom Griff entfernt.
+
+Aktionen an jedem Knoten (Symbole rechts):
+
+| Symbol | Aktion | Verfuegbar bei |
+|--------|--------|----------------|
+| `+` Plus-Kreis | Unter-Knoten hinzufuegen | nur Gruppen-Knoten |
+| Stift | Knoten bearbeiten (oeffnet Dialog) | alle Knoten |
+| Pfeile-Rund | In anderen Typ konvertieren (Gruppe <-> Aufgabe) | Gruppen ohne Kinder; Aufgaben ohne Zusagen |
+| Muelleimer | Knoten loeschen | Gruppen ohne Kinder; Aufgaben ohne Zusagen |
+
+Deaktivierte Aktionen (ausgegraut, mit Tooltip) erklaeren, warum die Aktion gerade nicht moeglich ist, z.B. *"Loeschen abgelehnt: Gruppe enthaelt aktive Aufgaben"*.
+
+##### Verschieben per Drag & Drop
+
+1. Mauszeiger auf das **Griff-Symbol** des zu verschiebenden Knotens bewegen. Der Zeiger wird zu einer Hand.
+2. Mausbutton gedrueckt halten und den Knoten auf seine neue Position ziehen -- innerhalb einer Gruppe zur Umsortierung, oder auf eine andere Gruppe, um umzuhaengen.
+3. Mausbutton loslassen. Der Server speichert die neue Position sofort; eine kurze Bestaetigung erscheint unten rechts.
+
+Auf Mobilgeraeten: Finger **kurz auf dem Griff halten** (ca. 200 ms), dann bewegen. Das verhindert versehentliches Verschieben beim Scrollen.
+
+**Regeln, die der Server prueft**:
+- Maximaltiefe **4 Ebenen** (Standard, vom Administrator anpassbar). Tieferes Verschachteln wird abgelehnt.
+- Ein Gruppen-Knoten darf nur in eine andere Gruppe (nicht in eine Aufgabe) verschoben werden.
+- Ein Knoten darf nicht in seinen eigenen Unterbaum gezogen werden (Zyklus-Schutz).
+
+Schlaegt eine Verschiebung fehl, rollt die UI den Knoten an die Ausgangsposition zurueck und zeigt eine Fehlermeldung mit der genauen Ursache.
+
+##### Knoten anlegen, bearbeiten, konvertieren, loeschen
+
+**Anlegen:**
+- Button **Knoten anlegen** ganz oben legt einen Top-Level-Knoten an.
+- Das Plus-Symbol an einem Gruppen-Knoten legt einen Unter-Knoten innerhalb dieser Gruppe an.
+
+Im Anlegen-Dialog waehlen Sie zuerst den **Typ** (Gruppe oder Aufgabe). Bei *Aufgabe* erscheinen die zusaetzlichen Felder (Slot-Modus, Kapazitaet, Stunden, Start/Ende).
+
+**Bearbeiten:** Stift-Symbol oder Klick auf den Titel. Der Typ laesst sich hier **nicht** wechseln -- dafuer gibt es die separate Konvertieren-Aktion.
+
+**Konvertieren:**
+- *Gruppe -> Aufgabe*: Nur moeglich, wenn die Gruppe keine aktiven Unter-Knoten hat. Im Dialog werden dann die Leaf-Attribute (Slot, Kapazitaet, Stunden) angefordert.
+- *Aufgabe -> Gruppe*: Nur moeglich, wenn die Aufgabe keine aktiven Zusagen hat. Die Leaf-Attribute werden **verworfen** -- Gruppen haben diese Felder nicht.
+
+**Loeschen:** Muelleimer. Nur moeglich, wenn keine aktiven Kinder (bei Gruppen) bzw. keine aktiven Zusagen (bei Aufgaben) bestehen. Die Loeschung ist ein Soft-Delete -- der Audit-Trail behaelt die vollstaendige Historie.
+
+##### Aggregierte Anzeige
+
+Rechts neben jedem Gruppen-Knoten erscheinen drei kleine Badges:
+
+| Badge | Bedeutung |
+|-------|-----------|
+| Personen | Summe der benoetigten Helfer aller Aufgaben im Teilbaum |
+| Sanduhr | Offene Slots (benoetigt minus bereits zugesagt) |
+| Uhr | Summe der Standard-Stunden aller Aufgaben im Teilbaum |
+
+Bei Aufgaben-Knoten zeigen die Badges die Werte des Knotens selbst, nicht aggregiert.
+
+##### Barrierefreiheit / ohne JavaScript
+
+Drag & Drop und der Bearbeiten-Dialog benoetigen JavaScript. Ist JavaScript deaktiviert, erscheint ein Hinweis -- in diesem Fall bitte die bisherige flache Aufgabenverwaltung auf der Event-Detailseite nutzen.
+
 ### 12.5 Event-Vorlagen
 
 Erreichbar ueber **Verwaltung > Event-Vorlagen**.
