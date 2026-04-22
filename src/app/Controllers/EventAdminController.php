@@ -217,30 +217,12 @@ class EventAdminController extends BaseController
             && $this->treeAggregator !== null
         ) {
             $treeEditorEnabled = true;
-            $flatTasks = $this->taskRepo->findByEvent($id);
-            $flatArrays = [];
-            foreach ($flatTasks as $t) {
-                $flatArrays[] = [
-                    'id'              => $t->getId(),
-                    'event_id'        => $t->getEventId(),
-                    'parent_task_id'  => $t->getParentTaskId(),
-                    'is_group'        => $t->isGroup() ? 1 : 0,
-                    'category_id'     => $t->getCategoryId(),
-                    'title'           => $t->getTitle(),
-                    'description'     => $t->getDescription(),
-                    'task_type'       => $t->getTaskType(),
-                    'slot_mode'       => $t->getSlotMode(),
-                    'start_at'        => $t->getStartAt(),
-                    'end_at'          => $t->getEndAt(),
-                    'capacity_mode'   => $t->getCapacityMode(),
-                    'capacity_target' => $t->getCapacityTarget(),
-                    'hours_default'   => $t->getHoursDefault(),
-                    'sort_order'      => $t->getSortOrder(),
-                ];
-            }
+            // Aggregator erwartet EventTask-Objekte (siehe TaskTreeAggregator-
+            // Docblock) — direkt durchreichen, keine Array-Umwandlung.
+            $flatTasks        = $this->taskRepo->findByEvent($id);
             $assignmentCounts = $this->assignmentRepo->countActiveByEvent($id);
-            $treeData = $this->treeAggregator->buildTree($flatArrays, $assignmentCounts);
-            $taskCategories = $this->categoryRepo->findAllActive();
+            $treeData         = $this->treeAggregator->buildTree($flatTasks, $assignmentCounts);
+            $taskCategories   = $this->categoryRepo->findAllActive();
         }
 
         return $this->render($response, 'admin/events/edit', [
@@ -744,13 +726,15 @@ class EventAdminController extends BaseController
             return $response->withStatus(404);
         }
 
-        $flatTasks = $this->loadEventTasks($eventId);
+        $flatTasks        = $this->taskRepo->findByEvent($eventId);
         $assignmentCounts = $this->assignmentRepo->countActiveByEvent($eventId);
-        $tree = $this->treeAggregator->buildTree($flatTasks, $assignmentCounts);
+        $tree             = $this->treeAggregator->buildTree($flatTasks, $assignmentCounts);
 
+        // Aggregator liefert EventTask-Objekte im 'task'-Feld — fuer JSON in
+        // flache Arrays umsetzen, damit die Response serialisierbar wird.
         return $this->json($response, [
             'event_id' => $eventId,
-            'tree'     => $tree,
+            'tree'     => $this->serializeTreeForJson($tree),
         ]);
     }
 
@@ -943,8 +927,15 @@ class EventAdminController extends BaseController
             return $response->withStatus(404);
         }
 
-        $flatTasks = $this->loadEventTasks($eventId);
-        $ancestorPath = $this->treeAggregator->getAncestorPath($taskId, $flatTasks);
+        // Aggregator braucht EventTask-Objekte fuer den parent-Walk. Pfad als
+        // String bauen, damit das Modal-JS (split ' > ') direkt darauf arbeiten
+        // kann — die Struktur-Variante getAncestorPath gibt ein Array zurueck,
+        // das Frontend erwartet einen flachen String.
+        $flatTasks     = $this->taskRepo->findByEvent($eventId);
+        $ancestorNodes = $this->treeAggregator->getAncestorPath($taskId, $flatTasks);
+        $titles        = array_map(static fn (array $n) => $n['title'], $ancestorNodes);
+        $titles[]      = $task->getTitle();
+        $ancestorPath  = implode(' > ', $titles);
 
         return $this->json($response, [
             'task' => [
@@ -1017,33 +1008,42 @@ class EventAdminController extends BaseController
     }
 
     /**
-     * Alle aktiven Tasks eines Events flach laden. Wird von showTaskTree()
-     * und editTaskNode() gebraucht (Aggregator + getAncestorPath).
+     * Aggregator-Output (task als EventTask-Objekt + aggregierte Subtree-
+     * Zahlen) in reine Arrays umsetzen, damit showTaskTree() per json_encode
+     * serialisieren kann. Rekursiv, damit 'children' mitgeht.
+     *
+     * @param array<int, array{task:\App\Models\EventTask, children:array, helpers_subtree:int, hours_subtree:float, leaves_subtree:int, open_slots_subtree:int|null}> $tree
+     * @return array<int, array<string, mixed>>
      */
-    private function loadEventTasks(int $eventId): array
+    private function serializeTreeForJson(array $tree): array
     {
-        $tasks = $this->taskRepo->findByEvent($eventId);
-        $rows = [];
-        foreach ($tasks as $task) {
-            $rows[] = [
-                'id'              => $task->getId(),
-                'event_id'        => $task->getEventId(),
-                'parent_task_id'  => $task->getParentTaskId(),
-                'is_group'        => $task->isGroup() ? 1 : 0,
-                'category_id'     => $task->getCategoryId(),
-                'title'           => $task->getTitle(),
-                'description'     => $task->getDescription(),
-                'task_type'       => $task->getTaskType(),
-                'slot_mode'       => $task->getSlotMode(),
-                'start_at'        => $task->getStartAt(),
-                'end_at'          => $task->getEndAt(),
-                'capacity_mode'   => $task->getCapacityMode(),
-                'capacity_target' => $task->getCapacityTarget(),
-                'hours_default'   => $task->getHoursDefault(),
-                'sort_order'      => $task->getSortOrder(),
+        $out = [];
+        foreach ($tree as $node) {
+            $task = $node['task'];
+            $out[] = [
+                'id'                 => (int) $task->getId(),
+                'event_id'           => $task->getEventId(),
+                'parent_task_id'     => $task->getParentTaskId(),
+                'is_group'           => $task->isGroup() ? 1 : 0,
+                'category_id'        => $task->getCategoryId(),
+                'title'              => $task->getTitle(),
+                'description'        => $task->getDescription(),
+                'task_type'          => $task->getTaskType(),
+                'slot_mode'          => $task->getSlotMode(),
+                'start_at'           => $task->getStartAt(),
+                'end_at'             => $task->getEndAt(),
+                'capacity_mode'      => $task->getCapacityMode(),
+                'capacity_target'    => $task->getCapacityTarget(),
+                'hours_default'      => $task->getHoursDefault(),
+                'sort_order'         => $task->getSortOrder(),
+                'helpers_subtree'    => $node['helpers_subtree'],
+                'hours_subtree'      => $node['hours_subtree'],
+                'leaves_subtree'     => $node['leaves_subtree'],
+                'open_slots_subtree' => $node['open_slots_subtree'],
+                'children'           => $this->serializeTreeForJson($node['children']),
             ];
         }
-        return $rows;
+        return $out;
     }
 
     private function wantsJson(Request $request): bool

@@ -3,12 +3,18 @@
  * Partial: einzelner Knoten im Aufgabenbaum-Editor (Modul 6 I7b1).
  *
  * Erwartet im Scope:
- *   $node            — assoziatives Array (aus TaskTreeAggregator::buildTree):
- *                      id, title, description, is_group, parent_task_id,
- *                      task_type, slot_mode, start_at, end_at,
- *                      capacity_mode, capacity_target, hours_default,
- *                      sort_order, children, helpers_subtree, hours_subtree,
- *                      leaves_subtree, open_slots_subtree, category_id.
+ *   $node            — Aggregator-Knoten aus TaskTreeAggregator::buildTree:
+ *                      [
+ *                        'task' => EventTask,
+ *                        'children' => array<Aggregator-Knoten>,
+ *                        'helpers_subtree' => int,
+ *                        'hours_subtree' => float,
+ *                        'leaves_subtree' => int,
+ *                        'open_slots_subtree' => int|null,
+ *                      ]
+ *                      Task-eigene Felder (title, description, slot_mode etc.)
+ *                      werden ueber $node['task']->getX() gelesen, NICHT als
+ *                      flache Keys am $node-Array.
  *   $depth           — int (0 fuer Top-Level).
  *   $csrfToken       — string (fuer noscript-Forms).
  *   $eventId         — int (fuer URL-Aufbau).
@@ -19,7 +25,7 @@
  *                      Daten ermittelt).
  *   $canDelete       — bool (wie canConvert; Delete-Regeln sind gleich).
  *
- * XSS-Schutz: Alle Freitext-Felder ($node['title'], $node['description'])
+ * XSS-Schutz: Alle Freitext-Felder ($task->getTitle(), $task->getDescription())
  * werden per htmlspecialchars/ViewHelper::e() encodiert.
  *
  * @var array $node
@@ -30,16 +36,18 @@
  */
 use App\Helpers\ViewHelper;
 
-$isGroup           = !empty($node['is_group']);
-$taskId            = (int) $node['id'];
-$title             = (string) ($node['title'] ?? '');
-$description       = (string) ($node['description'] ?? '');
+/** @var \App\Models\EventTask $task */
+$task              = $node['task'];
+$isGroup           = $task->isGroup();
+$taskId            = (int)    $task->getId();
+$title             = (string) $task->getTitle();
+$description       = (string) ($task->getDescription() ?? '');
 $helpersSubtree    = (int)    ($node['helpers_subtree'] ?? 0);
 $hoursSubtree      = (float)  ($node['hours_subtree']   ?? 0.0);
 $leavesSubtree     = (int)    ($node['leaves_subtree']  ?? 0);
 $openSlotsSubtree  = $node['open_slots_subtree'] ?? null;  // darf null bleiben
-$capacityTarget    = $node['capacity_target'] ?? null;
-$hoursDefault      = (float)  ($node['hours_default']   ?? 0.0);
+$capacityTarget    = $task->getCapacityTarget();
+$hoursDefault      = (float)  $task->getHoursDefault();
 $children          = (array)  ($node['children'] ?? []);
 
 $canConvert = $canConvert ?? (
