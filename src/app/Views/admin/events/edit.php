@@ -166,3 +166,101 @@ if ($conflict !== null) {
         <a href="<?= ViewHelper::url('/admin/events/' . (int) $event->getId()) ?>" class="btn btn-secondary">Abbrechen</a>
     </div>
 </form>
+
+<?php
+// =============================================================================
+// Modul 6 I7b1 - Aufgabenbaum-Editor (hinter Settings-Flag tree_editor_enabled).
+// Wenn Flag aus: dieser Abschnitt rendert gar nicht — die flache Task-UI auf
+// der Detail-Seite (show.php) bleibt Single-Source. Wenn Flag an: Tree-Editor-
+// Widget als eigener Abschnitt unterhalb des Event-Formulars.
+// =============================================================================
+$treeEditorEnabled = !empty($treeEditorEnabled);
+$treeData          = $treeData ?? [];
+$taskCategories    = $taskCategories ?? [];
+$csrfTokenString   = $_SESSION['csrf_token'] ?? '';
+$eventIdForTree    = (int) $event->getId();
+
+if ($treeEditorEnabled):
+    // Rekursiver Renderer: Closure faengt $node/$depth pro Aufruf, vermeidet
+    // Scope-Leak, den ein nacktes include im foreach sonst haette. Partial
+    // _task_tree_node.php erwartet $renderTaskNode im Scope fuer den Kinder-
+    // Loop.
+    $renderTaskNode = function (array $node, int $depth) use (
+        &$renderTaskNode, $csrfTokenString, $eventIdForTree
+    ): void {
+        $csrfToken = $csrfTokenString;
+        $eventId   = $eventIdForTree;
+        include __DIR__ . '/_task_tree_node.php';
+    };
+
+    // Kategorien als JSON ins data-Attribut — das Modal-JS liest sie beim
+    // Form-Aufbau (Alternative waere ein zweiter Fetch, aber die Liste ist
+    // ohnehin pro Render stabil und klein).
+    $categoriesJson = json_encode(
+        array_map(
+            static fn($c) => [
+                'id'               => (int) $c->getId(),
+                'name'             => $c->getName(),
+                'is_contribution'  => $c->isContribution(),
+            ],
+            $taskCategories
+        ),
+        JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP
+    );
+?>
+
+<hr class="my-4">
+
+<section class="task-tree-editor"
+         id="task-tree-editor"
+         data-event-id="<?= $eventIdForTree ?>"
+         data-csrf-token="<?= ViewHelper::e($csrfTokenString) ?>"
+         data-endpoint-tree="<?= ViewHelper::url('/admin/events/' . $eventIdForTree . '/tasks/tree') ?>"
+         data-endpoint-create="<?= ViewHelper::url('/admin/events/' . $eventIdForTree . '/tasks/node') ?>"
+         data-endpoint-reorder="<?= ViewHelper::url('/admin/events/' . $eventIdForTree . '/tasks/reorder') ?>"
+         data-categories="<?= ViewHelper::e($categoriesJson) ?>">
+
+    <div class="d-flex align-items-center justify-content-between mb-2">
+        <h2 class="h4 mb-0">
+            <i class="bi bi-diagram-3" aria-hidden="true"></i>
+            Aufgabenbaum
+        </h2>
+        <button type="button" class="btn btn-primary btn-sm"
+                data-action="add-child"
+                data-parent-task-id=""
+                title="Top-Level-Knoten anlegen">
+            <i class="bi bi-plus-circle" aria-hidden="true"></i>
+            Knoten anlegen
+        </button>
+    </div>
+
+    <?php include __DIR__ . '/_task_edit_modal.php'; ?>
+
+    <?php if (empty($treeData)): ?>
+        <p class="text-muted mb-0">
+            Noch keine Aufgaben. Lege den ersten Knoten oben an &mdash; ein Gruppen-
+            Knoten fasst weitere Aufgaben zusammen, ein Aufgaben-Knoten steht fuer
+            eine konkrete Helfer-Taetigkeit.
+        </p>
+    <?php else: ?>
+        <ul class="task-tree-root list-unstyled mb-0"
+            data-parent-task-id=""
+            data-endpoint-reorder="<?= ViewHelper::url('/admin/events/' . $eventIdForTree . '/tasks/reorder') ?>">
+            <?php foreach ($treeData as $topNode): ?>
+                <?php $renderTaskNode($topNode, 0); ?>
+            <?php endforeach; ?>
+        </ul>
+    <?php endif; ?>
+
+    <noscript>
+        <div class="alert alert-warning mt-3" role="alert">
+            <strong>JavaScript aus:</strong>
+            Der Aufgabenbaum-Editor (Drag &amp; Drop, Modal) braucht JavaScript.
+            Bitte nutze die Detail-Seite des Events fuer die Aufgaben-Pflege.
+        </div>
+    </noscript>
+</section>
+
+<script src="<?= ViewHelper::url('/js/vendor/sortablejs/Sortable.min.js') ?>"></script>
+<script src="<?= ViewHelper::url('/js/event-task-tree.js') ?>"></script>
+<?php endif; // $treeEditorEnabled ?>

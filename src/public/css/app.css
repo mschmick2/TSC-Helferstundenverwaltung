@@ -74,3 +74,102 @@ main {
 .footer {
     margin-top: auto;
 }
+
+/* =========================================================================
+ * Aufgabenbaum-Editor (Modul 6 I7b1)
+ * ========================================================================= */
+
+.task-tree-editor .task-tree-root,
+.task-tree-editor .task-tree-children {
+    padding-left: 0;
+    margin-bottom: 0;
+}
+
+.task-tree-editor .task-tree-children {
+    border-left: 2px solid #dee2e6;
+    margin-left: 0.75rem;
+    padding-left: 0.75rem;
+}
+
+.task-tree-editor .task-node {
+    list-style: none;
+    border-radius: 0.25rem;
+    margin-bottom: 0.125rem;
+}
+
+.task-tree-editor .task-node__row {
+    min-height: 2.5rem;
+    padding-left: 0.25rem;
+    padding-right: 0.25rem;
+    border-radius: 0.25rem;
+    transition: background-color 0.15s ease;
+}
+
+.task-tree-editor .task-node__row:hover {
+    background-color: #f8f9fa;
+}
+
+/* Drag-Handle: Touch-Target >= 44px, Cursor grab/grabbing */
+.task-tree-editor .task-node__handle {
+    cursor: grab;
+    padding: 0.25rem 0.5rem;
+    min-width: 1.75rem;
+    min-height: 1.75rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0.25rem;
+}
+
+.task-tree-editor .task-node__handle:active,
+.task-tree-editor .task-node--chosen .task-node__handle {
+    cursor: grabbing;
+    background-color: #e9ecef;
+}
+
+.task-tree-editor .task-node__handle:focus-visible {
+    outline: 2px solid #0d6efd;
+    outline-offset: 2px;
+}
+
+/* Edit-Trigger bleibt vom Cursor her klickbar — Link-Optik */
+.task-tree-editor .task-node__edit-trigger {
+    cursor: pointer;
+}
+
+.task-tree-editor .task-node__edit-trigger:hover {
+    text-decoration: underline !important;
+}
+
+/* SortableJS-States */
+.task-tree-editor .task-node--ghost {
+    opacity: 0.35;
+    background-color: #e3f2fd;
+}
+
+.task-tree-editor .task-node--drag {
+    background-color: #ffffff;
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+}
+
+.task-tree-editor .task-node--chosen {
+    background-color: #f1f3f5;
+}
+
+/* Action-Buttons: Touch-Friendly, 44x44 min. auf Mobile */
+@media (max-width: 576px) {
+    .task-tree-editor .task-node__actions .btn {
+        min-width: 2.75rem;
+        min-height: 2.75rem;
+    }
+    .task-tree-editor .task-node__handle {
+        min-width: 2.75rem;
+        min-height: 2.75rem;
+    }
+}
+
+/* Leaf-Felder im Modal werden bei is_group=1 ausgeblendet — d-none via JS;
+ * die CSS-Regel ist defensiver Fallback. */
+.task-edit-leaf-fields.d-none {
+    display: none !important;
+}

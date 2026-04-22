@@ -204,6 +204,45 @@ class EventAdminController extends BaseController
             return $this->redirect($response, '/admin/events');
         }
 
+        // Modul 6 I7b1: Aufgabenbaum-Editor unterhalb des Event-Formulars.
+        // Vor-Aggregation Server-seitig (vermeidet zweiten HTTP-Call beim
+        // initialen Render); showTaskTree liefert denselben Aggregator-Output
+        // spaeter fuer JS-gesteuerte Refreshes.
+        $treeEditorEnabled = false;
+        $treeData = [];
+        $taskCategories = [];
+        if ($this->settingsService !== null
+            && $this->settingsService->getString('events.tree_editor_enabled', '0') === '1'
+            && $this->assignmentRepo !== null
+            && $this->treeAggregator !== null
+        ) {
+            $treeEditorEnabled = true;
+            $flatTasks = $this->taskRepo->findByEvent($id);
+            $flatArrays = [];
+            foreach ($flatTasks as $t) {
+                $flatArrays[] = [
+                    'id'              => $t->getId(),
+                    'event_id'        => $t->getEventId(),
+                    'parent_task_id'  => $t->getParentTaskId(),
+                    'is_group'        => $t->isGroup() ? 1 : 0,
+                    'category_id'     => $t->getCategoryId(),
+                    'title'           => $t->getTitle(),
+                    'description'     => $t->getDescription(),
+                    'task_type'       => $t->getTaskType(),
+                    'slot_mode'       => $t->getSlotMode(),
+                    'start_at'        => $t->getStartAt(),
+                    'end_at'          => $t->getEndAt(),
+                    'capacity_mode'   => $t->getCapacityMode(),
+                    'capacity_target' => $t->getCapacityTarget(),
+                    'hours_default'   => $t->getHoursDefault(),
+                    'sort_order'      => $t->getSortOrder(),
+                ];
+            }
+            $assignmentCounts = $this->assignmentRepo->countActiveByEvent($id);
+            $treeData = $this->treeAggregator->buildTree($flatArrays, $assignmentCounts);
+            $taskCategories = $this->categoryRepo->findAllActive();
+        }
+
         return $this->render($response, 'admin/events/edit', [
             'title' => 'Event bearbeiten',
             'user' => $user,
@@ -211,6 +250,9 @@ class EventAdminController extends BaseController
             'event' => $event,
             'users' => $this->userRepo->findAllActive(),
             'organizerIds' => $this->organizerRepo->listUserIdsForEvent($id),
+            'treeEditorEnabled' => $treeEditorEnabled,
+            'treeData' => $treeData,
+            'taskCategories' => $taskCategories,
             'breadcrumbs' => [
                 ['label' => 'Dashboard', 'url' => '/'],
                 ['label' => 'Events', 'url' => '/admin/events'],
