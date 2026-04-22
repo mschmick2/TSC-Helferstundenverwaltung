@@ -755,6 +755,18 @@ class EventAdminController extends BaseController
 
         $data = (array) $request->getParsedBody();
 
+        // HTTP-Input → Service-Input: parent_task_id kommt aus Form-Hidden-
+        // Fields immer als String, der Service hat aber strikte ?int-Signatur
+        // (TaskTreeService::normalizeParentId). Hier einmalig casten, damit kein
+        // TypeError aus dem Controller-Aufruf wird. Leerer/0-String → null
+        // (= Top-Level-Knoten).
+        if (array_key_exists('parent_task_id', $data)) {
+            $pid = $data['parent_task_id'];
+            $data['parent_task_id'] = ($pid === null || $pid === '' || $pid === '0' || $pid === 0)
+                ? null
+                : (int) $pid;
+        }
+
         try {
             $newId = $this->treeService->createNode($eventId, $data, $actorId);
         } catch (ValidationException $e) {
