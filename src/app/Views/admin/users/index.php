@@ -54,9 +54,9 @@ use App\Helpers\ViewHelper;
             <div class="col-md-2">
                 <label class="form-label">&nbsp;</label>
                 <div class="form-check mt-2">
-                    <input type="checkbox" name="inactive" value="1" id="filter-inactive"
-                           class="form-check-input" <?= ($filters['inactive'] ?? false) ? 'checked' : '' ?>>
-                    <label for="filter-inactive" class="form-check-label small">Inaktive zeigen</label>
+                    <input type="checkbox" name="only_active" value="1" id="filter-only-active"
+                           class="form-check-input" <?= ($filters['only_active'] ?? false) ? 'checked' : '' ?>>
+                    <label for="filter-only-active" class="form-check-label small">Nur aktive zeigen</label>
                 </div>
             </div>
             <div class="col-md-3 d-flex align-items-end gap-2">

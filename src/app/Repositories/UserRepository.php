@@ -347,13 +347,19 @@ class UserRepository
         int $perPage = 20,
         ?string $search = null,
         ?string $role = null,
-        bool $includeInactive = false
+        bool $onlyActive = false
     ): array {
         $where = [];
         $params = [];
 
-        if (!$includeInactive) {
-            $where[] = 'u.deleted_at IS NULL';
+        // Soft-geloeschte User sind grundsaetzlich nicht in der Mitgliederliste
+        // sichtbar — "Loeschen" ist aus UI-Sicht endgueltig. Deaktivierte User
+        // bleiben sichtbar (Badge "Inaktiv") und koennen reaktiviert werden.
+        $where[] = 'u.deleted_at IS NULL';
+
+        // Feinfilter "Nur aktive zeigen": blendet zusaetzlich alle is_active=FALSE aus.
+        if ($onlyActive) {
+            $where[] = 'u.is_active = TRUE';
         }
 
         if ($search !== null && $search !== '') {
@@ -572,6 +578,14 @@ class UserRepository
     /**
      * Benutzer soft-löschen (deaktivieren)
      */
+    /**
+     * Benutzer unwiederbringlich loeschen (Soft-Delete).
+     *
+     * Setzt deleted_at und is_active=FALSE. Der User verschwindet aus der
+     * Standard-Mitgliederliste und kann ueber die UI nicht reaktiviert werden.
+     * Die Zeile bleibt physisch erhalten (Audit, Revisionssicherheit,
+     * Fremdschluessel-Integritaet auf historischen Antraegen).
+     */
     public function softDeleteUser(int $userId): void
     {
         $stmt = $this->pdo->prepare(
@@ -581,7 +595,41 @@ class UserRepository
     }
 
     /**
-     * Benutzer wiederherstellen
+     * Benutzer deaktivieren (reversibel). Setzt nur is_active = FALSE,
+     * laesst deleted_at unangetastet.
+     *
+     * Der User bleibt in der Liste mit Status-Badge "Inaktiv" und kann ueber
+     * activateUser() wieder freigeschaltet werden.
+     */
+    public function deactivateUser(int $userId): void
+    {
+        $stmt = $this->pdo->prepare(
+            "UPDATE users SET is_active = FALSE WHERE id = :id AND deleted_at IS NULL"
+        );
+        $stmt->execute(['id' => $userId]);
+    }
+
+    /**
+     * Benutzer aktivieren. Funktioniert nur, wenn der User nicht soft-geloescht
+     * ist — geloeschte Accounts werden bewusst nicht wiederhergestellt.
+     *
+     * Rueckgabe: true, wenn eine Zeile geaendert wurde (d.h. der User war
+     * tatsaechlich deaktiviert und nicht geloescht).
+     */
+    public function activateUser(int $userId): bool
+    {
+        $stmt = $this->pdo->prepare(
+            "UPDATE users SET is_active = TRUE WHERE id = :id AND deleted_at IS NULL"
+        );
+        $stmt->execute(['id' => $userId]);
+
+        return $stmt->rowCount() > 0;
+    }
+
+    /**
+     * Legacy: Soft-Delete rueckgaengig machen. Wird von der UI nicht mehr
+     * angeboten (Loeschung ist unwiederbringlich), bleibt als technisches
+     * Werkzeug fuer Admin-Eingriffe/Migrationen erhalten.
      */
     public function restoreUser(int $userId): void
     {

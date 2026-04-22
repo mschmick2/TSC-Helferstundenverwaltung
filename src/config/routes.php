@@ -151,6 +151,7 @@ return function (App $app): void {
         $group->post('/users/{id:[0-9]+}/reinvite', [UserController::class, 'reinvite']);
         $group->post('/users/{id:[0-9]+}/deactivate', [UserController::class, 'deactivate']);
         $group->post('/users/{id:[0-9]+}/activate', [UserController::class, 'activate']);
+        $group->post('/users/{id:[0-9]+}/delete', [UserController::class, 'delete']);
         $group->post('/users/{id:[0-9]+}/unlock', [UserController::class, 'unlock']);
 
         // Einstellungen
