@@ -83,17 +83,70 @@ class EntryLockRepositoryIntegrationTest extends IntegrationTestCase
     }
 
     /** @test */
-    public function release_by_user_loescht_nur_eigenen_lock(): void
+    public function release_by_session_loescht_nur_eigenen_lock_bei_null_session(): void
     {
         $this->repo->acquireOrRefresh($this->entryId, $this->userA, null, 5);
 
-        $removedForeign = $this->repo->releaseByUser($this->entryId, $this->userB);
+        $removedForeign = $this->repo->releaseBySession($this->entryId, $this->userB, null);
         $this->assertSame(0, $removedForeign);
 
-        $removedOwn = $this->repo->releaseByUser($this->entryId, $this->userA);
+        $removedOwn = $this->repo->releaseBySession($this->entryId, $this->userA, null);
         $this->assertSame(1, $removedOwn);
 
         $this->assertNull($this->repo->findActive($this->entryId));
+    }
+
+    /** @test */
+    public function release_by_session_loescht_nicht_bei_abweichender_session(): void
+    {
+        $sessionA = $this->createSession($this->userA);
+        $sessionB = $this->createSession($this->userA);
+
+        $this->repo->acquireOrRefresh($this->entryId, $this->userA, $sessionA, 5);
+
+        // Zweite Session desselben Users darf den Lock nicht entfernen.
+        $removed = $this->repo->releaseBySession($this->entryId, $this->userA, $sessionB);
+        $this->assertSame(0, $removed);
+        $this->assertNotNull($this->repo->findActive($this->entryId));
+
+        // Eigene Session kann ihn entfernen.
+        $removedOwn = $this->repo->releaseBySession($this->entryId, $this->userA, $sessionA);
+        $this->assertSame(1, $removedOwn);
+        $this->assertNull($this->repo->findActive($this->entryId));
+    }
+
+    /** @test */
+    public function zweite_session_desselben_users_wird_als_konflikt_gewertet(): void
+    {
+        // Option A: strenge Pro-Session-Semantik. Zwei Browser desselben
+        // Users kollidieren, damit Cross-Browser-Edits erkannt werden.
+        $sessionA = $this->createSession($this->userA);
+        $sessionB = $this->createSession($this->userA);
+
+        $first = $this->repo->acquireOrRefresh($this->entryId, $this->userA, $sessionA, 5);
+        $this->assertNotNull($first);
+        $this->assertSame($sessionA, (int) $first['session_id']);
+
+        // Gleicher User, andere Session → Konflikt.
+        $rejected = $this->repo->acquireOrRefresh($this->entryId, $this->userA, $sessionB, 5);
+        $this->assertNull($rejected);
+
+        $active = $this->repo->findActive($this->entryId);
+        $this->assertNotNull($active);
+        $this->assertSame($sessionA, (int) $active['session_id']);
+    }
+
+    /** @test */
+    public function gleicher_user_gleiche_session_darf_refreshen(): void
+    {
+        $sessionA = $this->createSession($this->userA);
+
+        $first = $this->repo->acquireOrRefresh($this->entryId, $this->userA, $sessionA, 5);
+        $this->assertNotNull($first);
+
+        $refreshed = $this->repo->acquireOrRefresh($this->entryId, $this->userA, $sessionA, 60);
+        $this->assertNotNull($refreshed);
+        $this->assertSame($sessionA, (int) $refreshed['session_id']);
     }
 
     /** @test */
@@ -131,6 +184,23 @@ class EntryLockRepositoryIntegrationTest extends IntegrationTestCase
     // -------------------------------------------------------------------------
     // Helpers
     // -------------------------------------------------------------------------
+
+    /**
+     * Legt eine echte Session-Zeile an, damit der FK entry_locks.session_id
+     * greift. Rueckgabe: session.id.
+     */
+    private function createSession(int $userId): int
+    {
+        $stmt = $this->pdo()->prepare(
+            "INSERT INTO sessions (user_id, token, expires_at, created_at)
+             VALUES (:uid, :tok, DATE_ADD(NOW(), INTERVAL 1 HOUR), NOW())"
+        );
+        $stmt->execute([
+            'uid' => $userId,
+            'tok' => 'sess-' . bin2hex(random_bytes(16)),
+        ]);
+        return (int) $this->pdo()->lastInsertId();
+    }
 
     private function createUser(string $suffix): int
     {

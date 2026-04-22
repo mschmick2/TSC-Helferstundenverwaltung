@@ -531,6 +531,87 @@ class EventAdminController extends BaseController
     }
 
     /**
+     * POST /admin/events/{eventId}/tasks/{taskId}/update
+     */
+    public function updateTask(Request $request, Response $response): Response
+    {
+        $user = $request->getAttribute('user');
+        $eventId = (int) $this->routeArgs($request)['eventId'];
+        $taskId  = (int) $this->routeArgs($request)['taskId'];
+        $data = (array) $request->getParsedBody();
+
+        $task = $this->taskRepo->findById($taskId);
+        if ($task === null || $task->getEventId() !== $eventId) {
+            ViewHelper::flash('danger', 'Aufgabe nicht gefunden.');
+            return $this->redirect($response, '/admin/events/' . $eventId);
+        }
+
+        $title = trim((string) ($data['title'] ?? ''));
+        if ($title === '') {
+            ViewHelper::flash('danger', 'Task-Titel ist Pflicht.');
+            return $this->redirect($response, '/admin/events/' . $eventId);
+        }
+
+        $taskType     = (string) ($data['task_type'] ?? \App\Models\EventTask::TYPE_AUFGABE);
+        $slotMode     = (string) ($data['slot_mode'] ?? \App\Models\EventTask::SLOT_FIX);
+        $capacityMode = (string) ($data['capacity_mode'] ?? \App\Models\EventTask::CAP_UNBEGRENZT);
+
+        if (!in_array($taskType, [\App\Models\EventTask::TYPE_AUFGABE, \App\Models\EventTask::TYPE_BEIGABE], true)
+            || !in_array($slotMode, [\App\Models\EventTask::SLOT_FIX, \App\Models\EventTask::SLOT_VARIABEL], true)
+            || !in_array($capacityMode, [
+                \App\Models\EventTask::CAP_UNBEGRENZT,
+                \App\Models\EventTask::CAP_ZIEL,
+                \App\Models\EventTask::CAP_MAXIMUM,
+            ], true)
+        ) {
+            ViewHelper::flash('danger', 'Ungueltige Auswahl bei Typ/Slot/Kapazitaet.');
+            return $this->redirect($response, '/admin/events/' . $eventId);
+        }
+
+        $oldValues = [
+            'title'           => $task->getTitle(),
+            'description'     => $task->getDescription(),
+            'task_type'       => $task->getTaskType(),
+            'slot_mode'       => $task->getSlotMode(),
+            'start_at'        => $task->getStartAt(),
+            'end_at'          => $task->getEndAt(),
+            'capacity_mode'   => $task->getCapacityMode(),
+            'capacity_target' => $task->getCapacityTarget(),
+            'hours_default'   => $task->getHoursDefault(),
+            'category_id'     => $task->getCategoryId(),
+        ];
+
+        $newValues = [
+            'title'           => $title,
+            'description'     => trim((string) ($data['description'] ?? '')) ?: null,
+            'task_type'       => $taskType,
+            'slot_mode'       => $slotMode,
+            'start_at'        => $slotMode === \App\Models\EventTask::SLOT_FIX ? ($data['task_start_at'] ?? null) : null,
+            'end_at'          => $slotMode === \App\Models\EventTask::SLOT_FIX ? ($data['task_end_at']   ?? null) : null,
+            'capacity_mode'   => $capacityMode,
+            'capacity_target' => !empty($data['capacity_target']) ? (int) $data['capacity_target'] : null,
+            'hours_default'   => (float) ($data['hours_default'] ?? 0.0),
+            'category_id'     => !empty($data['category_id']) ? (int) $data['category_id'] : null,
+            'sort_order'      => 0,
+        ];
+
+        $this->taskRepo->update($taskId, $newValues);
+
+        $this->auditService->log(
+            action: 'update',
+            tableName: 'event_tasks',
+            recordId: $taskId,
+            oldValues: $oldValues,
+            newValues: $newValues,
+            description: "Task '$title' in Event #$eventId aktualisiert",
+            metadata: ['event_id' => $eventId]
+        );
+
+        ViewHelper::flash('success', 'Aufgabe aktualisiert.');
+        return $this->redirect($response, '/admin/events/' . $eventId);
+    }
+
+    /**
      * POST /admin/events/{eventId}/tasks/{taskId}/delete
      */
     public function deleteTask(Request $request, Response $response): Response

@@ -41,6 +41,9 @@ Darueber hinausgehende Daten benoetigen Einwilligung (Art. 6 Abs. 1 lit. a).
 | `event_task_assignments.user_id` | Teilnahmedaten | 10 Jahre (Steuer/Helferstunden) | Helferstunden-Nachweis |
 | `event_task_assignments.replacement_suggested_user_id` | Funktionsdaten | 10 Jahre | Ersatz-Vorschlag |
 | `event_tasks.description` | Freitext (optional PII) | 10 Jahre | Aufgaben-Details |
+| `event_tasks.parent_task_id`, `event_tasks.is_group` | Strukturelle Metadaten | 10 Jahre | Aufgabenbaum-Hierarchie (Modul 6 I7a). **KEIN PII**. |
+| `event_template_tasks.description` | Freitext (optional PII) | wie Template | Aufgabenbeschreibung im Template |
+| `event_template_tasks.parent_template_task_id`, `event_template_tasks.is_group` | Strukturelle Metadaten | wie Template | Templates-Aufgabenbaum (Modul 6 I7a). **KEIN PII**. |
 | `event_templates.created_by` | Funktionsdaten | Dauer Mitgliedschaft | Template-Urheber |
 | `users` WHERE `mitgliedsnummer='SYSTEM'` | **KEIN PII** | permanent (technisch) | Automations-Account fuer auto-generierte work_entries. Wird von Anonymisierung ausgenommen (scripts/anonymize-db.sql). |
 | `work_entries.origin='event'` + `event_task_assignment_id` | Verknuepfung | 10 Jahre | Herkunft-Attribution auto-generierter Antraege |

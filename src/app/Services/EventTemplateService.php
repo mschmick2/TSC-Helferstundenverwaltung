@@ -310,7 +310,10 @@ final class EventTemplateService
         $startAtSql = date('Y-m-d H:i:s', $startTs);
         $endAtSql   = date('Y-m-d H:i:s', $endTs);
 
-        $templateTasks = $this->templateRepo->findTasksByTemplate($templateId);
+        // Top-Level-Tasks des Templates. Bei flachen Bestands-Templates sind das
+        // alle Tasks; bei hierarchischen (ab I7c) nur die Wurzelknoten — der
+        // Subtree-Kopierer haengt die Kinder rekursiv darunter.
+        $templateTasks = $this->templateRepo->findTaskChildren($templateId, null);
         if (count($templateTasks) === 0) {
             throw new BusinessRuleException(
                 'Template hat keine Tasks. Event kann nicht abgeleitet werden.'
@@ -332,38 +335,15 @@ final class EventTemplateService
                 'source_template_version' => $template->getVersion(),
             ]);
 
+            $tasksCopied = 0;
             foreach ($templateTasks as $tt) {
-                $taskStart = null;
-                $taskEnd = null;
-                if ($tt->getSlotMode() === EventTask::SLOT_FIX) {
-                    if ($tt->getDefaultOffsetMinutesStart() !== null) {
-                        $taskStart = date(
-                            'Y-m-d H:i:s',
-                            $startTs + (int) $tt->getDefaultOffsetMinutesStart() * 60
-                        );
-                    }
-                    if ($tt->getDefaultOffsetMinutesEnd() !== null) {
-                        $taskEnd = date(
-                            'Y-m-d H:i:s',
-                            $startTs + (int) $tt->getDefaultOffsetMinutesEnd() * 60
-                        );
-                    }
-                }
-
-                $this->eventTaskRepo->create([
-                    'event_id' => $eventId,
-                    'category_id' => $tt->getCategoryId(),
-                    'title' => $tt->getTitle(),
-                    'description' => $tt->getDescription(),
-                    'task_type' => $tt->getTaskType(),
-                    'slot_mode' => $tt->getSlotMode(),
-                    'start_at' => $taskStart,
-                    'end_at' => $taskEnd,
-                    'capacity_mode' => $tt->getCapacityMode(),
-                    'capacity_target' => $tt->getCapacityTarget(),
-                    'hours_default' => $tt->getHoursDefault(),
-                    'sort_order' => $tt->getSortOrder(),
-                ]);
+                $tasksCopied += $this->copyTemplateTaskSubtree(
+                    $templateId,
+                    $eventId,
+                    $tt,
+                    null,
+                    $startTs
+                );
             }
 
             $this->auditService->log(
@@ -377,7 +357,7 @@ final class EventTemplateService
                 ],
                 description: "Event '{$title}' aus Template '{$template->getName()}' v{$template->getVersion()} abgeleitet",
                 metadata: [
-                    'tasks_copied' => count($templateTasks),
+                    'tasks_copied' => $tasksCopied,
                 ],
             );
 
@@ -389,6 +369,85 @@ final class EventTemplateService
             }
             throw $e;
         }
+    }
+
+    /**
+     * Rekursive Kopie einer Template-Vorlage in event_tasks. Mappt parent-IDs
+     * waehrend des Walks neu. Offsets werden nur fuer Leaves mit slot_mode='fix'
+     * in absolute DATETIME-Werte umgerechnet — Gruppen haben weder Slot-Modus
+     * noch Offsets.
+     *
+     * Liefert die Anzahl der kopierten Knoten (inkl. Subtree).
+     *
+     * E2 — assertEnabled-Bypass (G3 2026-04-22):
+     * Dieser Pfad ruft bewusst nicht TaskTreeService::createNode() auf, sondern
+     * direkt eventTaskRepo->create(). Damit greift die Tree-Editor-Flag-Pruefung
+     * (events.tree_editor_enabled) hier NICHT — gewollt, weil Templates auch
+     * bei deaktiviertem Tree-Editor weiterhin in Events ableitbar bleiben
+     * muessen (Bestands-Templates sind heute flach und sollen trotz Editor=aus
+     * funktionieren). Derive ist ein interner Programmpfad, kein User-getriggerter
+     * Tree-Edit.
+     */
+    private function copyTemplateTaskSubtree(
+        int $sourceTemplateId,
+        int $eventId,
+        \App\Models\EventTemplateTask $tt,
+        ?int $newParentId,
+        int $startTs
+    ): int {
+        $isGroup = $tt->isGroup();
+
+        $taskStart = null;
+        $taskEnd = null;
+        if (!$isGroup && $tt->getSlotMode() === EventTask::SLOT_FIX) {
+            if ($tt->getDefaultOffsetMinutesStart() !== null) {
+                $taskStart = date(
+                    'Y-m-d H:i:s',
+                    $startTs + (int) $tt->getDefaultOffsetMinutesStart() * 60
+                );
+            }
+            if ($tt->getDefaultOffsetMinutesEnd() !== null) {
+                $taskEnd = date(
+                    'Y-m-d H:i:s',
+                    $startTs + (int) $tt->getDefaultOffsetMinutesEnd() * 60
+                );
+            }
+        }
+
+        $newTaskId = $this->eventTaskRepo->create([
+            'event_id'        => $eventId,
+            'parent_task_id'  => $newParentId,
+            'is_group'        => $isGroup,
+            'category_id'     => $isGroup ? null : $tt->getCategoryId(),
+            'title'           => $tt->getTitle(),
+            'description'     => $tt->getDescription(),
+            'task_type'       => $isGroup ? EventTask::TYPE_AUFGABE : $tt->getTaskType(),
+            // Gruppen: slot_mode null. Leaves: original slot_mode (string).
+            // Fuer Leaves wird das array_key_exists-Pattern im Repository
+            // greifen und den Wert weiterreichen.
+            'slot_mode'       => $isGroup ? null : $tt->getSlotMode(),
+            'start_at'        => $isGroup ? null : $taskStart,
+            'end_at'          => $isGroup ? null : $taskEnd,
+            'capacity_mode'   => $isGroup ? EventTask::CAP_UNBEGRENZT : $tt->getCapacityMode(),
+            'capacity_target' => $isGroup ? null : $tt->getCapacityTarget(),
+            'hours_default'   => $isGroup ? 0.0 : $tt->getHoursDefault(),
+            'sort_order'      => $tt->getSortOrder(),
+        ]);
+
+        $count = 1;
+        if ($isGroup && $tt->getId() !== null) {
+            $children = $this->templateRepo->findTaskChildren($sourceTemplateId, $tt->getId());
+            foreach ($children as $child) {
+                $count += $this->copyTemplateTaskSubtree(
+                    $sourceTemplateId,
+                    $eventId,
+                    $child,
+                    $newTaskId,
+                    $startTs
+                );
+            }
+        }
+        return $count;
     }
 
     // =========================================================================

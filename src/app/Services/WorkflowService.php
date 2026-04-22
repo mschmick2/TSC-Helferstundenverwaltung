@@ -334,6 +334,66 @@ class WorkflowService
     }
 
     /**
+     * Eintrag zur Überarbeitung zurück an Mitglied (eingereicht/in_klaerung → entwurf)
+     *
+     * Anders als returnForRevision(): Der Pruefer ist mit dem Antrag grundsaetzlich
+     * nicht einverstanden und erwartet eine inhaltliche Ueberarbeitung durch das
+     * Mitglied. Der Antrag verlaesst die Prueferliste und landet wieder im
+     * Entwurfszustand, wo das Mitglied ihn editieren und neu einreichen kann.
+     * Der Dialog-Verlauf bleibt vollstaendig erhalten.
+     */
+    public function returnToDraft(WorkEntry $entry, User $reviewer, string $reason): bool
+    {
+        $this->assertTransition($entry, 'entwurf');
+        $this->assertReviewPermission($entry, $reviewer);
+
+        if (trim($reason) === '') {
+            throw new BusinessRuleException('Bei der Rücksetzung zur Überarbeitung muss eine Begründung angegeben werden.');
+        }
+
+        $oldStatus = $entry->getStatus();
+
+        $result = $this->entryRepo->updateStatus(
+            $entry->getId(),
+            'entwurf',
+            $entry->getVersion(),
+            ['return_reason' => $reason]
+        );
+
+        if (!$result) {
+            throw new BusinessRuleException('Der Eintrag wurde zwischenzeitlich geändert. Bitte laden Sie die Seite neu.');
+        }
+
+        // Begruendung als Dialog-Nachricht sichern, damit der Verlauf nachvollziehbar bleibt
+        $this->dialogRepo->create($entry->getId(), $reviewer->getId(), $reason, true);
+
+        $this->auditService->log(
+            'status_change',
+            'work_entries',
+            $entry->getId(),
+            ['status' => $oldStatus],
+            ['status' => 'entwurf', 'return_reason' => $reason],
+            'Antrag zur Überarbeitung zurück an Mitglied',
+            $entry->getEntryNumber()
+        );
+
+        // E-Mail an Antragsteller
+        $this->notifyOwner($entry, function (string $email, string $vorname) use ($entry, $reason) {
+            $this->emailService->sendEntryReturnedToDraft(
+                $email,
+                $vorname,
+                $entry->getEntryNumber(),
+                $reason,
+                $this->getEntryUrl($entry)
+            );
+        });
+
+        $this->cancelDialogReminder($entry->getId());
+
+        return true;
+    }
+
+    /**
      * Korrektur an einem freigegebenen Eintrag (durch Admin/Prüfer)
      */
     public function correct(

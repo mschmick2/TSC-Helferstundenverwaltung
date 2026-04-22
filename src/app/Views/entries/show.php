@@ -195,6 +195,11 @@ $isReviewer = ($user->canReview() && $entry->getUserId() !== $user->getId() && $
                                 <i class="bi bi-question-circle"></i> Rückfrage
                             </button>
 
+                            <button type="button" class="btn btn-outline-warning btn-sm"
+                                    data-bs-toggle="modal" data-bs-target="#returnToDraftModal">
+                                <i class="bi bi-arrow-counterclockwise"></i> Zurück zur Überarbeitung
+                            </button>
+
                             <button type="button" class="btn btn-danger btn-sm"
                                     data-bs-toggle="modal" data-bs-target="#rejectModal">
                                 <i class="bi bi-x-lg"></i> Ablehnen
@@ -241,6 +246,38 @@ $isReviewer = ($user->canReview() && $entry->getUserId() !== $user->getId() && $
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
                     <button type="submit" class="btn btn-warning">
                         <i class="bi bi-question-circle"></i> Rückfrage senden
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Zurück zur Überarbeitung -->
+<div class="modal fade" id="returnToDraftModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="POST" action="<?= ViewHelper::url('/entries/' . $entry->getId() . '/return-to-draft') ?>">
+                <?= ViewHelper::csrfField() ?>
+                <div class="modal-header">
+                    <h5 class="modal-title">Antrag zur Überarbeitung zurückgeben</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="text-muted small">
+                        Der Antrag geht zurück in den Status <strong>Entwurf</strong>. Das Mitglied
+                        kann ihn dann bearbeiten und erneut einreichen. Der Dialog-Verlauf bleibt erhalten.
+                    </p>
+                    <div class="mb-3">
+                        <label for="return-to-draft-reason" class="form-label">Begründung <span class="text-danger">*</span></label>
+                        <textarea name="reason" id="return-to-draft-reason" class="form-control" rows="4" required
+                                  placeholder="Was soll das Mitglied überarbeiten?"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
+                    <button type="submit" class="btn btn-warning">
+                        <i class="bi bi-arrow-counterclockwise"></i> Zurück zur Überarbeitung
                     </button>
                 </div>
             </form>

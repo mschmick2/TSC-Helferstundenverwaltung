@@ -41,9 +41,9 @@ class UserController extends BaseController
         $perPage = 20;
         $search = $params['search'] ?? null;
         $role = $params['role'] ?? null;
-        $includeInactive = isset($params['inactive']) && $params['inactive'] === '1';
+        $onlyActive = isset($params['only_active']) && $params['only_active'] === '1';
 
-        $result = $this->userRepo->findAllPaginated($page, $perPage, $search, $role, $includeInactive);
+        $result = $this->userRepo->findAllPaginated($page, $perPage, $search, $role, $onlyActive);
         $roles = $this->userRepo->findAllRoles();
 
         return $this->render($response, 'admin/users/index', [
@@ -58,7 +58,7 @@ class UserController extends BaseController
             'filters' => [
                 'search' => $search,
                 'role' => $role,
-                'inactive' => $includeInactive,
+                'only_active' => $onlyActive,
             ],
             'breadcrumbs' => [
                 ['label' => 'Dashboard', 'url' => '/'],
@@ -258,6 +258,10 @@ class UserController extends BaseController
 
     /**
      * Benutzer deaktivieren (POST /admin/users/{id}/deactivate)
+     *
+     * Setzt is_active=FALSE, laesst deleted_at unangetastet. Der User bleibt
+     * in der Mitgliederliste mit Status-Badge "Inaktiv" und kann spaeter
+     * wieder aktiviert werden.
      */
     public function deactivate(Request $request, Response $response): Response
     {
@@ -276,21 +280,31 @@ class UserController extends BaseController
             return $this->redirect($response, '/admin/users');
         }
 
-        $this->userRepo->softDeleteUser($id);
+        if ($targetUser->getDeletedAt() !== null) {
+            ViewHelper::flash('warning', 'Gelöschte Mitglieder können nicht deaktiviert werden.');
+            return $this->redirect($response, '/admin/users/' . $id);
+        }
+
+        $this->userRepo->deactivateUser($id);
 
         $this->auditService->log(
-            'delete',
+            'config_change',
             'users',
             $id,
+            oldValues: ['is_active' => true],
+            newValues: ['is_active' => false],
             description: "Benutzer deaktiviert: {$targetUser->getVollname()}"
         );
 
-        ViewHelper::flash('success', 'Benutzer wurde deaktiviert.');
-        return $this->redirect($response, '/admin/users');
+        ViewHelper::flash('success', 'Mitglied wurde deaktiviert.');
+        return $this->redirect($response, '/admin/users/' . $id);
     }
 
     /**
-     * Benutzer reaktivieren (POST /admin/users/{id}/activate)
+     * Benutzer aktivieren (POST /admin/users/{id}/activate)
+     *
+     * Setzt is_active=TRUE. Gelöschte Accounts werden bewusst nicht
+     * wiederhergestellt — "Löschen" ist aus UI-Sicht endgueltig.
      */
     public function activate(Request $request, Response $response): Response
     {
@@ -303,17 +317,116 @@ class UserController extends BaseController
             return $this->redirect($response, '/admin/users');
         }
 
-        $this->userRepo->restoreUser($id);
+        if ($targetUser->getDeletedAt() !== null) {
+            ViewHelper::flash('warning', 'Gelöschte Mitglieder können nicht mehr aktiviert werden.');
+            return $this->redirect($response, '/admin/users');
+        }
+
+        $changed = $this->userRepo->activateUser($id);
+
+        if (!$changed) {
+            ViewHelper::flash('info', 'Mitglied war bereits aktiv.');
+            return $this->redirect($response, '/admin/users/' . $id);
+        }
 
         $this->auditService->log(
-            'restore',
+            'config_change',
             'users',
             $id,
-            description: "Benutzer reaktiviert: {$targetUser->getVollname()}"
+            oldValues: ['is_active' => false],
+            newValues: ['is_active' => true],
+            description: "Benutzer aktiviert: {$targetUser->getVollname()}"
         );
 
-        ViewHelper::flash('success', 'Benutzer wurde reaktiviert.');
+        ViewHelper::flash('success', 'Mitglied wurde aktiviert.');
+        return $this->redirect($response, '/admin/users/' . $id);
+    }
+
+    /**
+     * Benutzer löschen (POST /admin/users/{id}/delete)
+     *
+     * Endgueltige Soft-Loeschung: der User verschwindet aus der Mitglieder-
+     * liste und kann nicht mehr ueber die UI reaktiviert werden. Die Zeile
+     * bleibt physisch erhalten fuer Audit, Revisionssicherheit und die
+     * Fremdschluessel-Integritaet auf historischen Antraegen.
+     */
+    public function delete(Request $request, Response $response): Response
+    {
+        $currentUser = $request->getAttribute('user');
+        $args = $this->routeArgs($request);
+        $id = (int) $args['id'];
+
+        if ($id === $currentUser->getId()) {
+            ViewHelper::flash('danger', 'Sie können sich nicht selbst löschen.');
+            return $this->redirect($response, '/admin/users/' . $id);
+        }
+
+        $targetUser = $this->userRepo->findByIdForAdmin($id);
+        if ($targetUser === null) {
+            ViewHelper::flash('danger', 'Benutzer nicht gefunden.');
+            return $this->redirect($response, '/admin/users');
+        }
+
+        if ($targetUser->getDeletedAt() !== null) {
+            ViewHelper::flash('info', 'Mitglied ist bereits gelöscht.');
+            return $this->redirect($response, '/admin/users');
+        }
+
+        $this->userRepo->softDeleteUser($id);
+
+        $this->auditService->log(
+            'delete',
+            'users',
+            $id,
+            description: "Benutzer geloescht (soft, unwiederbringlich): {$targetUser->getVollname()}"
+        );
+
+        ViewHelper::flash('success', 'Mitglied wurde gelöscht.');
         return $this->redirect($response, '/admin/users');
+    }
+
+    /**
+     * Account-Sperre nach Fehlversuchen aufheben (POST /admin/users/{id}/unlock)
+     *
+     * Setzt failed_login_attempts auf 0 und locked_until auf NULL. Erzeugt einen
+     * Audit-Eintrag mit action=config_change, damit die manuelle Aufhebung
+     * nachvollziehbar bleibt.
+     */
+    public function unlock(Request $request, Response $response): Response
+    {
+        $args = $this->routeArgs($request);
+        $id = (int) $args['id'];
+
+        $targetUser = $this->userRepo->findByIdForAdmin($id);
+        if ($targetUser === null) {
+            ViewHelper::flash('danger', 'Benutzer nicht gefunden.');
+            return $this->redirect($response, '/admin/users');
+        }
+
+        if (!$targetUser->isLocked() && $targetUser->getFailedLoginAttempts() === 0) {
+            ViewHelper::flash('info', 'Account ist nicht gesperrt.');
+            return $this->redirect($response, '/admin/users/' . $id);
+        }
+
+        $oldValues = [
+            'failed_login_attempts' => $targetUser->getFailedLoginAttempts(),
+            'locked_until' => $targetUser->getLockedUntil(),
+        ];
+
+        $this->userRepo->resetFailedAttempts($id);
+
+        $this->auditService->log(
+            'config_change',
+            'users',
+            $id,
+            oldValues: $oldValues,
+            newValues: ['failed_login_attempts' => 0, 'locked_until' => null],
+            description: "Account-Sperre manuell aufgehoben: {$targetUser->getVollname()}",
+            metadata: ['reason' => 'manual_admin_unlock']
+        );
+
+        ViewHelper::flash('success', 'Account-Sperre wurde aufgehoben.');
+        return $this->redirect($response, '/admin/users/' . $id);
     }
 
     /**

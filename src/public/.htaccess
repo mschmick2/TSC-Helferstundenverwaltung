@@ -21,21 +21,30 @@ AddDefaultCharset UTF-8
 </IfModule>
 
 # Sicherheits-Header
+# HINWEIS: Identische Policy wird zusaetzlich in der PHP-Middleware
+# SecurityHeadersMiddleware gesetzt (doppelte Verteidigungslinie fuer lokalen
+# Dev-Server, der .htaccess nicht liest).
 <IfModule mod_headers.c>
-    # Verhindert Clickjacking
+    # Verhindert Clickjacking (ergaenzend zu CSP frame-ancestors fuer aeltere Browser)
     Header always set X-Frame-Options "SAMEORIGIN"
-    
+
     # Verhindert MIME-Type-Sniffing
     Header always set X-Content-Type-Options "nosniff"
-    
-    # XSS-Schutz
-    Header always set X-XSS-Protection "1; mode=block"
-    
+
     # Referrer-Policy
     Header always set Referrer-Policy "strict-origin-when-cross-origin"
-    
+
+    # Permissions-Policy (Browser-APIs deaktivieren, die VAES nicht braucht)
+    Header always set Permissions-Policy "geolocation=(), microphone=(), camera=(), payment=(), usb=()"
+
+    # HSTS — 2 Jahre, incl. Subdomains (nur ueber HTTPS wirksam)
+    Header always set Strict-Transport-Security "max-age=63072000; includeSubDomains"
+
     # Content Security Policy
-    Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; font-src 'self' https://cdn.jsdelivr.net; img-src 'self' data:; connect-src 'self';"
+    # Stand "Safe Improvements": object-src/base-uri/form-action/frame-ancestors
+    # ergaenzt, upgrade-insecure-requests aktiv. 'unsafe-inline' bleibt bis zum
+    # Nonce-Rollout der Inline-Skripte.
+    Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; font-src 'self' https://cdn.jsdelivr.net; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'; upgrade-insecure-requests"
 </IfModule>
 
 # HTTPS-Umleitung (auf Strato normalerweise automatisch)

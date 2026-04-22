@@ -73,6 +73,11 @@ $app->addRoutingMiddleware();
 $displayErrors = $container->get('settings')['app']['debug'] ?? false;
 $app->addErrorMiddleware($displayErrors, true, true);
 
+// Security-Header-Middleware: als letztes hinzufuegen -> laeuft als ERSTES und
+// setzt CSP/HSTS/Permissions-Policy auf JEDE Response, auch auf Error- und
+// Redirect-Responses. Entspricht CLAUDE.md §8 Nr. 3.
+$app->add(new \App\Middleware\SecurityHeadersMiddleware());
+
 // Routen laden
 (require $appRoot . '/config/routes.php')($app);
 

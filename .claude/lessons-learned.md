@@ -540,4 +540,176 @@ const topRow = page.locator('tbody tr').first();
 
 ---
 
+### 2026-04-22 — ASCII-Retransliteration per Regex zerstoert Woerter wie "neue", "dass"
+
+**Kontext:**
+Erstellung einer DOCX-Version des Benutzerhandbuchs aus `docs/Benutzerhandbuch.md`.
+Die Markdown-Quelle ist durchgehend ASCII-transliteriert (`ae`, `oe`, `ue`, `ss`
+statt `ä`, `ö`, `ü`, `ß`), weil sie ueber die Jahre aus CLI-Eingaben und
+Harness-Regeln gewachsen ist. Die DOCX-Ausgabe soll aber korrekte deutsche
+Typografie haben.
+
+**Problem / Ueberraschung:**
+Der naive erste Wurf ersetzte pauschal per Regex `ue→ü`, `ae→ä`, `oe→ö`,
+`ss→ß`. Resultat in einer Stichprobe von 20 Absaetzen: >50 kaputte Woerter.
+
+- `ue → ü` zerstoert *neue* → *nü*, *aktuell* → *aktüll*, *manuell* → *manüll*,
+  *individuelle* → *individülle*, *Grauer* → *Grürer*, *Blauer* → *Blürer*.
+- `ss → ß` zerstoert *dass* → *daß*, *muss* → *muß*, *passiert* → *paßiert*,
+  *lassen* → *laßen*, *Session* → *Seßion*, *password* → *paßword*,
+  *Permissions* → *Permißions*, *Assignment* → *Aßignment*.
+- `oe → ö` zerstoert *Poet*, *Coexistenz*, *Proest* (wenn Substring
+  irgendwo im Text).
+- `ae → ä` trifft seltener, aber z.B. *Rafael*, *Israel* waren in der
+  Stichprobe.
+
+Syntax-Check (`python -c`) sah sauber aus, Unit-Tests gibt es fuer diesen
+Konverter nicht — erst das Oeffnen der DOCX-Datei macht die Zerstoerung
+sichtbar.
+
+**Loesung:**
+`tools/md-to-docx/build-handbuch-docx.py` mit **expliziter Wort-Whitelist**:
+
+```python
+WORD_MAP: dict[str, str] = {
+    "abschliessen": "abschließen",
+    "Abhaengig": "Abhängig",
+    # ... 300+ Eintraege, einmalig manuell aus --audit-Lauf erstellt ...
+    "zurueckzusetzen": "zurückzusetzen",
+}
+
+_WORD_RE = re.compile(r"[A-Za-z][A-Za-z]+")
+
+def retransliterate(text: str) -> str:
+    return _WORD_RE.sub(
+        lambda m: WORD_MAP.get(m.group(0), m.group(0)),
+        text,
+    )
+```
+
+Der Script-`--audit`-Modus listet alle Kandidaten-Token (`ae/oe/ue/ss`-haltig),
+die noch NICHT in der Map sind — einmal durchlaufen, Map komplettieren,
+dann erst echter Export-Lauf.
+
+Ergebnis: 228 ä, 107 ö, 369 ü, 16 Ä, 23 Ö, 19 Ü, 20 ß — null Fehltreffer.
+
+**Praevention:**
+- Fuer ASCII→Umlaut-Retransliteration in deutschen Texten IMMER eine
+  explizite Wort-Whitelist bauen, nie pauschale Regex.
+- Vor dem ersten Echt-Lauf: Audit-Modus (Liste der ungemappten Kandidaten)
+  nutzen — so entsteht die Whitelist in einem Rutsch, ohne dass man durch
+  die DOCX-Datei hetzen muss, um Schaden zu finden.
+- Wiederverwendbares Tool unter [tools/md-to-docx/](../tools/md-to-docx/)
+  ablegen; die Map waechst inkrementell, wenn das Handbuch neue Begriffe
+  bekommt.
+- Gilt analog fuer andere ASCII-Transliterationen (Franzoesisch, Polnisch,
+  Tschechisch) — auch dort sind Muster wie `oe`, `ss`, `cz` ambig.
+
+---
+
+### 2026-04-22 — Soft-Delete vs. FK ON DELETE RESTRICT bei Self-Referenzen
+
+**Kontext:**
+Modul 6 I7a (Aufgabenbaum), Gate G3 Reviewer. Die Self-FK `event_tasks.parent_task_id`
+ist mit `ON DELETE RESTRICT` definiert (G1-Delta-Entscheidung — Tree-Aufraeumen
+erfolgt bewusst via Service, nicht implizit durch DB). Das Loeschen eines Knotens
+laeuft im Projekt grundsaetzlich als Soft-Delete (`UPDATE deleted_at = NOW()`),
+nicht als physisches `DELETE FROM`.
+
+**Problem / Ueberraschung:**
+ON DELETE RESTRICT greift ausschliesslich bei `DELETE FROM`. Ein Soft-Delete via
+`UPDATE deleted_at` umgeht den FK komplett — die Datenbank sieht die Operation als
+ganz normales Spalten-Update, nicht als Loeschung. Konsequenz: wenn eine Gruppe
+soft-deletet wird, bleiben ihre soft-deleteten Kinder mit `parent_task_id =
+<Gruppen-ID>` einfach in der Tabelle stehen. Die Service-Validation
+(`countActiveChildren > 0` blockiert das Soft-Delete einer Gruppe mit AKTIVEN
+Kindern) deckt nicht den Fall ab, dass die Kinder bereits soft-deletet sind und
+nun mit ihrer Eltern-Gruppe gemeinsam zu "Zombie-Referenzen" werden.
+
+Aktuell (I7a) ohne Restore-Feature unkritisch, weil niemand jemals die geloeschten
+Knoten wieder sichtbar macht. Aber: ein zukuenftiger Restore-Service muss explizit
+entscheiden, ob Kinder mit ihrem Parent reaktiviert werden oder nicht — sonst
+wuerden plotzlich Kinder ohne aktiven Parent in der UI auftauchen, oder ein
+restorter Parent haette stillschweigend wieder soft-deletete Kinder.
+
+**Loesung:**
+Inline-Doku-Kommentar in `TaskTreeService::softDeleteNode()` direkt vor dem
+`softDelete`-Call, der die Zombie-Mechanik explizit benennt (Datei:
+`src/app/Services/TaskTreeService.php`). Plus dieser Lessons-Eintrag als
+"Stolperstein-Hinweis" fuer den spaeteren Restore-Feature-Autor.
+
+**Praevention:**
+- Beim Bau eines Restore-Features fuer event_tasks IMMER zuerst pruefen:
+  hat der Knoten einen geloeschten Parent? Falls ja: entweder Restore-Kette
+  bis zur Wurzel mitziehen, oder Restore ablehnen mit klarer Fehlermeldung,
+  oder Knoten beim Restore an einen aktiven Vorfahren umhaengen.
+- Generelles Pattern fuer Self-FK + Soft-Delete: bei Projekten mit
+  Restore-Feature solche FKs bevorzugt mit zusaetzlicher
+  `parent.deleted_at IS NULL`-Invariante absichern (entweder per Trigger
+  oder per Service-Validation), damit Zombie-Referenzen nicht entstehen.
+- Allgemein: ON DELETE RESTRICT schuetzt NICHT vor Soft-Delete-Inkonsistenzen.
+  Die Annahme "FK regelt das" ist trichterhaft, sobald Soft-Delete im Spiel ist.
+
+→ Aufgenommen in `.claude/rules/04-database.md` ist nicht noetig — die Soft-Delete-
+Konvention ist dort bereits dokumentiert; der Restore-Spezialfall ist so selten,
+dass eine Rules-Erweiterung Overhead waere. Dieser Lessons-Eintrag reicht.
+
+---
+
+### 2026-04-22 — MySQL PREPARE/EXECUTE akzeptiert kein SIGNAL SQLSTATE
+
+**Kontext:**
+Modul 6 I7a, Migration 009 Down-Skript, G7 Tester-Durchlauf gegen
+Live-Test-DB.
+
+**Problem / Ueberraschung:**
+SIGNAL SQLSTATE '45000' innerhalb eines dynamisch gebauten @sql-
+Strings, ausgefuehrt via `PREPARE stmt FROM @sql; EXECUTE stmt;`
+— wirft MySQL-Fehler 1295 ("This command is not supported in the
+prepared statement protocol yet"). Der Sicherheits-Abbruch
+funktioniert zwar (Schema intakt, Daten intakt), aber die
+vorgesehene Klartext-Diagnose fuer den DBA ist verloren — er sieht
+nur eine technische Protokoll-Meldung statt der durchdachten
+Bereinigungs-Anweisung.
+
+Die Restriktion ist eine MySQL-Protokoll-Eigenschaft, kein
+Syntax-Fehler — `php -l`, `phpunit` und Statisch-Inspektions-Tests
+erkennen sie nicht. Erst der Live-Lauf gegen MySQL faengt es.
+
+**Loesung:**
+SIGNAL aus dem PREPARE-Wrapper herausziehen und in eine kurzlebige
+Stored Procedure mit DELIMITER-Wechsel verlagern. Pattern:
+
+- `DROP PROCEDURE IF EXISTS _migration_xxx_safety_check;` am Anfang
+  (Idempotenz, raeumt eine evtl. hinterlassene Prozedur eines
+  vorigen Abbruchs).
+- `DELIMITER $$` ... `END$$ DELIMITER ;`-Wrap fuer die Prozedur-
+  Definition (von phpMyAdmin auf Strato live verifiziert,
+  vgl. `create_database.sql`).
+- IF-Bedingung auf Session-Variablen, SIGNAL im Body.
+- `CALL _migration_xxx_safety_check();` direkt nach `CREATE`.
+- `DROP PROCEDURE _migration_xxx_safety_check;` direkt nach `CALL`.
+  Bei Abbruch durch SIGNAL bleibt die Prozedur im Schema fuer
+  DBA-Debugging — der naechste Lauf raeumt sie via `DROP IF EXISTS`
+  am Anfang.
+
+**Praevention:**
+- Jede Migration mit `SIGNAL` muss gegen eine Live-Test-DB
+  durchgespielt werden, sowohl im Erfolgs- als auch im geplanten
+  Abbruch-Pfad. Statische SQL-Pruefung erkennt die PREPARE-
+  Restriktion nicht — es ist eine Protokoll-Laufzeit-Restriktion.
+- G7 Tester-Gate: SIGNAL-Pfade muessen in der Checkliste explizit
+  manuell getriggert werden, nicht nur code-gelesen.
+- `MESSAGE_TEXT`-Laenge unter **128 Zeichen** halten (MySQL-Limit);
+  detaillierte Reparatur-Anweisungen gehoeren in den Skript-Kommentar
+  direkt oberhalb des Checks, damit der DBA auch bei phpMyAdmin-
+  Versionen, die `MESSAGE_TEXT` verschlucken, die Anleitung im
+  Skript findet.
+
+→ Konkrete Umsetzung in
+[`scripts/database/migrations/009_event_task_tree.down.sql`](../scripts/database/migrations/009_event_task_tree.down.sql)
+als Vorlage fuer kuenftige Migrationen mit Sicherheits-SIGNAL.
+
+---
+
 <!-- Neue Eintraege hier unten anfuegen, nicht oben. Append-Only. -->

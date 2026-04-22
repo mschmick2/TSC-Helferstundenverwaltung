@@ -137,7 +137,17 @@ use App\Helpers\ViewHelper;
                         <td>
                             <?= $targetUser->getFailedLoginAttempts() ?>
                             <?php if ($targetUser->isLocked()): ?>
-                                <span class="badge bg-danger">Gesperrt</span>
+                                <span class="badge bg-danger">Gesperrt bis
+                                    <?= ViewHelper::formatDateTime($targetUser->getLockedUntil()) ?></span>
+                            <?php endif; ?>
+                            <?php if ($targetUser->isLocked() || $targetUser->getFailedLoginAttempts() > 0): ?>
+                                <form method="POST" class="d-inline ms-2"
+                                      action="<?= ViewHelper::url('/admin/users/' . $targetUser->getId() . '/unlock') ?>">
+                                    <?= ViewHelper::csrfField() ?>
+                                    <button type="submit" class="btn btn-sm btn-outline-warning">
+                                        <i class="bi bi-unlock"></i> Sperre aufheben
+                                    </button>
+                                </form>
                             <?php endif; ?>
                         </td>
                     </tr>
@@ -189,25 +199,73 @@ use App\Helpers\ViewHelper;
         <div class="card border-danger">
             <div class="card-header text-danger"><i class="bi bi-exclamation-triangle"></i> Aktionen</div>
             <div class="card-body">
-                <?php if ($targetUser->getDeletedAt() !== null || !$targetUser->isActive()): ?>
-                    <form method="POST" action="<?= ViewHelper::url('/admin/users/' . $targetUser->getId() . '/activate') ?>" class="d-inline">
-                        <?= ViewHelper::csrfField() ?>
-                        <button type="submit" class="btn btn-success">
-                            <i class="bi bi-person-check"></i> Reaktivieren
-                        </button>
-                    </form>
+                <?php if ($targetUser->getDeletedAt() !== null): ?>
+                    <div class="alert alert-secondary mb-0">
+                        <i class="bi bi-trash"></i>
+                        Dieses Mitglied ist gelöscht und kann über die Oberfläche nicht wiederhergestellt werden.
+                        Die Datensätze bleiben aus Gründen der Revisionssicherheit erhalten.
+                    </div>
+                <?php elseif ($targetUser->getId() === $user->getId()): ?>
+                    <span class="text-muted">Sie können Ihr eigenes Konto nicht deaktivieren oder löschen.</span>
                 <?php else: ?>
-                    <?php if ($targetUser->getId() !== $user->getId()): ?>
-                        <form method="POST" action="<?= ViewHelper::url('/admin/users/' . $targetUser->getId() . '/deactivate') ?>"
-                              class="d-inline" onsubmit="return confirm('Benutzer wirklich deaktivieren?');">
-                            <?= ViewHelper::csrfField() ?>
-                            <button type="submit" class="btn btn-danger">
-                                <i class="bi bi-person-x"></i> Deaktivieren
-                            </button>
-                        </form>
-                    <?php else: ?>
-                        <span class="text-muted">Sie können sich nicht selbst deaktivieren.</span>
-                    <?php endif; ?>
+                    <div class="d-flex flex-wrap gap-2">
+                        <?php if ($targetUser->isActive()): ?>
+                            <form method="POST" action="<?= ViewHelper::url('/admin/users/' . $targetUser->getId() . '/deactivate') ?>"
+                                  class="d-inline" onsubmit="return confirm('Mitglied wirklich deaktivieren? Der Account bleibt in der Liste und kann später wieder aktiviert werden.');">
+                                <?= ViewHelper::csrfField() ?>
+                                <button type="submit" class="btn btn-warning">
+                                    <i class="bi bi-person-x"></i> Deaktivieren
+                                </button>
+                            </form>
+                        <?php else: ?>
+                            <form method="POST" action="<?= ViewHelper::url('/admin/users/' . $targetUser->getId() . '/activate') ?>" class="d-inline">
+                                <?= ViewHelper::csrfField() ?>
+                                <button type="submit" class="btn btn-success">
+                                    <i class="bi bi-person-check"></i> Aktivieren
+                                </button>
+                            </form>
+                        <?php endif; ?>
+
+                        <button type="button" class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#deleteUserModal">
+                            <i class="bi bi-trash"></i> Löschen
+                        </button>
+                    </div>
+
+                    <!-- Löschen-Bestätigungsmodal -->
+                    <div class="modal fade" id="deleteUserModal" tabindex="-1" aria-labelledby="deleteUserModalLabel" aria-hidden="true">
+                        <div class="modal-dialog">
+                            <div class="modal-content">
+                                <div class="modal-header bg-danger text-white">
+                                    <h5 class="modal-title" id="deleteUserModalLabel">
+                                        <i class="bi bi-exclamation-triangle"></i> Mitglied endgültig löschen?
+                                    </h5>
+                                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Schließen"></button>
+                                </div>
+                                <div class="modal-body">
+                                    <p>
+                                        Mitglied
+                                        <strong><?= ViewHelper::e($targetUser->getVollname()) ?></strong>
+                                        (<?= ViewHelper::e($targetUser->getMitgliedsnummer()) ?>)
+                                        wird aus der Mitgliederliste entfernt.
+                                    </p>
+                                    <ul class="mb-0">
+                                        <li>Der Account kann über die Oberfläche <strong>nicht wiederhergestellt</strong> werden.</li>
+                                        <li>Historische Anträge und Audit-Einträge bleiben erhalten.</li>
+                                        <li>Wenn Sie den Zugang nur zeitweise sperren wollen, nutzen Sie stattdessen <em>Deaktivieren</em>.</li>
+                                    </ul>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
+                                    <form method="POST" action="<?= ViewHelper::url('/admin/users/' . $targetUser->getId() . '/delete') ?>" class="d-inline">
+                                        <?= ViewHelper::csrfField() ?>
+                                        <button type="submit" class="btn btn-danger">
+                                            <i class="bi bi-trash"></i> Endgültig löschen
+                                        </button>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 <?php endif; ?>
             </div>
         </div>

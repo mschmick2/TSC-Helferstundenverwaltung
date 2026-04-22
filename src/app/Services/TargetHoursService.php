@@ -72,6 +72,15 @@ class TargetHoursService
     }
 
     /**
+     * Freigegebene (akzeptierte) Stunden eines Users im Jahr — unabhängig
+     * vom Soll-Stunden-Feature. Dashboard zeigt das immer.
+     */
+    public function getApprovedHours(int $userId, int $year): float
+    {
+        return $this->targetRepo->getActualHours($userId, $year);
+    }
+
+    /**
      * Individuelles Ziel setzen
      */
     public function setIndividualTarget(

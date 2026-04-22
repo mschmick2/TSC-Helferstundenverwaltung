@@ -52,6 +52,7 @@ export default defineConfig({
   projects: [
     {
       name: 'headed',
+      testIgnore: /_handbuch-screenshots\.spec\.ts/,
       use: {
         ...devices['Desktop Chrome'],
         headless: false,
@@ -61,6 +62,7 @@ export default defineConfig({
     },
     {
       name: 'headless',
+      testIgnore: /_handbuch-screenshots\.spec\.ts/,
       use: {
         ...devices['Desktop Chrome'],
         headless: true,
@@ -73,7 +75,7 @@ export default defineConfig({
     // damit Layout-/Touch-Regressionen sichtbar werden.
     {
       name: 'mobile-se',
-      testIgnore: /08-multitab\.spec\.ts/,
+      testIgnore: [/08-multitab\.spec\.ts/, /_handbuch-screenshots\.spec\.ts/],
       use: {
         ...devices['Desktop Chrome'],
         headless: true,
@@ -85,7 +87,7 @@ export default defineConfig({
     },
     {
       name: 'mobile-14',
-      testIgnore: /08-multitab\.spec\.ts/,
+      testIgnore: [/08-multitab\.spec\.ts/, /_handbuch-screenshots\.spec\.ts/],
       use: {
         ...devices['Desktop Chrome'],
         headless: true,
@@ -93,6 +95,22 @@ export default defineConfig({
         deviceScaleFactor: 3,
         isMobile: true,
         hasTouch: true,
+      },
+    },
+    // Handbuch-Screenshot-Project. Laeuft NICHT im Standard-Run. Invocation:
+    //   npx playwright test --project=screenshots
+    // Beim Start seeded die Spec (tests/e2e/specs/_handbuch-screenshots.spec.ts)
+    // via scripts/seed-handbuch-demodata.php zusaetzliche Demo-Daten in die
+    // frisch per globalSetup gebaute E2E-DB und legt PNGs unter
+    // docs/images/handbuch/ ab.
+    {
+      name: 'screenshots',
+      testMatch: /_handbuch-screenshots\.spec\.ts/,
+      use: {
+        ...devices['Desktop Chrome'],
+        headless: true,
+        viewport: { width: 1280, height: 900 },
+        deviceScaleFactor: 1,
       },
     },
   ],

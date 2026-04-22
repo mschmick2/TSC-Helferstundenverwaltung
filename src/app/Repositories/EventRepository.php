@@ -163,6 +163,20 @@ class EventRepository
     }
 
     /**
+     * Anzahl veroeffentlichter, noch laufender Events.
+     * Wird vom Dashboard-Hinweis-Banner genutzt.
+     */
+    public function countPublishedUpcoming(): int
+    {
+        $stmt = $this->pdo->prepare(
+            "SELECT COUNT(*) FROM events
+             WHERE status = :status AND deleted_at IS NULL AND end_at >= NOW()"
+        );
+        $stmt->execute(['status' => Event::STATUS_VEROEFFENTLICHT]);
+        return (int) $stmt->fetchColumn();
+    }
+
+    /**
      * Events, bei denen der User als Organisator eingetragen ist.
      *
      * @return Event[]

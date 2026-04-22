@@ -64,11 +64,64 @@ class OrganizerEventController extends BaseController
             ];
         }
 
+        // Sachstand pro Event: Task-Belegung (nur Aufgaben, ohne Beigaben)
+        $eventSummaries = [];
+        foreach ($events as $event) {
+            $tasks = $this->taskRepo->findByEvent((int) $event->getId());
+            $taskRows = [];
+            $totalTarget = 0;
+            $totalFilled = 0;
+            $hasUnlimited = false;
+
+            foreach ($tasks as $task) {
+                if ($task->isContribution()) {
+                    continue;
+                }
+                $filled = $this->assignmentRepo->countActiveByTask((int) $task->getId());
+                $target = $task->getCapacityTarget();
+                $mode = $task->getCapacityMode();
+
+                if ($mode === \App\Models\EventTask::CAP_UNBEGRENZT) {
+                    $open = null;
+                    $hasUnlimited = true;
+                } elseif ($target !== null) {
+                    $open = max(0, $target - $filled);
+                    $totalTarget += $target;
+                } else {
+                    $open = null;
+                }
+                $totalFilled += $filled;
+
+                $taskRows[] = [
+                    'task'   => $task,
+                    'filled' => $filled,
+                    'target' => $target,
+                    'mode'   => $mode,
+                    'open'   => $open,
+                ];
+            }
+
+            $totalOpen = max(0, $totalTarget - $totalFilled);
+            $percentage = $totalTarget > 0
+                ? (int) round(min(100, ($totalFilled / $totalTarget) * 100))
+                : 0;
+
+            $eventSummaries[(int) $event->getId()] = [
+                'tasks'         => $taskRows,
+                'total_target'  => $totalTarget,
+                'total_filled'  => $totalFilled,
+                'total_open'    => $totalOpen,
+                'has_unlimited' => $hasUnlimited,
+                'percentage'    => $percentage,
+            ];
+        }
+
         return $this->render($response, 'organizer/events/index', [
             'title' => 'Als Organisator',
             'user' => $user,
             'settings' => $this->settings,
             'events' => $events,
+            'eventSummaries' => $eventSummaries,
             'pendingReviews' => $pendingReviews,
             'reviewContext' => $reviewContext,
             'breadcrumbs' => [

@@ -1,8 +1,8 @@
 # REQUIREMENTS.md - VAES Anforderungsspezifikation
 
-**Version:** 1.3  
-**Stand:** 2025-02-09  
-**Status:** Review abgeschlossen, bereit für Entwicklung
+**Version:** 1.4  
+**Stand:** 2026-04-22  
+**Status:** Version 1.4.1 — "Zurück zur Überarbeitung" + Dashboard-Stundenanzeige ergänzt
 
 ---
 
@@ -199,6 +199,67 @@ REQ-INVITE-006: Link nur einmal verwendbar
 REQ-INVITE-007: Admin kann neue Einladung auslösen
 ```
 
+### 4.6 Mitglieder-Lebenszyklus (Aktivieren / Deaktivieren / Löschen)
+
+Drei getrennte Zustände — nicht zu vermischen:
+
+```
+REQ-LC-001: "Aktiv"       = is_active=TRUE, deleted_at=NULL.
+                            Normaler Login und volle Funktion.
+REQ-LC-002: "Deaktiviert" = is_active=FALSE, deleted_at=NULL.
+                            Login gesperrt, Account bleibt in der
+                            Mitgliederliste mit Badge "Inaktiv", kann
+                            ueber "Aktivieren" wieder freigeschaltet werden.
+REQ-LC-003: "Gelöscht"    = deleted_at gesetzt, is_active=FALSE.
+                            Soft-Delete, aus UI-Sicht endgueltig;
+                            nicht mehr in der Mitgliederliste. Zeile
+                            bleibt physisch erhalten (Revisionssicherheit,
+                            FK-Integritaet auf historischen Antraegen).
+REQ-LC-004: Admin darf sich selbst weder deaktivieren noch loeschen.
+REQ-LC-005: Geloeschte Accounts werden bewusst nicht ueber die UI
+            wiederhergestellt; Reaktivierung erfordert Admin-Eingriff
+            auf Datenbank-Ebene.
+REQ-LC-006: Loesch-Aktion erfordert explizite Bestaetigung ueber ein
+            Modal; einfacher onclick-confirm reicht nicht.
+REQ-LC-007: Aktivieren / Deaktivieren werden als Audit 'config_change'
+            protokolliert (old/new is_active). Loeschen als Audit 'delete'.
+REQ-LC-008: Mitgliederliste zeigt per Default aktive + deaktivierte
+            Mitglieder. Feinfilter "Nur aktive zeigen" blendet
+            deaktivierte aus. Geloeschte Mitglieder sind in keiner
+            regulaeren Sicht enthalten.
+```
+
+### 4.7 Externer Mitglieder-Abgleich (geplant, künftiger Zyklus)
+
+Nicht Teil des aktuellen Release-Umfangs — als Roadmap-Punkt hier
+verankert, damit Architektur und Rollen-/Datenmodell schon jetzt darauf
+ausgelegt werden können.
+
+```
+REQ-SYNC-P01: (PLAN) VAES soll sich periodisch mit einer externen
+              Mitgliederdatenbank des Vereins via REST-API abgleichen
+              (Stammdaten: Name, E-Mail, Mitgliedsnummer, Eintrittsdatum,
+              Austrittsdatum, Anschrift).
+REQ-SYNC-P02: (PLAN) Der Abgleich erfolgt unidirektional in Richtung
+              VAES (Quelle ist die externe Datenbank). Lokale Rollen,
+              Arbeitsstunden und Audit-Eintraege bleiben unberuehrt.
+REQ-SYNC-P03: (PLAN) Ausgetretene Mitglieder werden nicht automatisch
+              geloescht, sondern auf "Deaktiviert" gesetzt — die
+              endgueltige Loeschung bleibt eine manuelle Admin-Aktion
+              (siehe §4.6 REQ-LC-003).
+REQ-SYNC-P04: (PLAN) Der Sync-Endpunkt ist per API-Token
+              authentifiziert; Konfiguration ueber Admin-Settings.
+REQ-SYNC-P05: (PLAN) Sync-Laeufe werden im Audit-Log als 'import'
+              protokolliert (Zeilenzahl ok / fehlgeschlagen).
+REQ-SYNC-P06: (PLAN) Strato-Kompatibilitaet: kein Cron — Trigger
+              entweder manuell durch Admin oder via externen Scheduler,
+              der den Sync-Endpunkt aufruft.
+```
+
+> Umsetzung in einem separaten Entwicklungszyklus. Offene Punkte vor
+> Implementierung: API-Schema der externen Quelle, Konfliktstrategie
+> bei divergenten Stammdaten, DSGVO-Pruefung der API-Pipeline.
+
 ---
 
 ## 5. Arbeitsstunden-Erfassung
@@ -304,7 +365,28 @@ REQ-KORR-005: Korrektur-Vermerk am Antrag sichtbar
 REQ-KORR-006: E-Mail an betroffenes Mitglied
 ```
 
-### 7.6 Bearbeitungsrechte nach Status
+### 7.6 Zurück zur Überarbeitung (Prüfer-Aktion)
+
+Ermöglicht dem Prüfer, einen eingereichten oder in Klärung befindlichen Antrag
+zur Nachbearbeitung an das Mitglied zurückzugeben — ohne Ablehnung.
+
+```
+REQ-RTD-001: Prüfer/Admin können eingereichte und in Klärung befindliche Anträge
+             auf Status "entwurf" zurücksetzen
+REQ-RTD-002: Begründung ist Pflichtfeld (leerer Text wird abgelehnt)
+REQ-RTD-003: Selbstgenehmigungs-Sperre gilt analog zu Freigabe/Ablehnung
+             (eigene Anträge nicht zurücksetzbar)
+REQ-RTD-004: Begründung wird als Prüfer-Dialog-Nachricht gespeichert
+             (Dialog-Erhalt, siehe REQ-DLG-008)
+REQ-RTD-005: Status-Wechsel im Audit-Trail als 'status_change' protokolliert
+             (alte/neue Werte + Begründung in metadata)
+REQ-RTD-006: E-Mail an Eigentümer mit Begründung und Link zum Antrag
+REQ-RTD-007: Bedien-Element im Prüfer-View als eigener Button "Zurück zur
+             Überarbeitung" mit Bestätigungs-Modal und CSRF-geschütztem Formular
+REQ-RTD-008: Laufende Dialog-Erinnerung wird bei Rücksetzung abgebrochen
+```
+
+### 7.7 Bearbeitungsrechte nach Status
 
 | Status | Mitglied darf |
 |--------|--------------|
@@ -436,6 +518,14 @@ REQ-SOLL-008: Mitglied sieht eigenen Soll/Ist-Stand
 REQ-SOLL-009: Fortschrittsanzeige ("15 von 20 Stunden")
 REQ-SOLL-010: Prüfer/Admin: Übersicht aller Mitglieder
 REQ-SOLL-011: Report: Mitglieder mit nicht erfülltem Soll
+REQ-SOLL-012: Dashboard zeigt freigegebene Stunden des laufenden Jahres
+              IMMER prominent — unabhängig vom Soll-Stunden-Feature.
+              Darstellung: Karte "Freigegebene Stunden {Jahr}" mit
+              Jahressumme der Anträge im Status 'freigegeben' (2 Nachkomma-
+              stellen). Bei aktiviertem Soll-Feature erweitert sich die
+              Karte um Fortschrittsbalken, Soll-Wert und Restbedarf.
+              Sichtbarkeit: alle Rollen, die Stunden erfassen können
+              (Mitglied, Erfasser, Admin).
 ```
 
 ---
@@ -589,6 +679,8 @@ Siehe: `scripts/database/create_database.sql`
 - [ ] Dialog-System funktioniert bidirektional
 - [ ] Dialog bleibt bei Statusänderungen erhalten
 - [ ] Korrektur nach Freigabe möglich
+- [ ] "Zurück zur Überarbeitung" durch Prüfer möglich (mit Pflichtbegründung, Dialog-Erhalt, Audit-Eintrag)
+- [ ] Dashboard zeigt freigegebene Stunden des Jahres auch ohne Soll-Stunden-Feature
 - [ ] CSV-Import funktioniert
 - [ ] Manuelle Mitgliederanlage mit Pflichtfeld-Kennzeichnung funktioniert
 - [ ] Einladungslink-Prozess funktioniert
@@ -618,4 +710,8 @@ Siehe: `scripts/database/create_database.sql`
 
 ---
 
-*Letzte Aktualisierung: 2025-02-09*
+*Letzte Aktualisierung: 2026-04-22 (v1.4.1)*
+*Änderungen gegenüber 1.3 (2025-02-09):*
+- *§7.6 neu: Prüfer-Aktion "Zurück zur Überarbeitung" (REQ-RTD-001 bis -008)*
+- *§11.3 erweitert: REQ-SOLL-012 — Dashboard zeigt freigegebene Stunden immer*
+- *Abnahmekriterien um beide Punkte ergänzt*

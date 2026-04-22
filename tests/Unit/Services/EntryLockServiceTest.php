@@ -135,15 +135,25 @@ class EntryLockServiceTest extends TestCase
     /** @test */
     public function release_gibt_true_wenn_zeile_entfernt_wurde(): void
     {
-        $this->lockRepo->method('releaseByUser')->with(42, 7)->willReturn(1);
-        $this->assertTrue($this->service->release(42, 7));
+        $this->lockRepo->method('releaseBySession')->with(42, 7, 99)->willReturn(1);
+        $this->assertTrue($this->service->release(42, 7, 99));
     }
 
     /** @test */
     public function release_gibt_false_wenn_nichts_zu_entfernen_war(): void
     {
-        $this->lockRepo->method('releaseByUser')->willReturn(0);
-        $this->assertFalse($this->service->release(42, 7));
+        $this->lockRepo->method('releaseBySession')->willReturn(0);
+        $this->assertFalse($this->service->release(42, 7, 99));
+    }
+
+    /** @test */
+    public function release_mit_null_session_reicht_null_an_repository_durch(): void
+    {
+        $this->lockRepo->expects($this->once())
+            ->method('releaseBySession')
+            ->with(42, 7, null)
+            ->willReturn(1);
+        $this->assertTrue($this->service->release(42, 7, null));
     }
 
     // -------------------------------------------------------------------------
@@ -154,7 +164,7 @@ class EntryLockServiceTest extends TestCase
     public function check_status_ohne_aktiven_lock_ist_frei(): void
     {
         $this->lockRepo->method('findActive')->willReturn(null);
-        $this->assertSame(['held_by_other' => false], $this->service->checkStatus(42, 7));
+        $this->assertSame(['held_by_other' => false], $this->service->checkStatus(42, 7, 99));
     }
 
     /** @test */
@@ -163,9 +173,30 @@ class EntryLockServiceTest extends TestCase
         $this->lockRepo->method('findActive')->willReturn([
             'id'         => 1,
             'user_id'    => 7,
+            'session_id' => 99,
             'expires_at' => '2026-04-20 13:00:00',
         ]);
-        $this->assertSame(['held_by_other' => false], $this->service->checkStatus(42, 7));
+        $this->assertSame(['held_by_other' => false], $this->service->checkStatus(42, 7, 99));
+    }
+
+    /** @test */
+    public function check_status_gleicher_user_andere_session_meldet_fremd(): void
+    {
+        // Option A: zweite Session desselben Users kollidiert mit der ersten.
+        $this->lockRepo->method('findActive')->willReturn([
+            'id'         => 1,
+            'user_id'    => 7,
+            'session_id' => 99,
+            'expires_at' => '2026-04-20 13:00:00',
+        ]);
+        $this->userRepo->method('findById')->with(7)->willReturn(
+            $this->makeUser(7, 'Anna', 'Selbst')
+        );
+
+        $result = $this->service->checkStatus(42, 7, 100);
+
+        $this->assertTrue($result['held_by_other']);
+        $this->assertSame('Anna Selbst', $result['name']);
     }
 
     /** @test */
@@ -174,13 +205,14 @@ class EntryLockServiceTest extends TestCase
         $this->lockRepo->method('findActive')->willReturn([
             'id'         => 1,
             'user_id'    => 99,
+            'session_id' => 200,
             'expires_at' => '2026-04-20 13:00:00',
         ]);
         $this->userRepo->method('findById')->with(99)->willReturn(
             $this->makeUser(99, 'Eva', 'Beispiel')
         );
 
-        $result = $this->service->checkStatus(42, 7);
+        $result = $this->service->checkStatus(42, 7, 99);
 
         $this->assertTrue($result['held_by_other']);
         $this->assertSame('Eva Beispiel', $result['name']);

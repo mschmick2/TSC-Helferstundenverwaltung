@@ -6,6 +6,7 @@ namespace App\Controllers;
 
 use App\Models\User;
 use App\Repositories\DialogReadStatusRepository;
+use App\Repositories\EventRepository;
 use App\Repositories\WorkEntryRepository;
 use App\Services\TargetHoursService;
 use Psr\Http\Message\ResponseInterface as Response;
@@ -20,6 +21,7 @@ class DashboardController extends BaseController
         private TargetHoursService $targetHoursService,
         private DialogReadStatusRepository $dialogReadStatusRepo,
         private WorkEntryRepository $workEntryRepo,
+        private EventRepository $eventRepo,
         private array $settings
     ) {
     }
@@ -48,20 +50,28 @@ class DashboardController extends BaseController
         /** @var User $user */
         $user = $request->getAttribute('user');
 
+        $currentYear = (int) date('Y');
+        $canRecordHours = $user->hasRole('mitglied') || $user->hasRole('erfasser') || $user->isAdmin();
+
         $data = [
             'user' => $user,
             'title' => 'Dashboard',
             'settings' => $this->settings,
             'targetHoursEnabled' => $this->targetHoursService->isEnabled(),
             'targetComparison' => null,
+            'approvedHoursThisYear' => $canRecordHours
+                ? $this->targetHoursService->getApprovedHours($user->getId(), $currentYear)
+                : null,
+            'currentYear' => $currentYear,
             'unreadDialogs' => $this->dialogReadStatusRepo->findUnreadDialogsForUser($user->getId(), $user->canReview()),
             'pendingReviewCount' => $user->canReview() ? $this->workEntryRepo->countForReview($user->getId()) : 0,
+            'publishedEventCount' => $this->eventRepo->countPublishedUpcoming(),
         ];
 
         if ($data['targetHoursEnabled']) {
             $data['targetComparison'] = $this->targetHoursService->getUserComparison(
                 $user->getId(),
-                (int) date('Y')
+                $currentYear
             );
         }
 

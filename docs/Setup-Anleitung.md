@@ -475,6 +475,21 @@ net use Y: \\NAS-NAME\software_mondial /persistent:yes
 - Führen Sie das SQL-Script erneut aus
 - Prüfen Sie auf Fehlermeldungen in phpMyAdmin
 
+**Problem:** Down-Migration `009_event_task_tree.down.sql` bricht mit
+`SQLSTATE 45000` ab, ohne dass im phpMyAdmin-Status-Bereich der Klartext
+zu sehen ist (möglicher phpMyAdmin-Versions-Quirk: ältere Versionen
+verschlucken `MESSAGE_TEXT` von `SIGNAL`-Anweisungen)
+
+- Der Abbruch ist gewollt: er bedeutet, dass die Datenbank noch
+  Aufgabenbaum-Strukturen enthält (`event_tasks` oder
+  `event_template_tasks` mit `parent_task_id IS NOT NULL` oder
+  `is_group = 1`).
+- Die Bereinigungs-DELETEs stehen als SQL-Kommentar im Skript-Header
+  von `009_event_task_tree.down.sql` direkt oberhalb der
+  Sicherheits-Procedure. Skript öffnen, dort nachlesen.
+- Nach manueller Bereinigung der Tree-Strukturen kann die Down-Migration
+  erneut ausgeführt werden.
+
 ### .htaccess wird ignoriert
 
 **Problem:** Verzeichnisse sind trotzdem erreichbar

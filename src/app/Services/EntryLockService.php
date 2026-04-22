@@ -88,16 +88,25 @@ final class EntryLockService
     }
 
     /**
-     * Eigenen Lock loeschen. Rueckgabe: true, wenn eine Zeile entfernt wurde.
+     * Eigenen Lock loeschen (Option A: Session+User-Match).
+     *
+     * Nur wenn gleiche Session UND gleicher User wird der Lock entfernt —
+     * verhindert, dass eine parallele Session desselben Users den eigenen
+     * Lock der anderen Session loescht.
+     *
+     * Rueckgabe: true, wenn eine Zeile entfernt wurde.
      */
-    public function release(int $entryId, int $userId): bool
+    public function release(int $entryId, int $userId, ?int $sessionId): bool
     {
-        return $this->lockRepo->releaseByUser($entryId, $userId) > 0;
+        return $this->lockRepo->releaseBySession($entryId, $userId, $sessionId) > 0;
     }
 
     /**
      * Reiner Status-Check ohne Lock-Uebernahme. Fuer Read-Only-Clients,
      * die periodisch pruefen, ob der Lock frei geworden ist.
+     *
+     * Option A: "Eigener Lock" = gleiche Session UND gleicher User. Zwei
+     * Sessions desselben Users werden als Konflikt gewertet.
      *
      * Rueckgabe:
      *   ['held_by_other' => true,  'name' => '…', 'expires_at' => '…']
@@ -105,7 +114,7 @@ final class EntryLockService
      *
      * @return array<string, mixed>
      */
-    public function checkStatus(int $entryId, int $userId): array
+    public function checkStatus(int $entryId, int $userId, ?int $sessionId): array
     {
         $active = $this->lockRepo->findActive($entryId);
 
@@ -114,7 +123,9 @@ final class EntryLockService
         }
 
         $holderId = (int) $active['user_id'];
-        if ($holderId === $userId) {
+        $holderSession = $active['session_id'] === null ? null : (int) $active['session_id'];
+
+        if ($holderId === $userId && $holderSession === $sessionId) {
             return ['held_by_other' => false];
         }
 

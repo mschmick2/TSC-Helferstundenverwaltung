@@ -240,30 +240,6 @@ class CategoryController extends BaseController
     }
 
     /**
-     * Sortierung aktualisieren (POST /admin/categories/reorder) - AJAX
-     */
-    public function reorder(Request $request, Response $response): Response
-    {
-        $data = $request->getParsedBody();
-        $orders = $data['orders'] ?? [];
-
-        if (!is_array($orders)) {
-            return $this->json($response, ['error' => 'Ungültige Daten'], 400);
-        }
-
-        foreach ($orders as $item) {
-            if (isset($item['id'], $item['sort_order'])) {
-                $this->categoryRepo->updateSortOrder(
-                    (int) $item['id'],
-                    (int) $item['sort_order']
-                );
-            }
-        }
-
-        return $this->json($response, ['success' => true]);
-    }
-
-    /**
      * Hex-Farbcode normalisieren/validieren. Fallback: Bootstrap Primary.
      */
     private function normalizeColor(?string $value): string

@@ -24,11 +24,15 @@ class EntryLockRepository
     /**
      * Versucht, einen Lock auf (entryId) zu setzen oder zu verlaengern.
      *
+     * Pro-Session-Semantik (T-E23, Option A): "Eigener Lock" = gleiche Session
+     * UND gleicher User. Zwei getrennte Sessions desselben Users kollidieren,
+     * damit Cross-Browser-Edit erkannt wird.
+     *
      * Verhalten:
-     *   - Kein Eintrag vorhanden          → INSERT, Lock dem User zugeordnet.
-     *   - Eigener Lock vorhanden          → expires_at wird verlaengert.
-     *   - Fremder Lock, aber abgelaufen   → wird an den neuen User uebertragen.
-     *   - Fremder Lock, noch aktiv        → null.
+     *   - Kein Eintrag vorhanden                      → INSERT.
+     *   - Eigener Lock (gleiche Session, gleicher User) → expires_at verlaengert.
+     *   - Fremder Lock, aber abgelaufen               → wird uebertragen.
+     *   - Fremder Lock, noch aktiv                    → null.
      *
      * Rueckgabe: array mit der Lock-Zeile bei Erfolg, null bei Konflikt.
      *
@@ -36,13 +40,16 @@ class EntryLockRepository
      */
     public function acquireOrRefresh(int $entryId, int $userId, ?int $sessionId, int $ttlMinutes): ?array
     {
+        // <=> ist MySQLs NULL-safe equal: NULL<=>NULL == 1, NULL<=>5 == 0.
+        // Gleichheit beider Felder markiert den eigenen aktiven Lock; nur
+        // dann (oder bei abgelaufenem Lock) wird refreshed/uebernommen.
         $sql = "INSERT INTO entry_locks (work_entry_id, user_id, session_id, locked_at, expires_at)
                 VALUES (:entry_id, :user_id, :session_id, NOW(), DATE_ADD(NOW(), INTERVAL :ttl MINUTE))
                 ON DUPLICATE KEY UPDATE
-                    user_id = IF(user_id = VALUES(user_id) OR expires_at <= NOW(), VALUES(user_id), user_id),
-                    session_id = IF(user_id = VALUES(user_id), VALUES(session_id), session_id),
-                    locked_at = IF(user_id = VALUES(user_id) OR expires_at <= NOW(), NOW(), locked_at),
-                    expires_at = IF(user_id = VALUES(user_id) OR expires_at <= NOW(), VALUES(expires_at), expires_at)";
+                    user_id    = IF((session_id <=> VALUES(session_id) AND user_id = VALUES(user_id)) OR expires_at <= NOW(), VALUES(user_id), user_id),
+                    session_id = IF((session_id <=> VALUES(session_id) AND user_id = VALUES(user_id)) OR expires_at <= NOW(), VALUES(session_id), session_id),
+                    locked_at  = IF((session_id <=> VALUES(session_id) AND user_id = VALUES(user_id)) OR expires_at <= NOW(), NOW(), locked_at),
+                    expires_at = IF((session_id <=> VALUES(session_id) AND user_id = VALUES(user_id)) OR expires_at <= NOW(), VALUES(expires_at), expires_at)";
 
         $stmt = $this->pdo->prepare($sql);
         $stmt->execute([
@@ -58,19 +65,38 @@ class EntryLockRepository
             return null;
         }
 
-        return ((int) $current['user_id'] === $userId) ? $current : null;
+        $currentSession = $current['session_id'] === null ? null : (int) $current['session_id'];
+        $sessionMatches = $currentSession === $sessionId;
+        $userMatches = (int) $current['user_id'] === $userId;
+
+        return ($sessionMatches && $userMatches) ? $current : null;
     }
 
     /**
-     * Loescht den eigenen Lock. Gibt die Anzahl betroffener Zeilen zurueck
-     * (0, wenn kein eigener Lock mehr existierte, 1 bei Erfolg).
+     * Loescht den eigenen Lock (gleiche Session UND User). Gibt die Anzahl
+     * betroffener Zeilen zurueck (0, wenn kein eigener Lock mehr existierte).
+     *
+     * NULL-Session (Tests/Legacy) matcht ueber IS NULL.
      */
-    public function releaseByUser(int $entryId, int $userId): int
+    public function releaseBySession(int $entryId, int $userId, ?int $sessionId): int
     {
-        $stmt = $this->pdo->prepare(
-            'DELETE FROM entry_locks WHERE work_entry_id = :entry_id AND user_id = :user_id'
-        );
-        $stmt->execute(['entry_id' => $entryId, 'user_id' => $userId]);
+        if ($sessionId === null) {
+            $stmt = $this->pdo->prepare(
+                'DELETE FROM entry_locks
+                 WHERE work_entry_id = :entry_id AND user_id = :user_id AND session_id IS NULL'
+            );
+            $stmt->execute(['entry_id' => $entryId, 'user_id' => $userId]);
+        } else {
+            $stmt = $this->pdo->prepare(
+                'DELETE FROM entry_locks
+                 WHERE work_entry_id = :entry_id AND user_id = :user_id AND session_id = :session_id'
+            );
+            $stmt->execute([
+                'entry_id'   => $entryId,
+                'user_id'    => $userId,
+                'session_id' => $sessionId,
+            ]);
+        }
 
         return $stmt->rowCount();
     }

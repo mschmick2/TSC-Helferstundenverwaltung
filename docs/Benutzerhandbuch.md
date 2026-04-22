@@ -1,7 +1,8 @@
 # VAES Benutzerhandbuch
 
 **Vereins-Arbeitsstunden-Erfassungssystem (VAES)**
-Version 1.3
+Version 1.4.0
+Stand: April 2026
 
 ---
 
@@ -13,6 +14,7 @@ Version 1.3
    - 2.2 [Zwei-Faktor-Authentifizierung (2FA) einrichten](#22-zwei-faktor-authentifizierung-2fa-einrichten)
    - 2.3 [Anmelden](#23-anmelden)
    - 2.4 [Passwort vergessen](#24-passwort-vergessen)
+   - 2.5 [Profil und Passwort aendern](#25-profil-und-passwort-aendern)
 3. [Dashboard](#3-dashboard)
    - 3.1 [Schnellaktionen](#31-schnellaktionen)
    - 3.2 [Ungelesene Nachrichten](#32-ungelesene-nachrichten)
@@ -44,33 +46,44 @@ Version 1.3
    - 8.2 [Nachricht senden](#82-nachricht-senden)
    - 8.3 [Rueckfragen und Antworten](#83-rueckfragen-und-antworten)
    - 8.4 [Benachrichtigungen](#84-benachrichtigungen)
-9. [Reports und Exporte](#9-reports-und-exporte)
-   - 9.1 [Report-Seite](#91-report-seite)
-   - 9.2 [Filter verwenden](#92-filter-verwenden)
-   - 9.3 [Zusammenfassung](#93-zusammenfassung)
-   - 9.4 [PDF-Export](#94-pdf-export)
-   - 9.5 [CSV-Export](#95-csv-export)
-10. [Pruefer-Funktionen](#10-pruefer-funktionen)
-    - 10.1 [Pruefliste](#101-pruefliste)
-    - 10.2 [Eintrag freigeben](#102-eintrag-freigeben)
-    - 10.3 [Rueckfrage stellen](#103-rueckfrage-stellen)
-    - 10.4 [Eintrag ablehnen](#104-eintrag-ablehnen)
-    - 10.5 [Stunden korrigieren](#105-stunden-korrigieren)
-    - 10.6 [Wichtige Regel: Keine Selbstgenehmigung](#106-wichtige-regel-keine-selbstgenehmigung)
-11. [Administration](#11-administration)
-    - 11.1 [Mitgliederverwaltung](#111-mitgliederverwaltung)
-    - 11.2 [Kategorien verwalten](#112-kategorien-verwalten)
-    - 11.3 [Soll-Stunden verwalten](#113-soll-stunden-verwalten)
-    - 11.4 [Systemeinstellungen](#114-systemeinstellungen)
-    - 11.5 [Audit-Trail](#115-audit-trail)
-12. [Rollen und Berechtigungen](#12-rollen-und-berechtigungen)
-    - 12.1 [Mitglied](#121-mitglied)
-    - 12.2 [Erfasser](#122-erfasser)
-    - 12.3 [Pruefer](#123-pruefer)
-    - 12.4 [Auditor](#124-auditor)
-    - 12.5 [Administrator](#125-administrator)
-    - 12.6 [Berechtigungsmatrix](#126-berechtigungsmatrix)
-13. [Haeufige Fragen (FAQ)](#13-haeufige-fragen-faq)
+9. [Events und Veranstaltungen](#9-events-und-veranstaltungen)
+   - 9.1 [Eventliste](#91-eventliste)
+   - 9.2 [Kalenderansicht](#92-kalenderansicht)
+   - 9.3 [Event-Details und Aufgaben uebernehmen](#93-event-details-und-aufgaben-uebernehmen)
+   - 9.4 [Meine Events](#94-meine-events)
+   - 9.5 [Automatische Arbeitsstunden aus Events](#95-automatische-arbeitsstunden-aus-events)
+   - 9.6 [iCal-Abonnement (Kalender-Integration)](#96-ical-abonnement-kalender-integration)
+10. [Reports und Exporte](#10-reports-und-exporte)
+    - 10.1 [Report-Seite](#101-report-seite)
+    - 10.2 [Filter verwenden](#102-filter-verwenden)
+    - 10.3 [Zusammenfassung](#103-zusammenfassung)
+    - 10.4 [PDF-Export](#104-pdf-export)
+    - 10.5 [CSV-Export](#105-csv-export)
+11. [Pruefer-Funktionen](#11-pruefer-funktionen)
+    - 11.1 [Pruefliste](#111-pruefliste)
+    - 11.2 [Eintrag freigeben](#112-eintrag-freigeben)
+    - 11.3 [Rueckfrage stellen](#113-rueckfrage-stellen)
+    - 11.4 [Eintrag ablehnen](#114-eintrag-ablehnen)
+    - 11.5 [Stunden korrigieren](#115-stunden-korrigieren)
+    - 11.6 [Wichtige Regel: Keine Selbstgenehmigung](#116-wichtige-regel-keine-selbstgenehmigung)
+12. [Administration](#12-administration)
+    - 12.1 [Mitgliederverwaltung](#121-mitgliederverwaltung)
+    - 12.2 [Kategorien verwalten](#122-kategorien-verwalten)
+    - 12.3 [Soll-Stunden verwalten](#123-soll-stunden-verwalten)
+    - 12.4 [Event-Verwaltung](#124-event-verwaltung)
+    - 12.5 [Event-Vorlagen](#125-event-vorlagen)
+    - 12.6 [Systemeinstellungen](#126-systemeinstellungen)
+    - 12.7 [Audit-Trail](#127-audit-trail)
+13. [Mehrfach-Browser-Nutzung (Multitab-Schutz)](#13-mehrfach-browser-nutzung-multitab-schutz)
+14. [Rollen und Berechtigungen](#14-rollen-und-berechtigungen)
+    - 14.1 [Mitglied](#141-mitglied)
+    - 14.2 [Erfasser](#142-erfasser)
+    - 14.3 [Pruefer](#143-pruefer)
+    - 14.4 [Auditor](#144-auditor)
+    - 14.5 [Event-Admin](#145-event-admin)
+    - 14.6 [Administrator](#146-administrator)
+    - 14.7 [Berechtigungsmatrix](#147-berechtigungsmatrix)
+15. [Haeufige Fragen (FAQ)](#15-haeufige-fragen-faq)
 
 ---
 
@@ -83,15 +96,26 @@ VAES (Vereins-Arbeitsstunden-Erfassungssystem) ist eine webbasierte Anwendung zu
 - Erfassung von Arbeitsstunden mit Datum, Uhrzeit, Kategorie und Beschreibung
 - Mehrstufiger Freigabe-Workflow mit Pruefung durch berechtigte Personen
 - Dialog-System fuer Rueckfragen zwischen Mitglied und Pruefer
+- Event-Verwaltung mit Aufgabenzuweisung und automatischer Stundenerfassung
+- Kalender-Abonnement (iCal) fuer eigene Event-Einsaetze
 - Reports mit PDF- und CSV-Export
 - Vollstaendiger Audit-Trail aller Aenderungen
 - Soll-Stunden-Tracking mit Fortschrittsanzeige
-- Rollenbasierte Zugriffskontrolle mit fuenf Benutzerrollen
+- Rollenbasierte Zugriffskontrolle mit sechs Benutzerrollen
 - Zwei-Faktor-Authentifizierung fuer erhoehte Sicherheit
+- Schutz vor ungewolltem Ueberschreiben bei gleichzeitiger Bearbeitung (Multitab-Schutz)
 
 Die Anwendung ist fuer moderne Webbrowser optimiert und kann auf Desktop-Computern, Tablets und Smartphones genutzt werden.
 
 **Unterstuetzte Browser:** Firefox, Chrome, Edge, Safari (jeweils aktuelle Version).
+
+**Neu in Version 1.4:**
+- Events & Veranstaltungen mit Aufgabenbuchung
+- Event-Vorlagen fuer wiederkehrende Formate
+- iCal-Abonnement fuer den privaten Kalender
+- Explizite Absicherung gegen parallele Bearbeitung in mehreren Browser-Tabs
+- Verbesserte Security-Header (CSP, HSTS, Permissions-Policy)
+- Rate-Limiting fuer Passwort-Reset
 
 ---
 
@@ -171,31 +195,6 @@ Nachdem Sie sich zum ersten Mal angemeldet haben, erscheint die Seite **"2FA ein
 **Schritt 1: QR-Code anzeigen lassen**
 
 Auf der Einrichtungsseite sehen Sie einen schwarzweissen QR-Code (ein quadratisches Muster aus Punkten). Dieser QR-Code enthaelt die Verbindungsinformationen fuer Ihre Authenticator-App.
-
-```
-  ┌─────────────────────────────────────────────┐
-  │          2FA einrichten                      │
-  │                                              │
-  │  [Authenticator-App]  [E-Mail-Code]          │
-  │                                              │
-  │       ┌──────────────────┐                   │
-  │       │  ██ ██ ██ ██ ██  │                   │
-  │       │  ██    ██    ██  │                   │
-  │       │  ██ ██ ██ ██ ██  │  <-- QR-Code      │
-  │       │     ██    ██     │                   │
-  │       │  ██ ██ ██ ██ ██  │                   │
-  │       └──────────────────┘                   │
-  │                                              │
-  │  > Code manuell eingeben                     │
-  │                                              │
-  │  Bestaetigungscode eingeben:                 │
-  │  ┌──────────────────────┐                    │
-  │  │       000000         │                    │
-  │  └──────────────────────┘                    │
-  │                                              │
-  │  [Authenticator-App aktivieren]              │
-  └─────────────────────────────────────────────┘
-```
 
 **Schritt 2: QR-Code mit der App scannen**
 
@@ -296,6 +295,8 @@ Wenn Sie kein Smartphone besitzen oder keine Authenticator-App verwenden moechte
 
 ### 2.3 Anmelden
 
+![Anmeldeseite](images/handbuch/01-login.png)
+
 Nach der Ersteinrichtung melden Sie sich kuenftig wie folgt an:
 
 1. Oeffnen Sie die VAES-Anwendung in Ihrem Browser.
@@ -316,29 +317,11 @@ Nach der Ersteinrichtung melden Sie sich kuenftig wie folgt an:
 - Klicken Sie auf **"Verifizieren"**.
 - Der E-Mail-Code ist 10 Minuten gueltig.
 
-```
-  ┌─────────────────────────────────────────────┐
-  │     Zwei-Faktor-Authentifizierung            │
-  │                                              │
-  │     [Smartphone-Symbol]                      │
-  │                                              │
-  │     Geben Sie den Code aus Ihrer             │
-  │     Authenticator-App ein.                   │
-  │                                              │
-  │     Verifizierungscode:                      │
-  │     ┌──────────────────────┐                 │
-  │     │       _ _ _ _ _ _    │                 │
-  │     └──────────────────────┘                 │
-  │                                              │
-  │     [       Verifizieren       ]             │
-  │                                              │
-  │     Zurueck zur Anmeldung                    │
-  └─────────────────────────────────────────────┘
-```
-
 **Hinweis zur Kontosperre:** Nach 5 fehlgeschlagenen Anmeldeversuchen wird Ihr Konto voruebergehend fuer 15 Minuten gesperrt. Bei 5 falschen 2FA-Codes muessen Sie den Login-Vorgang komplett neu starten. Diese Werte koennen vom Administrator angepasst werden.
 
 ### 2.4 Passwort vergessen
+
+![Passwort-Vergessen-Seite](images/handbuch/02-forgot-password.png)
 
 1. Klicken Sie auf der Anmeldeseite auf **"Passwort vergessen?"**
 2. Geben Sie Ihre registrierte E-Mail-Adresse ein.
@@ -348,38 +331,27 @@ Nach der Ersteinrichtung melden Sie sich kuenftig wie folgt an:
 
 **Wichtig:** Nach einer Passwortaenderung werden alle aktiven Sitzungen beendet. Sie muessen sich erneut anmelden. Ihre 2FA-Einrichtung bleibt bestehen -- Sie benoetigen weiterhin Ihren 2FA-Code bei der Anmeldung.
 
+**Schutz vor Missbrauch:** Der Passwort-Vergessen-Endpunkt ist durch ein Zwei-Bucket-Rate-Limiting abgesichert. Pro IP-Adresse und pro Ziel-E-Mail-Adresse ist nur eine begrenzte Anzahl Reset-Anfragen pro Zeitfenster moeglich. Die Meldung auf der Webseite ist fuer legitime und missbraeuchliche Anfragen identisch ("Falls die Adresse bekannt ist, wurde eine E-Mail versendet.") -- damit laesst sich ueber diesen Endpunkt nicht herausfinden, welche E-Mail-Adressen im System registriert sind.
+
+### 2.5 Profil und Passwort aendern
+
+Die eigenen Stammdaten (Vorname, Nachname, Adresse, Telefon) werden von der **Mitgliederverwaltung** (Administrator) gepflegt. Moechten Sie Aenderungen anstossen, wenden Sie sich bitte an Ihren Administrator.
+
+**Eigenes Passwort aendern:**
+
+1. Melden Sie sich ab (Benutzermenue rechts oben > **Abmelden**).
+2. Auf der Login-Seite auf **"Passwort vergessen?"** klicken.
+3. Passwort-Reset-Link per E-Mail anfordern (siehe Abschnitt 2.4).
+
+**2FA-Methode aendern / zuruecksetzen:** Dies erfolgt ebenfalls ueber den Administrator. Dieser kann Ihre 2FA-Konfiguration loeschen, sodass Sie sie bei der naechsten Anmeldung neu einrichten koennen.
+
 ---
 
 ## 3. Dashboard
 
-Das Dashboard ist Ihre Startseite nach der Anmeldung. Es bietet einen schnellen Ueberblick und Zugang zu den wichtigsten Funktionen.
+![Dashboard Mitglied](images/handbuch/10-dashboard-mitglied.png)
 
-```
-  ┌─────────────────────────────────────────────────────────────┐
-  │  VAES   Dashboard   Arbeitsstunden   Reports    [Name ▼]   │
-  ├─────────────────────────────────────────────────────────────┤
-  │  Dashboard > ...                                            │
-  │                                                             │
-  │  Dashboard                                                  │
-  │  Willkommen, Max Mustermann!                                │
-  │                                                             │
-  │  ┌──────────────┐ ┌──────────────┐ ┌──────────────┐        │
-  │  │  [+]         │ │  [Liste]     │ │ [Pruefung]   │        │
-  │  │  Stunden     │ │  Meine       │ │ Antraege     │        │
-  │  │  erfassen    │ │  Eintraege   │ │ pruefen  [3] │        │
-  │  │              │ │              │ │ 3 Antraege   │        │
-  │  │ [Neuer       │ │ [Anzeigen]   │ │ warten auf   │        │
-  │  │  Eintrag]    │ │              │ │ Pruefung.    │        │
-  │  └──────────────┘ └──────────────┘ │ [Pruefliste] │        │
-  │                                    └──────────────┘        │
-  │                                                             │
-  │  Soll-Stunden 2026                                          │
-  │  [===========----------] 55,0%                              │
-  │  11,0 / 20,0 Std.           Noch 9,0 Std.                  │
-  │                                                             │
-  │  Ihre Rollen: [Mitglied] [Pruefer]                          │
-  └─────────────────────────────────────────────────────────────┘
-```
+Das Dashboard ist Ihre Startseite nach der Anmeldung. Es bietet einen schnellen Ueberblick und Zugang zu den wichtigsten Funktionen.
 
 ### 3.1 Schnellaktionen
 
@@ -389,6 +361,7 @@ Je nach Ihrer Rolle sehen Sie verschiedene Aktionskarten:
 |-------|---------------|--------------|
 | **Stunden erfassen** | Mitglied, Erfasser, Admin | Direkt-Link zum Erstellen eines neuen Eintrags |
 | **Meine Eintraege** | Alle | Uebersicht Ihrer eigenen Arbeitsstunden |
+| **Events** | Alle | Zugang zur Eventliste und zum Kalender |
 | **Antraege pruefen** | Pruefer, Admin | Zugang zur Pruefliste mit Anzahl offener Antraege |
 | **Mitglieder** | Admin | Zugang zur Mitgliederverwaltung |
 
@@ -398,7 +371,7 @@ Die Karte **"Antraege pruefen"** zeigt die aktuelle Anzahl offener Antraege als 
 
 Wenn neue Dialog-Nachrichten zu Ihren Eintraegen vorliegen, erscheint ein gelb hinterlegter Bereich mit der Aufschrift **Neue Dialog-Nachrichten**. Jede Nachricht zeigt:
 
-- Die Eintragsnummer (z.B. 2025-00012)
+- Die Eintragsnummer (z.B. 2026-00012)
 - Den Namen des Eintragseigentuemers
 - Den aktuellen Status des Eintrags
 - Die Anzahl neuer Nachrichten
@@ -418,7 +391,7 @@ Wenn die Soll-Stunden-Funktion vom Administrator aktiviert wurde, zeigt das Dash
 - Unterhalb 50% ist der Balken rot, ab 50% gelb, bei Erfuellung gruen.
 - Befreite Mitglieder sehen den Hinweis: **Sie sind von den Soll-Stunden befreit.**
 
-**Hinweis:** Nur Eintraege im Status **Freigegeben** werden als Ist-Stunden gezaehlt.
+**Hinweis:** Nur Eintraege im Status **Freigegeben** werden als Ist-Stunden gezaehlt. Auch automatisch erzeugte Eintraege aus Event-Einsaetzen fliessen nach Freigabe ein (siehe Abschnitt 9.5).
 
 ### 3.4 Rollenuebersicht
 
@@ -428,6 +401,7 @@ Am unteren Rand des Dashboards sehen Sie Ihre zugewiesenen Rollen als farbige Ba
 - **Erfasser** (hellblau)
 - **Pruefer** (gelb)
 - **Auditor** (grau)
+- **Event-Admin** (violett)
 - **Administrator** (rot)
 
 ---
@@ -440,6 +414,8 @@ Die Navigationsleiste am oberen Bildschirmrand zeigt je nach Rolle unterschiedli
 
 **Fuer alle Benutzer:**
 - **Dashboard** - Startseite
+- **Events** - Event-Uebersicht und Kalender
+- **Meine Events** - Eigene Event-Einsaetze
 - **Reports** - Auswertungen und Exporte
 
 **Fuer Mitglieder / Erfasser / Admin:**
@@ -450,6 +426,10 @@ Die Navigationsleiste am oberen Bildschirmrand zeigt je nach Rolle unterschiedli
 
 **Fuer Auditoren (ohne Admin-Rolle):**
 - **Audit-Trail** - Aenderungsprotokoll einsehen
+
+**Fuer Event-Admins / Administratoren (Dropdown-Menue "Verwaltung"):**
+- **Events verwalten** - Veranstaltungen anlegen und pflegen
+- **Event-Vorlagen** - Wiederkehrende Veranstaltungen als Vorlage definieren
 
 **Fuer Administratoren (Dropdown-Menue "Verwaltung"):**
 - **Mitglieder** - Benutzerverwaltung
@@ -466,7 +446,7 @@ Die Navigationsleiste am oberen Bildschirmrand zeigt je nach Rolle unterschiedli
 
 Unterhalb der Hauptnavigation zeigt eine Breadcrumb-Leiste Ihren aktuellen Standort in der Seitenhierarchie. Beispiel:
 
-> Dashboard > Arbeitsstunden > Eintrag 2025-00012
+> Dashboard > Arbeitsstunden > Eintrag 2026-00012
 
 Klicken Sie auf eine uebergeordnete Ebene, um direkt dorthin zu navigieren. Auf dem Dashboard werden keine Breadcrumbs angezeigt, da es die oberste Ebene ist.
 
@@ -482,6 +462,8 @@ Die Glocke wird alle 60 Sekunden automatisch aktualisiert, ohne dass Sie die Sei
 
 ### 5.1 Neuen Eintrag erstellen
 
+![Neuer Eintrag](images/handbuch/12-antrag-neu.png)
+
 1. Klicken Sie in der Navigation auf **Arbeitsstunden**.
 2. Klicken Sie auf den Button **Neuer Eintrag** oder nutzen Sie die Schnellaktion auf dem Dashboard.
 
@@ -489,38 +471,13 @@ Das Erfassungsformular zeigt folgende Felder (je nach Systemkonfiguration koenne
 
 | Feld | Beschreibung | Beispiel |
 |------|--------------|---------|
-| **Datum** | Tag der Arbeit | 15.03.2025 |
+| **Datum** | Tag der Arbeit | 15.03.2026 |
 | **Uhrzeit von** | Beginn der Arbeit (optional) | 09:00 |
 | **Uhrzeit bis** | Ende der Arbeit (optional) | 12:30 |
 | **Stunden** | Geleistete Arbeitsstunden (Dezimal) | 3,5 |
 | **Kategorie** | Art der Arbeit (Dropdown) | Vereinsheim, Sportplatz, ... |
 | **Projekt / Taetigkeit** | Kurze Bezeichnung (optional) | Renovierung Umkleide |
 | **Beschreibung** | Detaillierte Beschreibung (optional) | Waende gestrichen, Boden verlegt |
-
-```
-  ┌─────────────────────────────────────────────────────────────┐
-  │  Neue Arbeitsstunden erfassen                  [Zurueck]    │
-  │                                                             │
-  │  Datum *            Uhrzeit von        Uhrzeit bis          │
-  │  [15.03.2025    ]   [09:00      ]      [12:30      ]       │
-  │                                                             │
-  │  Stunden *                                                  │
-  │  [3,5           ]                                           │
-  │  Dezimalzahl, z.B. 2,5 fuer zweieinhalb Stunden            │
-  │                                                             │
-  │  Kategorie *                                                │
-  │  [Vereinsheim        ▼]                                     │
-  │                                                             │
-  │  Projekt / Taetigkeit                                       │
-  │  [Renovierung Umkleide                    ]                 │
-  │                                                             │
-  │  Beschreibung                                               │
-  │  [Waende gestrichen und Boden verlegt     ]                 │
-  │  [                                        ]                 │
-  │                                                             │
-  │  [Als Entwurf speichern]    [Speichern & Einreichen]        │
-  └─────────────────────────────────────────────────────────────┘
-```
 
 **Hinweise:**
 - Felder mit rotem Stern (*) sind Pflichtfelder.
@@ -563,11 +520,13 @@ Nur Eintraege im Status **Entwurf** koennen geloescht werden.
 
 ### 6.1 Uebersichtsliste
 
+![Antragsliste](images/handbuch/11-antragsliste.png)
+
 Unter **Arbeitsstunden** sehen Sie eine Tabelle mit allen Ihren Eintraegen:
 
 | Spalte | Beschreibung |
 |--------|--------------|
-| **Nr.** | Eindeutige Eintragsnummer (z.B. 2025-00012) |
+| **Nr.** | Eindeutige Eintragsnummer (z.B. 2026-00012) |
 | **Datum** | Arbeitsdatum |
 | **Kategorie** | Zugeordnete Arbeitskategorie |
 | **Stunden** | Geleistete Stunden (mit Stift-Symbol falls korrigiert) |
@@ -600,6 +559,24 @@ Klicken Sie auf eine Eintragsnummer, um die Detailansicht zu oeffnen. Diese zeig
 
 **Rechte Spalte:**
 - Dialog-Bereich mit allen Nachrichten (siehe Abschnitt 8)
+
+**Detailansicht im Status Entwurf:**
+
+![Antragsdetail im Status Entwurf](images/handbuch/13-antrag-detail-entwurf.png)
+
+Im Entwurfsstatus koennen Sie den Eintrag bearbeiten, loeschen oder einreichen. Der Dialog-Bereich ist noch leer.
+
+**Detailansicht im Status Eingereicht:**
+
+![Antragsdetail im Status Eingereicht](images/handbuch/14-antrag-detail-eingereicht.png)
+
+Nach dem Einreichen ist der Eintrag fuer Sie nicht mehr bearbeitbar. Sie koennen ihn zurueckziehen, stornieren oder Nachrichten an den Pruefer senden.
+
+**Detailansicht im Status Freigegeben:**
+
+![Antragsdetail im Status Freigegeben](images/handbuch/16-antrag-detail-freigegeben.png)
+
+Im Endstatus "Freigegeben" wird der Eintrag in der Soll-Stunden-Summe gezaehlt. Der Dialog-Verlauf bleibt lesbar, neue Nachrichten sind jedoch nicht mehr moeglich.
 
 ---
 
@@ -727,6 +704,8 @@ Die Gegenseite (Pruefer oder Mitglied) erhaelt eine E-Mail-Benachrichtigung uebe
 
 ### 8.3 Rueckfragen und Antworten
 
+![Antragsdetail mit Rueckfrage-Dialog](images/handbuch/15-antrag-detail-in-klaerung-dialog.png)
+
 Wenn ein Pruefer eine Rueckfrage stellt, aendert sich der Status des Eintrags auf **In Klaerung**. Die Rueckfrage erscheint im Dialog-Bereich mit gelbem Hintergrund.
 
 **Als Mitglied antworten:**
@@ -749,13 +728,135 @@ Sobald Sie einen Eintrag oeffnen, werden dessen Nachrichten als gelesen markiert
 
 ---
 
-## 9. Reports und Exporte
+## 9. Events und Veranstaltungen
 
-### 9.1 Report-Seite
+Mit dem Event-Modul koennen Helfer-Einsaetze fuer Veranstaltungen zentral geplant und uebernommen werden. Organisatoren legen Events mit einzelnen Aufgaben an; Mitglieder sehen offene Aufgaben und koennen sich selbst eintragen. Nach Abschluss des Events werden die geleisteten Stunden automatisch als Arbeitsstunden-Eintrag erzeugt.
+
+### 9.1 Eventliste
+
+![Eventliste fuer Mitglieder](images/handbuch/20-events-liste-mitglied.png)
+
+Erreichbar ueber **Events** in der Navigation. Die Liste zeigt anstehende und vergangene Veranstaltungen mit:
+
+- Titel und Datum
+- Ort (falls hinterlegt)
+- Kurzbeschreibung
+- Status-Badge (Geplant, Laufend, Abgeschlossen, Abgesagt)
+- Anzahl offener / besetzter Aufgaben
+
+**Filter:**
+- Zeitraum (Von / Bis)
+- Status (Nur zukuenftige / Alle)
+- Textsuche (Titel, Ort)
+
+Klicken Sie auf einen Event-Titel, um die Detailansicht zu oeffnen.
+
+### 9.2 Kalenderansicht
+
+![Event-Kalender](images/handbuch/22-events-kalender.png)
+
+Ueber den Button **Kalender** (oder direkt den Navigationspunkt) erreichen Sie eine Monatsuebersicht aller Events. Jedes Event erscheint als farbig markierter Eintrag am betreffenden Tag. Ein Klick auf den Eintrag oeffnet die Detailansicht des Events.
+
+Der Kalender laesst sich monatsweise vor- und zurueckblaettern. Heutige Events sind farblich hervorgehoben.
+
+### 9.3 Event-Details und Aufgaben uebernehmen
+
+![Event-Detail Mitglied-Ansicht](images/handbuch/21-event-detail-mitglied.png)
+
+Die Detailansicht eines Events zeigt:
+
+**Linke Spalte:**
+- Titel, Datum, Start-/Endzeit, Ort
+- Vollstaendige Beschreibung
+- Status des Events
+
+**Rechte Spalte (Aufgabenliste):**
+- Alle Aufgaben mit Name, benoetigten Helfern und Stunden pro Helfer
+- Bereits belegte Plaetze (mit Namen der Helfer, soweit Sichtbarkeit konfiguriert)
+- Freie Plaetze als Schaltflaeche **Aufgabe uebernehmen**
+
+**Aufgabe uebernehmen:**
+1. Klicken Sie bei einer Aufgabe mit freien Plaetzen auf **Aufgabe uebernehmen**.
+2. Bestaetigen Sie die Sicherheitsabfrage.
+3. Sie erscheinen in der Teilnehmerliste der Aufgabe. Unter **Meine Events** (siehe 9.4) sehen Sie nun Ihren Einsatz.
+
+**Eigene Zuweisung zuruecknehmen:**
+- Solange das Event nicht abgeschlossen ist, koennen Sie Ihren Platz wieder freigeben (Button **Zuweisung entfernen** in der Aufgabe).
+- Nach Abschluss des Events ist eine Ruecknahme nur durch den Organisator oder Admin moeglich.
+
+**Ersatz-Vorschlag:** Falls Sie kurzfristig verhindert sind, koennen Sie alternativ einen **Ersatz-Vorschlag** abgeben (Button **Ersatz vorschlagen**). Der Organisator erhaelt eine Benachrichtigung und kann die Umwidmung bestaetigen.
+
+### 9.4 Meine Events
+
+![Meine Events](images/handbuch/23-my-events.png)
+
+Unter **Meine Events** sehen Sie ausschliesslich Veranstaltungen, bei denen Sie eine Aufgabe uebernommen haben. Die Liste ist chronologisch sortiert (aelteste offene Aufgabe oben) und zeigt:
+
+- Event-Titel und Datum
+- Ihre zugewiesene Aufgabe
+- Start-/Endzeit Ihrer Aufgabe
+- Status (Geplant, Absolviert, Abgesagt)
+
+**Tipp:** Aus dieser Ansicht koennen Sie direkt in die Event-Details springen oder Ihre Zuweisung zuruecknehmen, solange das Event noch nicht abgeschlossen ist.
+
+### 9.5 Automatische Arbeitsstunden aus Events
+
+Sobald ein Event den Status **Abgeschlossen** erhaelt, erzeugt das System automatisch fuer jede zugewiesene Aufgabe einen Arbeitsstunden-Eintrag:
+
+- **Eigentuemer:** Der zugewiesene Helfer
+- **Datum / Uhrzeit:** Uebernommen aus Event bzw. Aufgabe
+- **Stunden:** Aus der Aufgaben-Definition
+- **Kategorie:** Die vom Organisator gewaehlte Standard-Kategorie
+- **Projekt:** Event-Titel
+- **Beschreibung:** Aufgaben-Bezeichnung (z.B. "Theke & Getraenke")
+- **Status:** Automatisch **Eingereicht** (springt direkt in den Freigabe-Workflow)
+- **Markierung:** Der Eintrag ist als "Event-Herkunft" gekennzeichnet. In der Detailansicht sehen Sie den Verweis auf das Event.
+
+Die Stunden zaehlen nach Freigabe normal auf Ihre Soll-Stunden.
+
+**Korrekturen:** Moechten Sie die automatisch erzeugten Stunden korrigieren (z.B. weil der Einsatz kuerzer war), wenden Sie sich bitte an den Pruefer. Dieser kann die Stunden ueber die Korrektur-Funktion anpassen (siehe Abschnitt 11.5).
+
+### 9.6 iCal-Abonnement (Kalender-Integration)
+
+![iCal-Abonnement einrichten](images/handbuch/24-my-events-ical.png)
+
+Ueber ein iCal-Abonnement koennen Sie Ihre Event-Einsaetze automatisch in Ihrem privaten Kalender (Outlook, Apple Kalender, Google Kalender, Thunderbird) anzeigen lassen. Der Kalender aktualisiert sich automatisch, wenn sich Zuweisungen aendern.
+
+**iCal-Link abrufen:**
+
+1. Oeffnen Sie **Meine Events**.
+2. Klicken Sie auf **Kalender-Abo einrichten**.
+3. Es erscheint eine Abonnement-URL, die einen persoenlichen Zugriffs-Token enthaelt. Kopieren Sie die URL.
+
+**Abonnement einrichten:**
+
+| Programm | Vorgehen |
+|----------|----------|
+| **Apple Kalender (macOS / iOS)** | Datei > Neues Kalenderabonnement > URL einfuegen > Ok |
+| **Outlook (Web)** | Kalender > Kalender hinzufuegen > Aus dem Internet abonnieren > URL einfuegen |
+| **Outlook (Desktop)** | Kalender > Kalender hinzufuegen > Aus dem Internet > URL einfuegen |
+| **Google Kalender** | Weitere Kalender (+ Symbol) > Per URL > URL einfuegen |
+| **Thunderbird** | Kalender > Neu > Im Netzwerk > iCalendar (ICS) > URL einfuegen |
+
+**Sicherheit des Tokens:**
+
+- Der Token in der URL identifiziert Sie gegenueber dem System. Behandeln Sie ihn wie ein Passwort.
+- Geben Sie die URL nicht weiter. Jeder, der die URL kennt, sieht Ihre Einsaetze.
+- Bei Verdacht auf Missbrauch koennen Sie ueber die Schaltflaeche **Token zuruecksetzen** einen neuen Token erzeugen. Alle bestehenden Abonnements werden damit ungueltig und muessen mit der neuen URL erneut angelegt werden.
+
+**Aktualisierungszyklus:** Kalender-Programme rufen das Abo im Schnitt alle 15 Minuten bis 3 Stunden ab (je nach Anbieter). Manuelles Aktualisieren ist meist ebenfalls moeglich.
+
+---
+
+## 10. Reports und Exporte
+
+### 10.1 Report-Seite
+
+![Reports fuer Mitglieder](images/handbuch/25-reports-mitglied.png)
 
 Die Report-Seite erreichen Sie ueber **Reports** in der Navigation. Sie zeigt eine umfassende Auswertung Ihrer Arbeitsstunden (Pruefer und Administratoren sehen alle Mitglieder).
 
-### 9.2 Filter verwenden
+### 10.2 Filter verwenden
 
 Folgende Filter stehen zur Verfuegung:
 
@@ -768,7 +869,7 @@ Folgende Filter stehen zur Verfuegung:
 
 Klicken Sie auf **Filtern**, um die Auswahl anzuwenden.
 
-### 9.3 Zusammenfassung
+### 10.3 Zusammenfassung
 
 Oberhalb der Tabelle zeigt der Report Zusammenfassungskarten:
 
@@ -780,7 +881,13 @@ Zusaetzlich sind aufklappbare Bereiche verfuegbar:
 - **Stunden nach Kategorie** - Aufsummiert pro Arbeitskategorie
 - **Stunden nach Mitglied** - Aufsummiert pro Person (nur fuer Pruefer/Admin)
 
-### 9.4 PDF-Export
+**Admin-/Pruefer-Sicht:**
+
+![Reports fuer Administratoren](images/handbuch/64-admin-reports.png)
+
+In der erweiterten Ansicht (Pruefer, Auditor, Admin) stehen zusaetzlich Mitglieder-bezogene Filter und Aggregationen zur Verfuegung.
+
+### 10.4 PDF-Export
 
 1. Setzen Sie die gewuenschten Filter.
 2. Klicken Sie auf den roten Button **PDF**.
@@ -792,7 +899,7 @@ Die PDF enthaelt:
 - Vollstaendige Tabelle aller gefilterten Eintraege
 - Erstellungsdatum und Benutzername
 
-### 9.5 CSV-Export
+### 10.5 CSV-Export
 
 1. Setzen Sie die gewuenschten Filter.
 2. Klicken Sie auf den gruenen Button **CSV**.
@@ -804,11 +911,13 @@ Die CSV-Datei kann in Tabellenkalkulationsprogrammen (Excel, LibreOffice Calc) g
 
 ---
 
-## 10. Pruefer-Funktionen
+## 11. Pruefer-Funktionen
 
 Dieser Abschnitt beschreibt Funktionen, die nur fuer Benutzer mit der Rolle **Pruefer** oder **Administrator** verfuegbar sind.
 
-### 10.1 Pruefliste
+### 11.1 Pruefliste
+
+![Pruefliste](images/handbuch/30-prueferliste.png)
 
 Unter **Pruefung** in der Navigation sehen Sie alle eingereichten Eintraege anderer Mitglieder. Eigene Eintraege erscheinen hier nicht (Selbstgenehmigung ist nicht erlaubt).
 
@@ -828,7 +937,9 @@ Die Tabelle zeigt:
 
 Die Liste kann nach Status, Kategorie und Zeitraum gefiltert werden. Standardmaessig werden Eintraege nach Einreichungsdatum sortiert (aelteste zuerst).
 
-### 10.2 Eintrag freigeben
+### 11.2 Eintrag freigeben
+
+![Antrag pruefen](images/handbuch/31-antrag-pruefen.png)
 
 1. Klicken Sie in der Pruefliste auf **Pruefen** beim gewuenschten Eintrag.
 2. Pruefen Sie die Details und den Dialog-Verlauf.
@@ -837,7 +948,7 @@ Die Liste kann nach Status, Kategorie und Zeitraum gefiltert werden. Standardmae
 
 Der Eigentuemer erhaelt eine E-Mail-Benachrichtigung. Der Eintrag erreicht den Endstatus **Freigegeben**.
 
-### 10.3 Rueckfrage stellen
+### 11.3 Rueckfrage stellen
 
 1. Oeffnen Sie den Eintrag ueber die Pruefliste.
 2. Klicken Sie auf den gelben Button **Rueckfrage**.
@@ -846,7 +957,7 @@ Der Eigentuemer erhaelt eine E-Mail-Benachrichtigung. Der Eintrag erreicht den E
 
 Der Eintrag wechselt in den Status **In Klaerung**. Der Eigentuemer erhaelt eine E-Mail und sieht die Rueckfrage im Dialog-Bereich.
 
-### 10.4 Eintrag ablehnen
+### 11.4 Eintrag ablehnen
 
 1. Oeffnen Sie den Eintrag ueber die Pruefliste.
 2. Klicken Sie auf den roten Button **Ablehnen**.
@@ -855,7 +966,7 @@ Der Eintrag wechselt in den Status **In Klaerung**. Der Eigentuemer erhaelt eine
 
 Der Eigentuemer erhaelt eine E-Mail-Benachrichtigung. Der Eintrag erreicht den Endstatus **Abgelehnt**.
 
-### 10.5 Stunden korrigieren
+### 11.5 Stunden korrigieren
 
 Bereits freigegebene Eintraege koennen nachtraeglich korrigiert werden (z.B. bei Fehlern in der Stundenanzahl).
 
@@ -868,7 +979,7 @@ Bereits freigegebene Eintraege koennen nachtraeglich korrigiert werden (z.B. bei
 
 Die urspruengliche Stundenzahl bleibt im System gespeichert und wird in der Detailansicht als "Korrigiert (vorher: X h)" angezeigt. Die Korrektur wird vollstaendig im Audit-Trail protokolliert. Der Eigentuemer erhaelt eine E-Mail-Benachrichtigung mit den alten und neuen Stunden.
 
-### 10.6 Wichtige Regel: Keine Selbstgenehmigung
+### 11.6 Wichtige Regel: Keine Selbstgenehmigung
 
 Ein Pruefer kann **niemals** eigene Eintraege freigeben, ablehnen oder mit einer Rueckfrage versehen. Diese Regel gilt auch fuer Administratoren. Wenn ein Pruefer selbst Arbeitsstunden einreicht, muss ein anderer Pruefer diese genehmigen.
 
@@ -876,15 +987,17 @@ Ebenso koennen Eintraege, die ein Pruefer in der Rolle **Erfasser** fuer andere 
 
 ---
 
-## 11. Administration
+## 12. Administration
 
-Dieser Abschnitt beschreibt Funktionen, die nur fuer Benutzer mit der Rolle **Administrator** verfuegbar sind.
+Dieser Abschnitt beschreibt Funktionen, die nur fuer Benutzer mit der Rolle **Administrator** (bzw. in Teilen **Event-Admin**) verfuegbar sind.
 
-### 11.1 Mitgliederverwaltung
+### 12.1 Mitgliederverwaltung
 
 Erreichbar ueber **Verwaltung > Mitglieder**.
 
 #### Mitglieder-Liste
+
+![Mitglieder-Liste](images/handbuch/50-admin-mitglieder-liste.png)
 
 Die Uebersicht zeigt alle Mitglieder mit:
 - Mitgliedsnummer, Name, E-Mail-Adresse
@@ -898,6 +1011,8 @@ Die Uebersicht zeigt alle Mitglieder mit:
 - Checkbox: Inaktive Mitglieder anzeigen
 
 #### Neues Mitglied anlegen
+
+![Neues Mitglied anlegen](images/handbuch/51-admin-mitglied-anlegen.png)
 
 1. Klicken Sie auf **Neues Mitglied**.
 2. Fuellen Sie die Stammdaten aus:
@@ -914,6 +1029,8 @@ Das Mitglied erhaelt automatisch eine Einladungs-E-Mail mit einem Link zum Setze
 
 #### CSV-Import
 
+![CSV-Import Mitglieder](images/handbuch/53-admin-mitglieder-import.png)
+
 Fuer die Anlage mehrerer Mitglieder gleichzeitig:
 
 1. Klicken Sie auf **CSV-Import**.
@@ -927,18 +1044,23 @@ Importierte Mitglieder erhalten automatisch die Rolle **Mitglied** und eine Einl
 
 #### Mitglied bearbeiten
 
+![Mitglied-Detail mit Rollenverwaltung](images/handbuch/52-admin-mitglied-detail-rollen.png)
+
 In der Detailansicht eines Mitglieds koennen Sie:
 
 - **Rollen aendern:** Haekchen bei den gewuenschten Rollen setzen und speichern.
 - **Neue Einladung senden:** Falls die erste Einladung abgelaufen ist.
 - **Mitglied deaktivieren:** Das Mitglied kann sich nicht mehr anmelden. Bestehende Daten bleiben erhalten.
 - **Mitglied reaktivieren:** Ein deaktiviertes Mitglied wieder freischalten.
+- **2FA zuruecksetzen:** Loescht die 2FA-Einrichtung des Mitglieds (Nutzer muss sie bei naechster Anmeldung neu einrichten).
 
 Die Detailansicht zeigt ausserdem den 2FA-Status (TOTP / E-Mail / Nicht eingerichtet), die Anzahl fehlgeschlagener Anmeldeversuche und ob das Konto gesperrt ist.
 
 **Hinweis:** Sie koennen sich nicht selbst deaktivieren.
 
-### 11.2 Kategorien verwalten
+### 12.2 Kategorien verwalten
+
+![Kategorien verwalten](images/handbuch/60-admin-kategorien.png)
 
 Erreichbar ueber **Verwaltung > Kategorien**.
 
@@ -968,7 +1090,9 @@ Kategorien koennen nur geloescht werden, wenn ihnen keine Eintraege zugeordnet s
 
 **Hinweis:** Die Tabelle zeigt neben jeder Kategorie die Anzahl zugeordneter Eintraege an.
 
-### 11.3 Soll-Stunden verwalten
+### 12.3 Soll-Stunden verwalten
+
+![Soll-Stunden verwalten](images/handbuch/61-admin-soll-stunden.png)
 
 Erreichbar ueber **Verwaltung > Soll-Stunden**.
 
@@ -993,7 +1117,84 @@ Die Uebersichtsseite zeigt fuer das gewaehlte Jahr:
 4. Optional: Fuegen Sie eine **Notiz** hinzu (z.B. Begruendung fuer Befreiung).
 5. Klicken Sie auf **Speichern**.
 
-### 11.4 Systemeinstellungen
+### 12.4 Event-Verwaltung
+
+Erreichbar ueber **Verwaltung > Events** (Rolle **Event-Admin** oder **Administrator**).
+
+#### Event-Liste
+
+![Event-Verwaltung Uebersicht](images/handbuch/40-admin-events-liste.png)
+
+Die Uebersicht zeigt alle Events mit Datum, Status, Anzahl belegter/offener Plaetze und Aktionen (Ansehen, Bearbeiten, Loeschen).
+
+Filter: Status (Geplant / Laufend / Abgeschlossen / Abgesagt), Zeitraum, Textsuche.
+
+#### Event erstellen
+
+![Event erstellen](images/handbuch/41-admin-event-erstellen.png)
+
+1. Klicken Sie auf **Neues Event**.
+2. Geben Sie Titel, Beschreibung, Datum, Start-/Endzeit und Ort ein.
+3. Waehlen Sie die **Standard-Kategorie**, die bei automatisch erzeugten Arbeitsstunden gesetzt wird.
+4. Optional: Waehlen Sie eine **Event-Vorlage** (siehe 12.5). Dabei werden die Aufgaben aus der Vorlage kopiert.
+5. Fuegen Sie **Aufgaben** hinzu. Pro Aufgabe definieren Sie:
+   - Name (z.B. "Aufbau", "Theke & Getraenke")
+   - Beschreibung
+   - Anzahl benoetigter Helfer
+   - Stunden pro Helfer
+   - Optional: Start-/Endzeit (abweichend vom Event-Rahmen)
+6. Klicken Sie auf **Event speichern**.
+
+Das Event erscheint sofort in der oeffentlichen Eventliste. Mitglieder koennen die Aufgaben uebernehmen.
+
+#### Event-Detailansicht (Admin)
+
+![Event-Detail Admin](images/handbuch/42-admin-event-detail.png)
+
+In der Detailansicht pflegen Sie:
+
+- **Organisatoren:** Mitglieder zuweisen, die das Event vor Ort verantworten. Organisatoren duerfen Zuweisungen Dritter bearbeiten.
+- **Aufgaben:** Hinzufuegen, bearbeiten, loeschen.
+- **Manuelle Zuweisungen:** Helfer direkt einer Aufgabe zuordnen (z.B. aus Telefonliste).
+- **Ersatz-Vorschlaege:** Vorschlaege zustimmen oder ablehnen.
+- **Status wechseln:** Von **Geplant** zu **Laufend**, **Abgeschlossen** oder **Abgesagt**. Beim Wechsel zu **Abgeschlossen** werden automatisch Arbeitsstunden-Eintraege fuer alle Zuweisungen erzeugt.
+
+**Abgeschlossene Events** koennen nicht mehr editiert werden. Bereits erzeugte Arbeitsstunden koennen der Eigentuemer, der Pruefer (Korrektur) oder der Admin bearbeiten.
+
+#### Event loeschen
+
+Events koennen nur geloescht werden, solange keine Zuweisungen bestehen oder keine Arbeitsstunden aus ihnen erzeugt wurden. In allen anderen Faellen wird das Event **Abgesagt** -- bestehende Zuweisungen bleiben als Historie sichtbar.
+
+### 12.5 Event-Vorlagen
+
+Erreichbar ueber **Verwaltung > Event-Vorlagen**.
+
+Vorlagen beschleunigen die Anlage wiederkehrender Formate (z.B. "Saison-Abschlussfest", "Hauptversammlung", "Turnier-Wochenende"). Eine Vorlage enthaelt einen Grundriss aus Aufgaben, die beim Erstellen eines konkreten Events kopiert werden.
+
+#### Vorlagen-Liste
+
+![Event-Vorlagen](images/handbuch/43-admin-event-templates-liste.png)
+
+Zeigt alle Vorlagen mit Name, Anzahl Aufgaben und Anzahl Events, die aus dieser Vorlage erzeugt wurden.
+
+#### Vorlage erstellen / bearbeiten
+
+![Event-Vorlage Detail](images/handbuch/44-admin-event-template-detail.png)
+
+1. Klicken Sie auf **Neue Vorlage** bzw. das Stift-Symbol.
+2. Geben Sie Name und Beschreibung ein.
+3. Legen Sie Aufgaben an (analog zu 12.4).
+4. Speichern.
+
+**Tipp:** Beim Erstellen eines neuen Events kann die Vorlage als **Basis** ausgewaehlt werden -- Sie muessen dann nur Datum, Ort und event-spezifische Details eintragen.
+
+#### Vorlage loeschen
+
+Vorlagen koennen jederzeit geloescht werden. Bereits erzeugte Events bleiben unberuehrt, da die Aufgaben im Event-Datensatz kopiert (nicht verlinkt) sind.
+
+### 12.6 Systemeinstellungen
+
+![Systemeinstellungen](images/handbuch/62-admin-settings.png)
 
 Erreichbar ueber **Verwaltung > Einstellungen**.
 
@@ -1009,6 +1210,8 @@ Die Einstellungen sind in aufklappbare Gruppen unterteilt (Akkordeon):
 - **Maximale Fehlversuche** - Anzahl erlaubter Fehlanmeldungen vor Kontosperre (mindestens 1)
 - **Sperrdauer** - Dauer der Kontosperre nach zu vielen Fehlversuchen (Minuten)
 - **2FA erforderlich** - Erzwingt die Einrichtung der Zwei-Faktor-Authentifizierung fuer alle Benutzer
+- **Rate-Limit Passwort-Reset (IP)** - Maximale Reset-Anfragen pro IP-Adresse pro Zeitfenster
+- **Rate-Limit Passwort-Reset (E-Mail)** - Maximale Reset-Anfragen pro Ziel-E-Mail pro Zeitfenster
 
 #### Erinnerungen
 - **Erinnerungstage** - Nach wie vielen Tagen ohne Aktivitaet eine Erinnerung gesendet wird
@@ -1044,7 +1247,9 @@ Konfigurierbare Felder: Datum, Uhrzeit von, Uhrzeit bis, Stunden, Kategorie, Pro
 #### Bearbeitungssperren
 - **Sperr-Timeout** - Dauer, nach der eine Bearbeitungssperre automatisch aufgehoben wird (Minuten)
 
-### 11.5 Audit-Trail
+### 12.7 Audit-Trail
+
+![Audit-Trail](images/handbuch/63-admin-audit.png)
 
 Erreichbar ueber **Verwaltung > Audit-Trail** (Admin) oder **Audit-Trail** in der Navigation (Auditor).
 
@@ -1072,6 +1277,7 @@ Der Audit-Trail protokolliert alle Aenderungen im System lueckenlos. Jeder Eintr
 | Fehlgeschlagene Anmeldung | Gelb | Ungueltige Anmeldedaten |
 | Export/Import | Dunkel | PDF-Export erstellt |
 | Dialog-Nachricht | Hell | Neue Nachricht im Dialog |
+| Konfigurations-Aenderung | Lila | Rolle geaendert, Einstellung angepasst |
 
 **Filter:**
 - Aktion (Erstellen, Aendern, Loeschen, etc.)
@@ -1082,13 +1288,40 @@ Der Audit-Trail protokolliert alle Aenderungen im System lueckenlos. Jeder Eintr
 **Detailansicht:**
 Klicken Sie auf das Auge-Symbol bei einem Audit-Eintrag, um die vollstaendigen Daten zu sehen, einschliesslich der alten und neuen Werte, IP-Adresse, Browser-Information und Session-ID.
 
+**Manipulationsschutz:** Der Audit-Trail ist **append-only**. Eintraege koennen weder geaendert noch geloescht werden -- auch nicht von Administratoren. Dies wird auf Datenbankebene durch Trigger erzwungen.
+
 ---
 
-## 12. Rollen und Berechtigungen
+## 13. Mehrfach-Browser-Nutzung (Multitab-Schutz)
+
+VAES verhindert, dass ein Eintrag versehentlich gleichzeitig in mehreren Browser-Tabs bearbeitet oder durch den Workflow geschickt wird. Der Schutz wirkt auf drei Ebenen:
+
+**1. Pessimistische Bearbeitungssperre (Edit-Lock):**
+Beim Oeffnen eines Eintrags im Bearbeitungsmodus setzt das System eine Sperre. Oeffnet eine zweite Sitzung denselben Eintrag, erscheint ein Hinweis: *"Dieser Eintrag wird bereits von [Name] bearbeitet. Sie koennen ihn nur lesen."* Der zweite Tab wird nicht zum Schreiben zugelassen, bis die erste Sitzung ihre Bearbeitung abschliesst oder die Sperre nach dem in den Systemeinstellungen konfigurierten **Sperr-Timeout** automatisch ausgelaufen ist.
+
+**2. Optimistische Versions-Pruefung:**
+Jeder Eintrag hat eine interne Versionsnummer. Beim Absenden eines Formulars (Speichern, Einreichen, Status-Wechsel) vergleicht das System die beim Laden uebergebene Versionsnummer mit der aktuellen. Wurde inzwischen von jemand anderem etwas geaendert, erscheint die Meldung: *"Der Eintrag wurde zwischenzeitlich veraendert. Bitte laden Sie die Seite neu und pruefen Sie den aktuellen Stand."* -- Ihre Eingabe wird NICHT unbemerkt ueberschrieben.
+
+**3. Tab-Synchronisation (BroadcastChannel):**
+Wenn Sie denselben Eintrag in mehreren Tabs innerhalb desselben Browsers offen haben und einen Status-Wechsel durchfuehren, erhalten die anderen Tabs sofort einen Hinweis und laden automatisch neu. Dadurch sehen Sie in allen Tabs denselben aktuellen Stand.
+
+**Was Sie tun sollten, wenn die Meldung erscheint:**
+
+| Meldung | Ursache | Aktion |
+|---------|---------|--------|
+| "Wird bereits bearbeitet" | Edit-Lock vorhanden | Anderen Tab schliessen oder warten, bis der Lock ausgelaufen ist |
+| "Eintrag wurde veraendert" | Version veraltet | Seite neu laden, Stand pruefen, ggf. neu eingeben |
+| Tab wurde automatisch neu geladen | BroadcastChannel-Sync | Nichts -- Sie sehen jetzt den aktuellen Stand |
+
+**Technischer Hintergrund:** Der Schutz folgt dem Prinzip **"niemals stille Datenueberschreibung"**. Lieber einmal einen Nutzer zum Neuladen bitten, als einen Bearbeitungskonflikt geraeuschlos zu verschlucken.
+
+---
+
+## 14. Rollen und Berechtigungen
 
 VAES verwendet ein rollenbasiertes Berechtigungssystem. Jedem Benutzer koennen eine oder mehrere Rollen zugewiesen werden.
 
-### 12.1 Mitglied
+### 14.1 Mitglied
 
 Die Basisrolle fuer alle Vereinsmitglieder.
 
@@ -1099,8 +1332,10 @@ Die Basisrolle fuer alle Vereinsmitglieder.
 - Dialog-Nachrichten zu eigenen Eintraegen senden und empfangen
 - Persoenliche Reports einsehen und exportieren
 - Soll-Stunden-Fortschritt auf dem Dashboard sehen
+- Events ansehen, Aufgaben uebernehmen und zuruecknehmen
+- Eigenes iCal-Abonnement einrichten und Token zuruecksetzen
 
-### 12.2 Erfasser
+### 14.2 Erfasser
 
 Erweiterte Rolle fuer die Erfassung von Stunden im Auftrag anderer Mitglieder.
 
@@ -1110,7 +1345,7 @@ Erweiterte Rolle fuer die Erfassung von Stunden im Auftrag anderer Mitglieder.
 
 **Hinweis:** Der Erfasser kann die von ihm fuer andere erstellten Eintraege auch bearbeiten und zurueckziehen, solange sie im Status Entwurf sind.
 
-### 12.3 Pruefer
+### 14.3 Pruefer
 
 Rolle fuer die Freigabe von Arbeitsstunden.
 
@@ -1123,7 +1358,7 @@ Rolle fuer die Freigabe von Arbeitsstunden.
 
 **Einschraenkung:** Eigene Eintraege oder Eintraege, die man als Erfasser erstellt hat, koennen nicht genehmigt werden.
 
-### 12.4 Auditor
+### 14.4 Auditor
 
 Lesezugriff auf das gesamte System fuer Pruefungszwecke.
 
@@ -1134,7 +1369,19 @@ Lesezugriff auf das gesamte System fuer Pruefungszwecke.
 
 **Einschraenkung:** Kein Schreibzugriff. Kann keine Eintraege erstellen, bearbeiten oder genehmigen.
 
-### 12.5 Administrator
+### 14.5 Event-Admin
+
+Spezialrolle fuer die Event-Verwaltung.
+
+**Zusaetzliche Berechtigungen:**
+- Events anlegen, bearbeiten, abschliessen, absagen
+- Aufgaben definieren und Helfer manuell zuweisen
+- Event-Vorlagen pflegen
+- Ersatz-Vorschlaege bestaetigen
+
+**Hinweis:** Event-Admin hat keinen Zugriff auf Mitglieder-, Kategorie- oder Systemverwaltung. Ein Event-Admin muss zusaetzlich die Rolle **Mitglied** (fuer eigene Stundenerfassung) haben.
+
+### 14.6 Administrator
 
 Vollzugriff auf alle Funktionen des Systems.
 
@@ -1148,30 +1395,34 @@ Vollzugriff auf alle Funktionen des Systems.
 - Systemeinstellungen aendern
 - Audit-Trail einsehen
 - Alle Pruefer-Funktionen (mit Selbstgenehmigungs-Einschraenkung)
+- Alle Event-Admin-Funktionen
 
-### 12.6 Berechtigungsmatrix
+### 14.7 Berechtigungsmatrix
 
-| Funktion | Mitglied | Erfasser | Pruefer | Auditor | Admin |
-|----------|----------|----------|---------|---------|-------|
-| Eigene Stunden erfassen | Ja | Ja | Ja | Nein | Ja |
-| Stunden fuer andere erfassen | Nein | Ja | Nein | Nein | Nein |
-| Eigene Eintraege verwalten | Ja | Ja | Ja | Nein | Ja |
-| Alle Eintraege einsehen | Nein | Nein | Ja | Ja | Ja |
-| Eintraege freigeben/ablehnen | Nein | Nein | Ja | Nein | Ja |
-| Rueckfragen stellen | Nein | Nein | Ja | Nein | Ja |
-| Stunden korrigieren | Nein | Nein | Ja | Nein | Ja |
-| Reports (eigene) | Ja | Ja | Ja | Ja | Ja |
-| Reports (alle Mitglieder) | Nein | Nein | Ja | Ja | Ja |
-| PDF/CSV-Export | Ja | Ja | Ja | Ja | Ja |
-| Mitglieder verwalten | Nein | Nein | Nein | Nein | Ja |
-| Kategorien verwalten | Nein | Nein | Nein | Nein | Ja |
-| Soll-Stunden verwalten | Nein | Nein | Nein | Nein | Ja |
-| Systemeinstellungen | Nein | Nein | Nein | Nein | Ja |
-| Audit-Trail | Nein | Nein | Nein | Ja | Ja |
+| Funktion | Mitglied | Erfasser | Pruefer | Auditor | Event-Admin | Admin |
+|----------|----------|----------|---------|---------|-------------|-------|
+| Eigene Stunden erfassen | Ja | Ja | Ja | Nein | Ja (als Mitglied) | Ja |
+| Stunden fuer andere erfassen | Nein | Ja | Nein | Nein | Nein | Nein |
+| Eigene Eintraege verwalten | Ja | Ja | Ja | Nein | Ja (als Mitglied) | Ja |
+| Alle Eintraege einsehen | Nein | Nein | Ja | Ja | Nein | Ja |
+| Eintraege freigeben/ablehnen | Nein | Nein | Ja | Nein | Nein | Ja |
+| Rueckfragen stellen | Nein | Nein | Ja | Nein | Nein | Ja |
+| Stunden korrigieren | Nein | Nein | Ja | Nein | Nein | Ja |
+| Reports (eigene) | Ja | Ja | Ja | Ja | Ja (als Mitglied) | Ja |
+| Reports (alle Mitglieder) | Nein | Nein | Ja | Ja | Nein | Ja |
+| PDF/CSV-Export | Ja | Ja | Ja | Ja | Ja | Ja |
+| Events ansehen / Aufgabe uebernehmen | Ja | Ja | Ja | Ja | Ja | Ja |
+| Events verwalten | Nein | Nein | Nein | Nein | Ja | Ja |
+| Event-Vorlagen verwalten | Nein | Nein | Nein | Nein | Ja | Ja |
+| Mitglieder verwalten | Nein | Nein | Nein | Nein | Nein | Ja |
+| Kategorien verwalten | Nein | Nein | Nein | Nein | Nein | Ja |
+| Soll-Stunden verwalten | Nein | Nein | Nein | Nein | Nein | Ja |
+| Systemeinstellungen | Nein | Nein | Nein | Nein | Nein | Ja |
+| Audit-Trail | Nein | Nein | Nein | Ja | Nein | Ja |
 
 ---
 
-## 13. Haeufige Fragen (FAQ)
+## 15. Haeufige Fragen (FAQ)
 
 **F: Ich habe mein Passwort vergessen. Was kann ich tun?**
 A: Klicken Sie auf der Anmeldeseite auf "Passwort vergessen?" und geben Sie Ihre E-Mail-Adresse ein. Sie erhalten einen Link zum Zuruecksetzen.
@@ -1223,7 +1474,22 @@ A: Kategorien muessen vom Administrator angelegt und aktiviert werden. Wenden Si
 **F: Welche Browser werden unterstuetzt?**
 A: VAES funktioniert mit allen modernen Browsern: Firefox, Chrome, Edge und Safari (jeweils aktuelle Version). Internet Explorer wird nicht unterstuetzt.
 
+**F: Ich habe eine Event-Aufgabe uebernommen -- wann bekomme ich die Stunden?**
+A: Sobald der Event-Admin das Event auf "Abgeschlossen" setzt, erzeugt das System automatisch einen Arbeitsstunden-Eintrag in Ihrem Namen (Status: Eingereicht). Ein Pruefer gibt diesen dann frei.
+
+**F: Ich kann bei einer Event-Aufgabe nicht mehr teilnehmen. Was kann ich tun?**
+A: Solange das Event noch nicht abgeschlossen ist, koennen Sie Ihren Platz in der Event-Detailansicht ueber **Zuweisung entfernen** freigeben. Alternativ koennen Sie einen **Ersatz-Vorschlag** machen, der vom Organisator bestaetigt werden muss.
+
+**F: Was mache ich, wenn mein iCal-Kalender alte Termine noch anzeigt?**
+A: Der Abo-Sync der Kalender-Programme laeuft typischerweise alle 15 Minuten bis 3 Stunden. Triggern Sie eine manuelle Aktualisierung (in den meisten Programmen ueber Rechtsklick auf den Kalender > "Aktualisieren"). Bei Verdacht auf einen kompromittierten Token setzen Sie den Token zurueck (**Meine Events > Kalender-Abo > Token zuruecksetzen**).
+
+**F: Ich habe einen Antrag in zwei Tabs offen und beim Speichern erscheint "Der Eintrag wurde zwischenzeitlich veraendert". Was bedeutet das?**
+A: Eine andere Sitzung (oder Sie selbst im anderen Tab) hat den Antrag nach dem Laden dieser Seite veraendert. VAES verhindert, dass Ihre ungeprueften Eingaben den neueren Stand stillschweigend ueberschreiben. Laden Sie die Seite neu, pruefen Sie den aktuellen Zustand und geben Sie Ihre Aenderung ggf. erneut ein (siehe Abschnitt 13).
+
+**F: Warum sehe ich im oeffentlichen Internet ein Zertifikats-/HTTPS-Warnsymbol?**
+A: VAES sendet einen strengen Satz Security-Header (CSP, HSTS, Permissions-Policy). Auf korrekt konfigurierten Hostings sollte kein Warnsymbol auftreten. Falls doch, wenden Sie sich an den Administrator -- das kann auf einen Konfigurationsfehler im Hosting hinweisen.
+
 ---
 
-*VAES Benutzerhandbuch - Version 1.3*
-*Letzte Aktualisierung: Februar 2026*
+*VAES Benutzerhandbuch - Version 1.4.0*
+*Letzte Aktualisierung: April 2026*

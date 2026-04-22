@@ -119,6 +119,7 @@ return function (App $app): void {
         $group->post('/entries/{id:[0-9]+}/approve', [WorkEntryController::class, 'approve']);
         $group->post('/entries/{id:[0-9]+}/reject', [WorkEntryController::class, 'reject']);
         $group->post('/entries/{id:[0-9]+}/return', [WorkEntryController::class, 'returnForRevision']);
+        $group->post('/entries/{id:[0-9]+}/return-to-draft', [WorkEntryController::class, 'returnToDraft']);
         $group->post('/entries/{id:[0-9]+}/correct', [WorkEntryController::class, 'correct']);
     })
         ->add(new RoleMiddleware(['pruefer', 'administrator']))
@@ -136,7 +137,6 @@ return function (App $app): void {
         $group->post('/categories/{id:[0-9]+}/deactivate', [CategoryController::class, 'deactivate']);
         $group->post('/categories/{id:[0-9]+}/activate', [CategoryController::class, 'activate']);
         $group->post('/categories/{id:[0-9]+}/delete', [CategoryController::class, 'delete']);
-        $group->post('/categories/reorder', [CategoryController::class, 'reorder']);
 
         // Benutzer
         $group->get('/users', [UserController::class, 'index']);
@@ -150,6 +150,8 @@ return function (App $app): void {
         $group->post('/users/{id:[0-9]+}/reinvite', [UserController::class, 'reinvite']);
         $group->post('/users/{id:[0-9]+}/deactivate', [UserController::class, 'deactivate']);
         $group->post('/users/{id:[0-9]+}/activate', [UserController::class, 'activate']);
+        $group->post('/users/{id:[0-9]+}/delete', [UserController::class, 'delete']);
+        $group->post('/users/{id:[0-9]+}/unlock', [UserController::class, 'unlock']);
 
         // Einstellungen
         $group->get('/settings', [AdminController::class, 'settings']);
@@ -189,6 +191,8 @@ return function (App $app): void {
 
         // Event-Tasks
         $group->post('/events/{id:[0-9]+}/tasks', [EventAdminController::class, 'addTask']);
+        $group->post('/events/{eventId:[0-9]+}/tasks/{taskId:[0-9]+}/update',
+            [EventAdminController::class, 'updateTask']);
         $group->post('/events/{eventId:[0-9]+}/tasks/{taskId:[0-9]+}/delete',
             [EventAdminController::class, 'deleteTask']);
 

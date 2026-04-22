@@ -18,6 +18,89 @@ use App\Helpers\ViewHelper;
     </div>
 </div>
 
+<!-- Event-Hinweis: Veroeffentlichte Events mit offenen Aufgaben -->
+<?php if (!empty($publishedEventCount)): ?>
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="alert alert-info d-flex justify-content-between align-items-center mb-0" role="alert">
+                <div>
+                    <i class="bi bi-calendar-event"></i>
+                    <strong>Hinweis:</strong>
+                    Es gibt aktuell
+                    <?= (int) $publishedEventCount ?>
+                    <?= $publishedEventCount === 1 ? 'Event' : 'Events' ?>
+                    mit offenen Aufgaben. Schauen Sie bitte vorbei und pruefen Sie, ob Sie eine Aufgabe uebernehmen koennen.
+                </div>
+                <a href="<?= ViewHelper::url('/events') ?>" class="btn btn-info btn-sm ms-3">
+                    Zu den Events
+                </a>
+            </div>
+        </div>
+    </div>
+<?php endif; ?>
+
+<!-- Freigegebene Stunden (immer sichtbar, wenn User Stunden erfassen kann) -->
+<?php if ($approvedHoursThisYear !== null): ?>
+    <?php
+    $hasTargetData = !empty($targetHoursEnabled) && $targetComparison !== null;
+    $tc = $targetComparison;
+    $tcExempt = $hasTargetData ? (bool) $tc['is_exempt'] : false;
+    $tcTarget = $hasTargetData ? (float) $tc['target'] : 0.0;
+    $tcActual = $hasTargetData ? (float) $tc['actual'] : (float) $approvedHoursThisYear;
+    $tcRemaining = $hasTargetData ? (float) $tc['remaining'] : 0.0;
+    $tcPercentage = $hasTargetData ? (float) $tc['percentage'] : 0.0;
+    $tcFulfilled = $hasTargetData && !$tcExempt && $tcActual >= $tcTarget;
+    $borderClass = $hasTargetData && !$tcExempt
+        ? ($tcFulfilled ? 'border-success' : 'border-warning')
+        : 'border-success';
+    ?>
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card <?= $borderClass ?>">
+                <div class="card-body">
+                    <h6 class="card-title">
+                        <i class="bi bi-check2-square text-success"></i>
+                        Freigegebene Stunden <?= (int) $currentYear ?>
+                    </h6>
+                    <?php if ($hasTargetData && $tcExempt): ?>
+                        <p class="mb-1">
+                            <span class="fs-3 fw-bold text-success"><?= number_format($tcActual, 2, ',', '.') ?></span>
+                            <span class="text-muted">Std.</span>
+                        </p>
+                        <p class="mb-0 text-muted small">Sie sind von den Soll-Stunden befreit.</p>
+                    <?php elseif ($hasTargetData): ?>
+                        <div class="row align-items-center">
+                            <div class="col-md-8">
+                                <div class="progress mb-2" style="height: 25px;">
+                                    <div class="progress-bar <?= $tcFulfilled ? 'bg-success' : ($tcPercentage >= 50 ? 'bg-warning' : 'bg-danger') ?>"
+                                         style="width: <?= round($tcPercentage) ?>%;">
+                                        <?= round($tcPercentage, 1) ?>%
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4 text-end">
+                                <span class="fs-3 fw-bold text-success"><?= number_format($tcActual, 2, ',', '.') ?></span>
+                                <span class="text-muted">Std.</span>
+                                <small class="text-muted d-block">von <?= number_format($tcTarget, 1, ',', '.') ?> Soll-Std.</small>
+                                <?php if ($tcFulfilled): ?>
+                                    <span class="badge bg-success mt-1">Erfüllt</span>
+                                <?php else: ?>
+                                    <small class="text-muted d-block">Noch <?= number_format($tcRemaining, 1, ',', '.') ?> Std.</small>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+                    <?php else: ?>
+                        <p class="mb-0">
+                            <span class="fs-2 fw-bold text-success"><?= number_format((float) $approvedHoursThisYear, 2, ',', '.') ?></span>
+                            <span class="text-muted">Std. bisher freigegeben</span>
+                        </p>
+                    <?php endif; ?>
+                </div>
+            </div>
+        </div>
+    </div>
+<?php endif; ?>
+
 <!-- Schnellaktionen -->
 <div class="row g-4 mb-4">
     <?php if ($user->hasRole('mitglied') || $user->hasRole('erfasser') || $user->isAdmin()): ?>
@@ -126,53 +209,6 @@ use App\Helpers\ViewHelper;
         </div>
     </div>
 </div>
-<?php endif; ?>
-
-<!-- Soll/Ist-Stunden (wenn aktiviert) -->
-<?php if (!empty($targetHoursEnabled) && $targetComparison !== null): ?>
-    <?php
-    $tc = $targetComparison;
-    $tcTarget = (float) $tc['target'];
-    $tcActual = (float) $tc['actual'];
-    $tcRemaining = (float) $tc['remaining'];
-    $tcPercentage = (float) $tc['percentage'];
-    $tcExempt = (bool) $tc['is_exempt'];
-    $tcFulfilled = $tcActual >= $tcTarget;
-    ?>
-    <div class="row mb-4">
-        <div class="col-12">
-            <div class="card <?= $tcExempt ? 'border-secondary' : ($tcFulfilled ? 'border-success' : 'border-warning') ?>">
-                <div class="card-body">
-                    <h6 class="card-title">
-                        <i class="bi bi-bullseye"></i> Soll-Stunden <?= date('Y') ?>
-                    </h6>
-                    <?php if ($tcExempt): ?>
-                        <p class="mb-0 text-muted">Sie sind von den Soll-Stunden befreit.</p>
-                    <?php else: ?>
-                        <div class="row align-items-center">
-                            <div class="col-md-8">
-                                <div class="progress mb-2" style="height: 25px;">
-                                    <div class="progress-bar <?= $tcFulfilled ? 'bg-success' : ($tcPercentage >= 50 ? 'bg-warning' : 'bg-danger') ?>"
-                                         style="width: <?= round($tcPercentage) ?>%;">
-                                        <?= round($tcPercentage, 1) ?>%
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="col-md-4 text-end">
-                                <span class="fw-bold"><?= number_format($tcActual, 1, ',', '.') ?></span>
-                                / <?= number_format($tcTarget, 1, ',', '.') ?> Std.
-                                <?php if ($tcFulfilled): ?>
-                                    <span class="badge bg-success ms-1">Erfüllt</span>
-                                <?php else: ?>
-                                    <span class="text-muted small d-block">Noch <?= number_format($tcRemaining, 1, ',', '.') ?> Std.</span>
-                                <?php endif; ?>
-                            </div>
-                        </div>
-                    <?php endif; ?>
-                </div>
-            </div>
-        </div>
-    </div>
 <?php endif; ?>
 
 <!-- Info-Bereich -->

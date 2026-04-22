@@ -468,6 +468,7 @@ return [
             $c->get(TargetHoursService::class),
             $c->get(DialogReadStatusRepository::class),
             $c->get(WorkEntryRepository::class),
+            $c->get(EventRepository::class),
             $c->get('settings')
         );
     },

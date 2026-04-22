@@ -503,7 +503,10 @@ class WorkEntryController extends BaseController
             return $this->jsonResponse($response, ['ok' => false, 'reason' => 'unavailable'], 503);
         }
 
-        $status = $this->lockService->checkStatus($entryId, $user->getId());
+        $sessionId = $request->getAttribute('session_id');
+        $sessionId = is_int($sessionId) ? $sessionId : null;
+
+        $status = $this->lockService->checkStatus($entryId, $user->getId(), $sessionId);
         return $this->jsonResponse($response, array_merge(['ok' => true], $status), 200);
     }
 
@@ -521,7 +524,10 @@ class WorkEntryController extends BaseController
             return $this->jsonResponse($response, ['ok' => false], 204);
         }
 
-        $this->lockService->release($entryId, $user->getId());
+        $sessionId = $request->getAttribute('session_id');
+        $sessionId = is_int($sessionId) ? $sessionId : null;
+
+        $this->lockService->release($entryId, $user->getId(), $sessionId);
 
         return $this->jsonResponse($response, ['ok' => true], 200);
     }
@@ -811,6 +817,33 @@ class WorkEntryController extends BaseController
         }
 
         return $this->redirect($response, '/entries/' . $entry->getId());
+    }
+
+    /**
+     * Eintrag zur Überarbeitung an Mitglied zurück (→ entwurf)
+     */
+    public function returnToDraft(Request $request, Response $response): Response
+    {
+        $user = $this->getUser($request);
+        $args = $this->routeArgs($request);
+        $entry = $this->entryRepo->findById((int) $args['id']);
+
+        if (!$entry) {
+            ViewHelper::flash('error', 'Eintrag nicht gefunden.');
+            return $this->redirect($response, '/review');
+        }
+
+        $data = (array) $request->getParsedBody();
+        $reason = trim($data['reason'] ?? '');
+
+        try {
+            $this->workflowService->returnToDraft($entry, $user, $reason);
+            ViewHelper::flash('success', 'Antrag zur Überarbeitung an das Mitglied zurückgegeben.');
+        } catch (BusinessRuleException | AuthorizationException $e) {
+            ViewHelper::flash('error', $e->getMessage());
+        }
+
+        return $this->redirect($response, '/review');
     }
 
     /**

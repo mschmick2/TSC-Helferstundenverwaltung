@@ -27,7 +27,6 @@ use App\Helpers\ViewHelper;
         <table class="table table-hover align-middle">
             <thead class="table-light">
                 <tr>
-                    <th style="width: 60px;">Pos.</th>
                     <th>Name</th>
                     <th>Beschreibung</th>
                     <th class="text-center">Einträge</th>
@@ -38,7 +37,6 @@ use App\Helpers\ViewHelper;
             <tbody>
                 <?php foreach ($categories as $cat): ?>
                 <tr class="<?= !$cat->isActive() ? 'table-secondary' : '' ?>">
-                    <td><?= $cat->getSortOrder() ?></td>
                     <td class="fw-semibold"><?= ViewHelper::e($cat->getName()) ?></td>
                     <td class="text-muted small"><?= ViewHelper::e($cat->getDescription() ?? '-') ?></td>
                     <td class="text-center">
@@ -110,12 +108,6 @@ use App\Helpers\ViewHelper;
                                                   class="form-control" rows="2" maxlength="500"><?= ViewHelper::e($cat->getDescription() ?? '') ?></textarea>
                                     </div>
                                     <div class="mb-3">
-                                        <label for="edit-sort-<?= $cat->getId() ?>" class="form-label">Sortierung</label>
-                                        <input type="number" name="sort_order" id="edit-sort-<?= $cat->getId() ?>"
-                                               class="form-control" min="0"
-                                               value="<?= $cat->getSortOrder() ?>">
-                                    </div>
-                                    <div class="mb-3">
                                         <label for="edit-color-<?= $cat->getId() ?>" class="form-label">Farbe (Kalender)</label>
                                         <input type="color" name="color" id="edit-color-<?= $cat->getId() ?>"
                                                class="form-control form-control-color" style="width: 60px;"
@@ -182,11 +174,6 @@ use App\Helpers\ViewHelper;
                         <label for="create-desc" class="form-label">Beschreibung</label>
                         <textarea name="description" id="create-desc"
                                   class="form-control" rows="2" maxlength="500"></textarea>
-                    </div>
-                    <div class="mb-3">
-                        <label for="create-sort" class="form-label">Sortierung</label>
-                        <input type="number" name="sort_order" id="create-sort"
-                               class="form-control" min="0" value="0">
                     </div>
                     <div class="mb-3">
                         <label for="create-color" class="form-label">Farbe (Kalender)</label>
