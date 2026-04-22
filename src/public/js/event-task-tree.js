@@ -71,13 +71,27 @@
             Sortable.create(ul, {
                 group: 'event-tasks',
                 handle: '[data-sortable-handle]',
+                draggable: '.task-node',
                 animation: 150,
-                delay: 200,            // Mobile: Long-Press, kein Scroll-Konflikt
+                delay: 200,                    // Mobile: Long-Press, kein Scroll-Konflikt
                 delayOnTouchOnly: true,
                 touchStartThreshold: 5,
                 ghostClass: 'task-node--ghost',
                 chosenClass: 'task-node--chosen',
                 dragClass: 'task-node--drag',
+                // Nested-Sortable-Setup: SortableJS braucht diese Kombi, damit
+                // Drop-Targets in verschachtelten ULs stabil erkannt werden.
+                // Ohne fallbackOnBody zerreisst es die Drag-Hit-Area, wenn der
+                // Cursor ueber ein Kind-UL wandert; invertSwap + swapThreshold
+                // halten das Drop-Verhalten zwischen Gruppen und deren Kindern
+                // voraussagbar.
+                fallbackOnBody: true,
+                swapThreshold: 0.65,
+                invertSwap: true,
+                // Leere Ziel-ULs (Gruppe ohne Kinder) haben keine Hoehe — ohne
+                // emptyInsertThreshold laesst SortableJS sie nicht als Drop-
+                // Target zu.
+                emptyInsertThreshold: 12,
                 onEnd: handleSortEnd,
             });
         });

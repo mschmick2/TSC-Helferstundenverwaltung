@@ -84,13 +84,15 @@ $baseUrl = '/admin/events/' . $eventId . '/tasks/' . $taskId;
             <?php endif; ?>
         </span>
 
-        <a href="#" class="task-node__edit-trigger text-decoration-none text-body flex-grow-1"
-           data-task-id="<?= $taskId ?>"
-           data-endpoint-edit="<?= ViewHelper::url($baseUrl . '/edit') ?>"
-           data-action="edit"
-           title="<?= ViewHelper::e($title) ?>">
+        <button type="button"
+                class="task-node__edit-trigger btn btn-link text-decoration-none text-body flex-grow-1 text-start px-1 py-0"
+                data-task-id="<?= $taskId ?>"
+                data-endpoint-edit="<?= ViewHelper::url($baseUrl . '/edit') ?>"
+                data-action="edit"
+                draggable="false"
+                title="<?= ViewHelper::e($title) ?>">
             <?= ViewHelper::e($title) ?>
-        </a>
+        </button>
 
         <span class="task-node__badges small text-muted d-none d-md-inline">
             <?php if ($isGroup): ?>
