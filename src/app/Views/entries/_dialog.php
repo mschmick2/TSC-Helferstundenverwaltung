@@ -18,7 +18,7 @@ use App\Helpers\ViewHelper;
         <?php endif; ?>
     </div>
 
-    <div class="card-body" style="max-height: 400px; overflow-y: auto;" id="dialog-container">
+    <div class="card-body" style="max-height: 500px; overflow-y: auto;" id="dialog-container">
         <?php if (empty($dialogs)): ?>
             <p class="text-muted text-center small mb-0">
                 <i class="bi bi-chat"></i> Noch keine Nachrichten.
