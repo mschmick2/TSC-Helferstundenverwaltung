@@ -17,6 +17,8 @@ use App\Services\AuditService;
 use App\Services\CalendarFeedService;
 use App\Services\EventAssignmentService;
 use App\Services\IcalService;
+use App\Services\SettingsService;
+use App\Services\TaskTreeAggregator;
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
 
@@ -36,7 +38,9 @@ class MemberEventController extends BaseController
         private CalendarFeedService $calendarFeedService,
         private UserRepository $userRepo,
         private AuditService $auditService,
-        private array $settings
+        private array $settings,
+        private ?TaskTreeAggregator $treeAggregator = null,
+        private ?SettingsService $settingsService = null
     ) {
     }
 
@@ -88,6 +92,32 @@ class MemberEventController extends BaseController
             ];
         }
 
+        // Modul 6 I7b2 Phase 1: Baum-Aggregat fuer Accordion-Ansicht vorbereiten.
+        // Nur aktiv, wenn events.tree_editor_enabled='1' UND das Event
+        // tatsaechlich eine Baumstruktur hat (mindestens ein Gruppen- oder
+        // Unter-Knoten). Andernfalls bleibt die bestehende flache Karten-
+        // Liste die Single-Source.
+        $treeEditorEnabled = false;
+        $hasTreeStructure  = false;
+        $treeData          = [];
+
+        if ($this->settingsService !== null
+            && $this->settingsService->getString('events.tree_editor_enabled', '0') === '1'
+            && $this->treeAggregator !== null
+        ) {
+            $treeEditorEnabled = true;
+            foreach ($tasks as $t) {
+                if ($t->isGroup() || $t->getParentTaskId() !== null) {
+                    $hasTreeStructure = true;
+                    break;
+                }
+            }
+            if ($hasTreeStructure) {
+                $assignmentCounts = $this->assignmentRepo->countActiveByEvent($id);
+                $treeData = $this->treeAggregator->buildTree($tasks, $assignmentCounts);
+            }
+        }
+
         return $this->render($response, 'events/show', [
             'title' => $event->getTitle(),
             'user' => $user,
@@ -95,6 +125,9 @@ class MemberEventController extends BaseController
             'event' => $event,
             'tasks' => $tasks,
             'taskMeta' => $taskMeta,
+            'treeEditorEnabled' => $treeEditorEnabled,
+            'hasTreeStructure'  => $hasTreeStructure,
+            'treeData'          => $treeData,
             'breadcrumbs' => [
                 ['label' => 'Dashboard', 'url' => '/'],
                 ['label' => 'Events', 'url' => '/events'],

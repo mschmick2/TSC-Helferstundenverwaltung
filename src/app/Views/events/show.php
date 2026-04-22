@@ -24,7 +24,27 @@ use App\Models\EventTask;
     <?php endif; ?>
 </div>
 
+<?php
+// Modul 6 I7b2 Phase 1: Controller liefert bei Flag=1 und vorhandener
+// Baumstruktur bereits $treeEditorEnabled / $hasTreeStructure / $treeData.
+// Das rekursive Accordion-Partial folgt in Phase 2 — bis dahin fallen wir
+// auf die bestehende flache Karten-Liste zurueck und zeigen in dev/test
+// einen Hinweis, damit Tester sehen, dass der Daten-Flow aus dem Controller
+// korrekt greift.
+$showAccordion = !empty($treeEditorEnabled) && !empty($hasTreeStructure);
+?>
+
 <h2 class="h5 mb-3"><i class="bi bi-list-task"></i> Aufgaben und Beigaben</h2>
+
+<?php if ($showAccordion): ?>
+    <div class="alert alert-secondary d-flex align-items-center gap-2 mb-3" role="alert">
+        <i class="bi bi-info-circle" aria-hidden="true"></i>
+        <span class="small">
+            Hinweis: Hierarchische Baumansicht wird in I7b2 Phase 2 nachgeliefert.
+            Aktuell zeigen wir die flache Liste.
+        </span>
+    </div>
+<?php endif; ?>
 
 <?php if (empty($tasks)): ?>
     <p class="text-muted">Noch keine Aufgaben definiert.</p>

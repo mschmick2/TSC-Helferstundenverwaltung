@@ -603,7 +603,9 @@ return [
             $c->get(\App\Services\CalendarFeedService::class),
             $c->get(UserRepository::class),
             $c->get(AuditService::class),
-            $c->get('settings')
+            $c->get('settings'),
+            $c->get(\App\Services\TaskTreeAggregator::class),
+            $c->get(SettingsService::class)
         );
     },
 
