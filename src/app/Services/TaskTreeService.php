@@ -443,6 +443,93 @@ final class TaskTreeService
         }
     }
 
+    /**
+     * Attribute eines Knotens aktualisieren — ohne Shape-Wechsel zwischen Gruppe
+     * und Aufgabe. is_group im Payload wird defensiv entfernt; Wechsel der Shape
+     * laeuft ueber convertToGroup()/convertToLeaf().
+     *
+     * Audit-Eintrag enthaelt nur die tatsaechlich geaenderten Felder (Feld-Diff).
+     * Sind keine Felder veraendert, wird weder DB-Write noch Audit-Eintrag
+     * ausgeloest.
+     */
+    public function updateNode(int $taskId, array $data, int $actorId): void
+    {
+        $this->assertEnabled();
+
+        $task = $this->taskRepo->findById($taskId);
+        if ($task === null) {
+            throw new BusinessRuleException('Aufgaben-Knoten nicht gefunden.');
+        }
+
+        // Shape-Wechsel ist nicht Scope dieser Methode — defensiv entfernen.
+        unset($data['is_group']);
+
+        $base = [
+            'title'           => $task->getTitle(),
+            'description'     => $task->getDescription(),
+            'category_id'     => $task->getCategoryId(),
+            'task_type'       => $task->getTaskType(),
+            'slot_mode'       => $task->getSlotMode(),
+            'start_at'        => $task->getStartAt(),
+            'end_at'          => $task->getEndAt(),
+            'capacity_mode'   => $task->getCapacityMode(),
+            'capacity_target' => $task->getCapacityTarget(),
+            'hours_default'   => $task->getHoursDefault(),
+            'sort_order'      => $task->getSortOrder(),
+        ];
+        // $data + $base: Keys aus $data gewinnen, $base fuellt Luecken.
+        $merged = $data + $base;
+
+        $payload = $task->isGroup()
+            ? $this->buildGroupPayload($task->getEventId(), $task->getParentTaskId(), $merged)
+            : $this->buildLeafPayload($task->getEventId(), $task->getParentTaskId(), $merged);
+
+        // Feld-Diff: nur tatsaechlich veraenderte Felder loggen.
+        $oldValues = [];
+        $newValues = [];
+        foreach ($base as $field => $oldVal) {
+            $newVal = $payload[$field] ?? null;
+            if ($oldVal !== $newVal) {
+                $oldValues[$field] = $oldVal;
+                $newValues[$field] = $newVal;
+            }
+        }
+
+        if ($oldValues === []) {
+            // Nichts veraendert — kein DB-Write, kein Audit-Eintrag.
+            return;
+        }
+
+        $this->pdo->beginTransaction();
+        try {
+            $this->taskRepo->update($taskId, $payload);
+
+            $this->auditService->log(
+                action: 'update',
+                tableName: 'event_tasks',
+                recordId: $taskId,
+                oldValues: $oldValues,
+                newValues: $newValues,
+                description: $task->isGroup()
+                    ? "Gruppen-Knoten aktualisiert: '{$payload['title']}'"
+                    : "Aufgaben-Knoten aktualisiert: '{$payload['title']}'",
+                metadata: [
+                    'event_id'       => $task->getEventId(),
+                    'parent_task_id' => $task->getParentTaskId(),
+                    'is_group'       => $task->isGroup() ? 1 : 0,
+                    'actor_id'       => $actorId,
+                ],
+            );
+
+            $this->pdo->commit();
+        } catch (\Throwable $e) {
+            if ($this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
+            throw $e;
+        }
+    }
+
     // =========================================================================
     // Validierungs-Helfer
     // =========================================================================

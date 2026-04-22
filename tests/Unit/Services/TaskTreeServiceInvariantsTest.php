@@ -303,6 +303,181 @@ final class TaskTreeServiceInvariantsTest extends TestCase
     }
 
     // ========================================================================
+    // updateNode — Phase 1b (I7b1)
+    // ========================================================================
+
+    public function test_update_node_aendert_attribute_ohne_shape_wechsel(): void
+    {
+        $code = $this->read(self::SERVICE_PATH);
+        $body = $this->methodBody($code, 'updateNode');
+
+        self::assertNotSame('', $body, 'TaskTreeService::updateNode() fehlt (I7b1 Phase 1b).');
+        self::assertStringContainsString(
+            'assertEnabled',
+            $body,
+            'updateNode() muss assertEnabled() aufrufen, damit der Flag-Schutz greift.'
+        );
+        self::assertStringContainsString(
+            'findById',
+            $body,
+            'updateNode() muss den Knoten via findById laden, bevor Attribute gemischt werden.'
+        );
+        self::assertMatchesRegularExpression(
+            '/isGroup\s*\(\s*\).*?buildGroupPayload.*?buildLeafPayload/s',
+            $body,
+            'updateNode() muss anhand isGroup() zwischen buildGroupPayload() und '
+            . 'buildLeafPayload() dispatchen, damit die jeweilige Shape erhalten bleibt.'
+        );
+    }
+
+    public function test_update_node_ignoriert_is_group_feld_im_payload(): void
+    {
+        $body = $this->methodBody($this->read(self::SERVICE_PATH), 'updateNode');
+        self::assertMatchesRegularExpression(
+            "/unset\\(\\s*\\\$data\\[\\s*'is_group'\\s*\\]\\s*\\)/",
+            $body,
+            'updateNode() muss is_group aus dem Payload entfernen — Shape-Wechsel '
+            . 'laeuft ueber convertToGroup()/convertToLeaf(), nicht ueber update.'
+        );
+    }
+
+    public function test_update_node_auf_gruppe_blockiert_capacity_target_feld(): void
+    {
+        $body = $this->methodBody($this->read(self::SERVICE_PATH), 'updateNode');
+        self::assertStringContainsString(
+            'buildGroupPayload',
+            $body,
+            'updateNode() muss buildGroupPayload() fuer Gruppen aufrufen. '
+            . 'buildGroupPayload setzt capacity_target/hours_default/slot_mode hart — '
+            . 'damit werden unerlaubte Shape-Felder im Request silent ignoriert, '
+            . 'chk_et_group_shape wird nie beruehrt.'
+        );
+    }
+
+    public function test_update_node_auf_leaf_erfordert_gueltige_shape(): void
+    {
+        $body = $this->methodBody($this->read(self::SERVICE_PATH), 'updateNode');
+        self::assertStringContainsString(
+            'buildLeafPayload',
+            $body,
+            'updateNode() muss buildLeafPayload() fuer Leaves aufrufen. '
+            . 'buildLeafPayload validiert slot_mode/fix-Offsets/capacity_mode — '
+            . 'ungueltige Shape wird als ValidationException geworfen.'
+        );
+    }
+
+    public function test_update_node_loggt_audit_als_update_mit_diff(): void
+    {
+        $body = $this->methodBody($this->read(self::SERVICE_PATH), 'updateNode');
+
+        self::assertStringContainsString("action: 'update'", $body);
+        self::assertStringContainsString("tableName: 'event_tasks'", $body);
+        self::assertStringContainsString(
+            'oldValues:',
+            $body,
+            'updateNode-Audit muss oldValues mit der Feld-Diff-Basis loggen.'
+        );
+        self::assertStringContainsString(
+            'newValues:',
+            $body,
+            'updateNode-Audit muss newValues mit den geaenderten Feldern loggen.'
+        );
+    }
+
+    // ========================================================================
+    // convertToGroup / convertToLeaf — Gap-Fuellung Phase 1b (I7b1)
+    // ========================================================================
+
+    public function test_convert_to_leaf_calls_leaf_payload_builder_and_repo_method(): void
+    {
+        $body = $this->methodBody($this->read(self::SERVICE_PATH), 'convertToLeaf');
+
+        self::assertStringContainsString(
+            'buildLeafPayload',
+            $body,
+            'convertToLeaf() muss buildLeafPayload() aufrufen, damit die neue Leaf-Shape '
+            . 'durch denselben Validator laeuft wie createNode().'
+        );
+        self::assertStringContainsString(
+            'taskRepo->convertToLeaf',
+            $body,
+            'convertToLeaf() muss die Repository-Methode convertToLeaf() triggern, '
+            . 'sonst bleibt die Shape in der DB unveraendert.'
+        );
+    }
+
+    public function test_convert_to_group_calls_repo_method(): void
+    {
+        $body = $this->methodBody($this->read(self::SERVICE_PATH), 'convertToGroup');
+        self::assertStringContainsString(
+            'taskRepo->convertToGroup',
+            $body,
+            'convertToGroup() muss die Repository-Methode convertToGroup() triggern.'
+        );
+    }
+
+    public function test_convert_to_group_discards_leaf_attributes_in_new_shape(): void
+    {
+        $body = $this->methodBody($this->read(self::SERVICE_PATH), 'convertToGroup');
+
+        // newShape-Array muss Leaf-Attribute explizit auf Gruppen-Werte zuruecksetzen.
+        self::assertMatchesRegularExpression(
+            "/'slot_mode'\\s*=>\\s*null/",
+            $body,
+            'convertToGroup() muss slot_mode im newShape auf null setzen '
+            . '(Leaf-Attribut wird verworfen).'
+        );
+        self::assertMatchesRegularExpression(
+            "/'capacity_target'\\s*=>\\s*null/",
+            $body,
+            'convertToGroup() muss capacity_target im newShape auf null setzen.'
+        );
+        self::assertMatchesRegularExpression(
+            "/'hours_default'\\s*=>\\s*0\\.0/",
+            $body,
+            'convertToGroup() muss hours_default im newShape auf 0.0 setzen.'
+        );
+        self::assertMatchesRegularExpression(
+            "/'start_at'\\s*=>\\s*null/",
+            $body,
+            'convertToGroup() muss start_at im newShape auf null setzen.'
+        );
+        self::assertMatchesRegularExpression(
+            "/'end_at'\\s*=>\\s*null/",
+            $body,
+            'convertToGroup() muss end_at im newShape auf null setzen.'
+        );
+        self::assertStringContainsString(
+            'CAP_UNBEGRENZT',
+            $body,
+            'convertToGroup() muss capacity_mode auf CAP_UNBEGRENZT zuruecksetzen.'
+        );
+    }
+
+    public function test_convert_methods_log_update_with_old_and_new_values(): void
+    {
+        $code = $this->read(self::SERVICE_PATH);
+        foreach (['convertToGroup', 'convertToLeaf'] as $method) {
+            $body = $this->methodBody($code, $method);
+            self::assertStringContainsString(
+                "action: 'update'",
+                $body,
+                "$method() muss Audit-Action 'update' verwenden (ENUM-Katalog)."
+            );
+            self::assertStringContainsString(
+                'oldValues:',
+                $body,
+                "$method() muss Alt-Shape in oldValues loggen."
+            );
+            self::assertStringContainsString(
+                'newValues:',
+                $body,
+                "$method() muss Neu-Shape in newValues loggen."
+            );
+        }
+    }
+
+    // ========================================================================
     // Group-Shape-Sentinel (G1-Delta-Klaerung: task_type='aufgabe')
     // ========================================================================
 
