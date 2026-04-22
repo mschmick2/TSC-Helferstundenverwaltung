@@ -183,17 +183,35 @@ $statusMeta = $statusLabels[$event->getStatus()] ?? ['class' => 'secondary', 'la
                                 </td>
                                 <td><?= ViewHelper::formatHours($t->getHoursDefault()) ?> h</td>
                                 <td class="text-end">
-                                    <form method="POST"
-                                          action="<?= ViewHelper::url('/admin/events/' . (int) $event->getId() . '/tasks/' . (int) $t->getId() . '/delete') ?>"
-                                          class="d-inline"
-                                          onsubmit="return confirm('Aufgabe wirklich loeschen?');">
-                                        <?= ViewHelper::csrfField() ?>
-                                        <button type="submit" class="btn btn-sm btn-outline-danger" aria-label="Loeschen">
-                                            <i class="bi bi-trash"></i>
+                                    <div class="btn-group btn-group-sm" role="group">
+                                        <button type="button" class="btn btn-outline-primary"
+                                                data-bs-toggle="collapse"
+                                                data-bs-target="#editTaskForm-<?= (int) $t->getId() ?>"
+                                                aria-expanded="false"
+                                                aria-controls="editTaskForm-<?= (int) $t->getId() ?>"
+                                                aria-label="Bearbeiten">
+                                            <i class="bi bi-pencil"></i>
                                         </button>
-                                    </form>
+                                        <form method="POST"
+                                              action="<?= ViewHelper::url('/admin/events/' . (int) $event->getId() . '/tasks/' . (int) $t->getId() . '/delete') ?>"
+                                              class="d-inline"
+                                              onsubmit="return confirm('Aufgabe wirklich loeschen?');">
+                                            <?= ViewHelper::csrfField() ?>
+                                            <button type="submit" class="btn btn-outline-danger" aria-label="Loeschen">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </form>
+                                    </div>
                                 </td>
                             </tr>
+                            <tr>
+                                <td colspan="7" class="p-0 border-0">
+                                    <div class="collapse" id="editTaskForm-<?= (int) $t->getId() ?>">
+                                        <?php $task = $t; require __DIR__ . '/_task_form.php'; ?>
+                                    </div>
+                                </td>
+                            </tr>
+                            <?php unset($task); ?>
                         <?php endforeach; ?>
                     </tbody>
                 </table>
