@@ -178,6 +178,41 @@ class EventTaskAssignmentRepository
     }
 
     /**
+     * Anzahl aktiver Zusagen pro Task fuer ein Event als Map task_id -> count.
+     * Eine einzige Query statt N — vom TaskTreeAggregator zur Berechnung von
+     * open_slots_subtree genutzt (Modul 6 I7b).
+     *
+     * Tasks ohne aktive Zusagen erscheinen NICHT in der Map. Caller verwenden
+     * `$counts[$taskId] ?? 0`.
+     *
+     * @return array<int,int>
+     */
+    public function countActiveByEvent(int $eventId): array
+    {
+        $stmt = $this->pdo->prepare(
+            "SELECT eta.task_id, COUNT(*) AS cnt
+             FROM event_task_assignments eta
+             JOIN event_tasks et ON et.id = eta.task_id
+             WHERE et.event_id = :event_id
+               AND eta.status IN (:s_vorg, :s_best, :s_storno)
+               AND eta.deleted_at IS NULL
+             GROUP BY eta.task_id"
+        );
+        $stmt->execute([
+            'event_id' => $eventId,
+            's_vorg'   => EventTaskAssignment::STATUS_VORGESCHLAGEN,
+            's_best'   => EventTaskAssignment::STATUS_BESTAETIGT,
+            's_storno' => EventTaskAssignment::STATUS_STORNO_ANGEFRAGT,
+        ]);
+
+        $map = [];
+        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+            $map[(int) $row['task_id']] = (int) $row['cnt'];
+        }
+        return $map;
+    }
+
+    /**
      * Alle bestaetigten Zusagen eines Events (fuer Event-Abschluss in I3).
      *
      * @return EventTaskAssignment[]

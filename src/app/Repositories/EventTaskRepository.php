@@ -358,19 +358,26 @@ class EventTaskRepository
      * (Default-Strategie aus dem Plan, billige Einzelmoves ohne Re-Numbering).
      *
      * Es wird nur sort_order angefasst, parent bleibt unveraendert.
+     *
+     * H1 (G4 I7a): Das UPDATE filtert zusaetzlich auf event_id, damit ein
+     * versehentlich oder boeswillig manipulierter ID-Stream nicht Tasks aus
+     * einem anderen Event veraendern kann. Service-Validation
+     * (TaskTreeService::reorderSiblings -> findChildren-Set-Vergleich) faengt
+     * fremde IDs bereits ab; das ist Defense-in-Depth auf Repository-Ebene.
      */
-    public function reorderSiblings(array $orderedIds): void
+    public function reorderSiblings(int $eventId, array $orderedIds): void
     {
         $stmt = $this->pdo->prepare(
             "UPDATE event_tasks
              SET sort_order = :ord, version = version + 1
-             WHERE id = :id AND deleted_at IS NULL"
+             WHERE id = :id AND event_id = :event_id AND deleted_at IS NULL"
         );
         $step = 10;
         foreach (array_values($orderedIds) as $index => $taskId) {
             $stmt->execute([
-                'ord' => ($index + 1) * $step,
-                'id'  => (int) $taskId,
+                'ord'      => ($index + 1) * $step,
+                'id'       => (int) $taskId,
+                'event_id' => $eventId,
             ]);
         }
     }

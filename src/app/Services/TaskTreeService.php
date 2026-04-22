@@ -206,7 +206,7 @@ final class TaskTreeService
 
         $this->pdo->beginTransaction();
         try {
-            $this->taskRepo->reorderSiblings($proposed);
+            $this->taskRepo->reorderSiblings($eventId, $proposed);
 
             $this->auditService->log(
                 action: 'update',

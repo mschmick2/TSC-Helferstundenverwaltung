@@ -42,6 +42,13 @@ final class TaskTreeAggregator
      * Tree mit verschachtelten children und Aggregaten je Gruppe.
      *
      * @param EventTask[] $tasks Alle aktiven Tasks eines Events (flach).
+     * @param array<int,int> $assignmentCounts Optional: Map task_id -> Anzahl
+     *     aktiver Zusagen. Wenn gegeben (siehe
+     *     EventTaskAssignmentRepository::countActiveByEvent), wird
+     *     `open_slots_subtree` als Summe von max(0, helpers - active) ueber
+     *     alle Leaves im Subtree befuellt. Wenn leer (Default), bleibt
+     *     `open_slots_subtree` null (I7a-Verhalten, fuer Editor-Sicht
+     *     ausreichend).
      * @return array<int, array{
      *     task: EventTask,
      *     children: array,
@@ -51,7 +58,7 @@ final class TaskTreeAggregator
      *     open_slots_subtree: int|null
      * }>
      */
-    public function buildTree(array $tasks): array
+    public function buildTree(array $tasks, array $assignmentCounts = []): array
     {
         // Index nach parent-ID (0 = Top-Level, weil int-Keys hashbar sind)
         $byParent = [];
@@ -72,7 +79,7 @@ final class TaskTreeAggregator
         }
         unset($siblings);
 
-        return $this->assemble($byParent, 0);
+        return $this->assemble($byParent, 0, $assignmentCounts);
     }
 
     /**
@@ -155,6 +162,9 @@ final class TaskTreeAggregator
      * Rekursiver Aufbau der Tree-Knoten samt Subtree-Aggregaten.
      *
      * @param array<int, EventTask[]> $byParent Geschwister-Map (Key 0 = Top-Level).
+     * @param array<int,int> $assignmentCounts Map task_id -> aktive Zusagen.
+     *     Leeres Array deaktiviert die open_slots_subtree-Berechnung
+     *     (open_slots_subtree bleibt null, I7a-Default).
      * @return array<int, array{
      *     task: EventTask,
      *     children: array,
@@ -164,11 +174,13 @@ final class TaskTreeAggregator
      *     open_slots_subtree: int|null
      * }>
      */
-    private function assemble(array $byParent, int $parentKey): array
+    private function assemble(array $byParent, int $parentKey, array $assignmentCounts = []): array
     {
+        $countsActive = $assignmentCounts !== [];
         $out = [];
         foreach ($byParent[$parentKey] ?? [] as $task) {
-            $children = $this->assemble($byParent, (int) $task->getId());
+            $children = $this->assemble($byParent, (int) $task->getId(), $assignmentCounts);
+            $openSlots = 0;
 
             if ($task->isGroup()) {
                 $helpers = 0;
@@ -178,6 +190,9 @@ final class TaskTreeAggregator
                     $helpers += $child['helpers_subtree'];
                     $hours += $child['hours_subtree'];
                     $leaves += $child['leaves_subtree'];
+                    if ($countsActive) {
+                        $openSlots += $child['open_slots_subtree'] ?? 0;
+                    }
                 }
             } else {
                 // Leaf: capacity_target=NULL bedeutet "unbegrenzt" — fuer das
@@ -186,6 +201,10 @@ final class TaskTreeAggregator
                 $helpers = $task->getCapacityTarget() ?? 0;
                 $hours = $task->getHoursDefault();
                 $leaves = 1;
+                if ($countsActive) {
+                    $taken = $assignmentCounts[(int) $task->getId()] ?? 0;
+                    $openSlots = max(0, $helpers - $taken);
+                }
             }
 
             $out[] = [
@@ -194,9 +213,7 @@ final class TaskTreeAggregator
                 'helpers_subtree'    => $helpers,
                 'hours_subtree'      => $hours,
                 'leaves_subtree'     => $leaves,
-                // I7b befuellt das mit (helpers_subtree - active_assignments).
-                // Bis dahin null = "noch nicht berechnet".
-                'open_slots_subtree' => null,
+                'open_slots_subtree' => $countsActive ? $openSlots : null,
             ];
         }
         return $out;

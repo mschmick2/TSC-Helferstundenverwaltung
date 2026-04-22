@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace App\Controllers;
 
+use App\Exceptions\AuthorizationException;
+use App\Models\User;
+use App\Repositories\EventOrganizerRepository;
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
 use Slim\Routing\RouteContext;
@@ -72,5 +75,38 @@ abstract class BaseController
             $url = $basePath . $url;
         }
         return $response->withHeader('Location', $url)->withStatus($status);
+    }
+
+    /**
+     * Pruefen, ob $user das gegebene Event editieren darf:
+     *   - User mit Rolle event_admin oder administrator: ja, immer.
+     *   - Sonst: nur, wenn User in event_organizers fuer dieses Event sitzt.
+     *
+     * Wirft AuthorizationException, wenn keine der beiden Bedingungen greift.
+     *
+     * Short-Circuit: Rollen-Check zuerst (in-memory auf $user), Organizer-Lookup
+     * (DB-Query) nur, wenn der Rollen-Check fehlschlaegt. Spart die Query bei
+     * jedem event_admin-Request.
+     *
+     * Doc-Hinweis (G1 I7b, 2026-04-22): Wenn ein dritter Aufrufer-Pfad diese
+     * Pruefung braucht (z.B. I7c-Templates-Editor), in einen
+     * AuthorizationService extrahieren. Aktuell als BaseController-Methode
+     * ausreichend, weil nur EventAdminController-Tree-Actions sie aufrufen
+     * und ein eigener Service fuer drei Zeilen Logik Overhead waere.
+     */
+    protected function assertEventEditPermission(
+        User $user,
+        int $eventId,
+        EventOrganizerRepository $organizerRepo
+    ): void {
+        if ($user->hasRole('event_admin') || $user->hasRole('administrator')) {
+            return;
+        }
+        if ($organizerRepo->isOrganizer($eventId, $user->getId())) {
+            return;
+        }
+        throw new AuthorizationException(
+            'Sie haben keine Berechtigung, dieses Event zu bearbeiten.'
+        );
     }
 }
