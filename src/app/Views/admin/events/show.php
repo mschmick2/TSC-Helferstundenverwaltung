@@ -121,6 +121,58 @@ $statusMeta = $statusLabels[$event->getStatus()] ?? ['class' => 'secondary', 'la
     </div>
 <?php endif; ?>
 
+<?php
+// Modul 6 I7b1 Phase 3c: Baumstruktur-Ansicht, wenn Settings-Flag aktiv
+// UND im Event mindestens ein Gruppen-Knoten oder ein Unterknoten existiert.
+// Andernfalls bleibt die bestehende flache Tabelle erhalten — inkl.
+// Inline-Create/Edit-Forms als bisherige Bearbeitungs-UI. Im Baum-Modus
+// wird auf den separaten Editor (Bearbeiten-Button oben) verwiesen.
+$treeEditorEnabled = !empty($treeEditorEnabled);
+$hasTreeStructure  = !empty($hasTreeStructure);
+$treeData          = $treeData ?? [];
+?>
+
+<?php if ($treeEditorEnabled && $hasTreeStructure): ?>
+    <div class="card mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h2 class="h5 mb-0"><i class="bi bi-diagram-3"></i> Aufgabenbaum</h2>
+            <a href="<?= ViewHelper::url('/admin/events/' . (int) $event->getId() . '/edit') ?>"
+               class="btn btn-sm btn-outline-primary">
+                <i class="bi bi-pencil"></i> Struktur bearbeiten
+            </a>
+        </div>
+        <div class="card-body">
+            <div class="alert alert-info d-flex align-items-center gap-2 mb-3" role="alert">
+                <i class="bi bi-info-circle" aria-hidden="true"></i>
+                <span>
+                    Diese Aufgaben sind hierarchisch strukturiert. Zum Aendern der
+                    Struktur oben auf <strong>Struktur bearbeiten</strong> klicken;
+                    dort stehen Drag &amp; Drop sowie der Modal-Editor zur Verfuegung.
+                </span>
+            </div>
+
+            <?php if (empty($treeData)): ?>
+                <p class="text-muted mb-0">
+                    Alle Aufgaben wurden geloescht (Struktur ist leer).
+                </p>
+            <?php else: ?>
+                <?php
+                // Rekursiver Renderer via Closure (use-by-reference fuer Self-Call),
+                // identisches Muster wie im Editor-Partial — vermeidet das Scope-
+                // Leak-Problem, das ein nacktes include im foreach hat.
+                $renderReadonlyNode = function (array $node, int $depth) use (&$renderReadonlyNode): void {
+                    include __DIR__ . '/_task_tree_readonly.php';
+                };
+                ?>
+                <ul class="task-tree-readonly list-unstyled mb-0">
+                    <?php foreach ($treeData as $topNode): ?>
+                        <?php $renderReadonlyNode($topNode, 0); ?>
+                    <?php endforeach; ?>
+                </ul>
+            <?php endif; ?>
+        </div>
+    </div>
+<?php else: ?>
 <div class="card mb-4">
     <div class="card-header d-flex justify-content-between align-items-center">
         <h2 class="h5 mb-0"><i class="bi bi-list-task"></i> Aufgaben und Beigaben</h2>
@@ -219,6 +271,7 @@ $statusMeta = $statusLabels[$event->getStatus()] ?? ['class' => 'secondary', 'la
         <?php endif; ?>
     </div>
 </div>
+<?php endif; ?>
 
 <form method="POST" action="<?= ViewHelper::url('/admin/events/' . (int) $event->getId() . '/delete') ?>"
       class="mt-4"

@@ -173,3 +173,46 @@ main {
 .task-edit-leaf-fields.d-none {
     display: none !important;
 }
+
+/* =========================================================================
+ * Aufgabenbaum — Read-Only-Ansicht (Modul 6 I7b1 Phase 3c)
+ * Admin-Detail-Seite, reine Anzeige, keine Interaktivitaet.
+ * ========================================================================= */
+
+.task-tree-readonly {
+    padding-left: 0;
+    margin-bottom: 0;
+    list-style: none;
+}
+
+/* Verschachtelte Listen erben Einrueckung + Leitlinie.
+ * Tiefer als 4 geht nicht (Service-enforced tree_max_depth). */
+.task-tree-readonly .task-tree-readonly {
+    border-left: 2px solid #dee2e6;
+    margin-left: 0.75rem;
+    padding-left: 0.75rem;
+}
+
+.task-tree-readonly .task-node-readonly {
+    margin-bottom: 0.125rem;
+}
+
+.task-tree-readonly .task-node-readonly__row {
+    min-height: 2rem;
+    padding-left: 0.25rem;
+    padding-right: 0.25rem;
+}
+
+.task-tree-readonly .task-node-readonly__title {
+    word-break: break-word;
+}
+
+.task-tree-readonly .task-node-readonly__summary {
+    white-space: nowrap;
+}
+
+@media (max-width: 576px) {
+    .task-tree-readonly .task-node-readonly__summary {
+        white-space: normal;
+    }
+}

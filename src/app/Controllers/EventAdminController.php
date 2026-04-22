@@ -172,6 +172,32 @@ class EventAdminController extends BaseController
             $sourceTemplate = $this->templateRepo->findById((int) $event->getSourceTemplateId());
         }
 
+        // Modul 6 I7b1 Phase 3c: Read-Only-Baumansicht anbieten, sobald das
+        // Feature-Flag an ist UND das Event mindestens einen Gruppen- oder
+        // Unter-Knoten besitzt. Andernfalls bleibt die bestehende flache
+        // Tabelle in der View greifen.
+        $treeEditorEnabled = false;
+        $hasTreeStructure  = false;
+        $treeData          = [];
+
+        if ($this->settingsService !== null
+            && $this->settingsService->getString('events.tree_editor_enabled', '0') === '1'
+            && $this->assignmentRepo !== null
+            && $this->treeAggregator !== null
+        ) {
+            $treeEditorEnabled = true;
+            foreach ($tasks as $t) {
+                if ($t->isGroup() || $t->getParentTaskId() !== null) {
+                    $hasTreeStructure = true;
+                    break;
+                }
+            }
+            if ($hasTreeStructure) {
+                $assignmentCounts = $this->assignmentRepo->countActiveByEvent($id);
+                $treeData = $this->treeAggregator->buildTree($tasks, $assignmentCounts);
+            }
+        }
+
         return $this->render($response, 'admin/events/show', [
             'title' => 'Event: ' . $event->getTitle(),
             'user' => $user,
@@ -181,6 +207,9 @@ class EventAdminController extends BaseController
             'organizers' => $organizers,
             'categories' => $this->categoryRepo->findAllActive(),
             'sourceTemplate' => $sourceTemplate,
+            'treeEditorEnabled' => $treeEditorEnabled,
+            'hasTreeStructure'  => $hasTreeStructure,
+            'treeData'          => $treeData,
             'breadcrumbs' => [
                 ['label' => 'Dashboard', 'url' => '/'],
                 ['label' => 'Events', 'url' => '/admin/events'],
