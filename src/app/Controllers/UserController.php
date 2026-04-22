@@ -317,6 +317,50 @@ class UserController extends BaseController
     }
 
     /**
+     * Account-Sperre nach Fehlversuchen aufheben (POST /admin/users/{id}/unlock)
+     *
+     * Setzt failed_login_attempts auf 0 und locked_until auf NULL. Erzeugt einen
+     * Audit-Eintrag mit action=config_change, damit die manuelle Aufhebung
+     * nachvollziehbar bleibt.
+     */
+    public function unlock(Request $request, Response $response): Response
+    {
+        $args = $this->routeArgs($request);
+        $id = (int) $args['id'];
+
+        $targetUser = $this->userRepo->findByIdForAdmin($id);
+        if ($targetUser === null) {
+            ViewHelper::flash('danger', 'Benutzer nicht gefunden.');
+            return $this->redirect($response, '/admin/users');
+        }
+
+        if (!$targetUser->isLocked() && $targetUser->getFailedLoginAttempts() === 0) {
+            ViewHelper::flash('info', 'Account ist nicht gesperrt.');
+            return $this->redirect($response, '/admin/users/' . $id);
+        }
+
+        $oldValues = [
+            'failed_login_attempts' => $targetUser->getFailedLoginAttempts(),
+            'locked_until' => $targetUser->getLockedUntil(),
+        ];
+
+        $this->userRepo->resetFailedAttempts($id);
+
+        $this->auditService->log(
+            'config_change',
+            'users',
+            $id,
+            oldValues: $oldValues,
+            newValues: ['failed_login_attempts' => 0, 'locked_until' => null],
+            description: "Account-Sperre manuell aufgehoben: {$targetUser->getVollname()}",
+            metadata: ['reason' => 'manual_admin_unlock']
+        );
+
+        ViewHelper::flash('success', 'Account-Sperre wurde aufgehoben.');
+        return $this->redirect($response, '/admin/users/' . $id);
+    }
+
+    /**
      * Formular: Neues Mitglied anlegen (GET /admin/users/create)
      */
     public function showCreate(Request $request, Response $response): Response

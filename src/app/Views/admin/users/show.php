@@ -137,7 +137,17 @@ use App\Helpers\ViewHelper;
                         <td>
                             <?= $targetUser->getFailedLoginAttempts() ?>
                             <?php if ($targetUser->isLocked()): ?>
-                                <span class="badge bg-danger">Gesperrt</span>
+                                <span class="badge bg-danger">Gesperrt bis
+                                    <?= ViewHelper::formatDateTime($targetUser->getLockedUntil()) ?></span>
+                            <?php endif; ?>
+                            <?php if ($targetUser->isLocked() || $targetUser->getFailedLoginAttempts() > 0): ?>
+                                <form method="POST" class="d-inline ms-2"
+                                      action="<?= ViewHelper::url('/admin/users/' . $targetUser->getId() . '/unlock') ?>">
+                                    <?= ViewHelper::csrfField() ?>
+                                    <button type="submit" class="btn btn-sm btn-outline-warning">
+                                        <i class="bi bi-unlock"></i> Sperre aufheben
+                                    </button>
+                                </form>
                             <?php endif; ?>
                         </td>
                     </tr>
