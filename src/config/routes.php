@@ -137,7 +137,6 @@ return function (App $app): void {
         $group->post('/categories/{id:[0-9]+}/deactivate', [CategoryController::class, 'deactivate']);
         $group->post('/categories/{id:[0-9]+}/activate', [CategoryController::class, 'activate']);
         $group->post('/categories/{id:[0-9]+}/delete', [CategoryController::class, 'delete']);
-        $group->post('/categories/reorder', [CategoryController::class, 'reorder']);
 
         // Benutzer
         $group->get('/users', [UserController::class, 'index']);

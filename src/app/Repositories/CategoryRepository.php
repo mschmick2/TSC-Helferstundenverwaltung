@@ -26,7 +26,7 @@ class CategoryRepository
         $stmt = $this->pdo->query(
             "SELECT * FROM categories
              WHERE is_active = TRUE AND deleted_at IS NULL
-             ORDER BY sort_order ASC, name ASC"
+             ORDER BY name ASC"
         );
 
         $categories = [];
@@ -63,7 +63,7 @@ class CategoryRepository
     {
         $stmt = $this->pdo->query(
             "SELECT * FROM categories WHERE deleted_at IS NULL
-             ORDER BY sort_order ASC, name ASC"
+             ORDER BY name ASC"
         );
 
         $categories = [];
@@ -154,7 +154,7 @@ class CategoryRepository
         $stmt = $this->pdo->query(
             "SELECT * FROM categories
              WHERE is_contribution = TRUE AND is_active = TRUE AND deleted_at IS NULL
-             ORDER BY sort_order ASC, name ASC"
+             ORDER BY name ASC"
         );
 
         $categories = [];
