@@ -964,3 +964,117 @@ Drei-Mode-Variable `$treeMode ∈ {'legacy', 'editor', 'readonly'}`:
 
 → Siehe `admin/event-templates/edit.php` als Referenz-Implementierung.
 
+---
+
+### 2026-04-23 — Playwright-"intercepts pointer events" ist Symptom, nicht Ursache
+
+**Kontext:**
+Modul 6 I7b6 — Mobile-Tree-Editor-Fix. Playwright meldete auf
+mobile-se und mobile-14, dass beim Klick auf den Delete-Button
+eines Tree-Nodes zwei verschiedene Elemente den Click abfingen:
+`<div class="container">` und `<button data-action="add-child">`
+(der Top-Level-Toolbar-Button).
+
+**Problem / Ueberraschung:**
+Die intuitive Diagnose "Toolbar-Button ueberlagert Delete-Button
+per Stacking-Context" war falsch. Im CSS gab es keine sticky-,
+fixed- oder z-index-Regel, die das erklaeren konnte. Der Bug-
+Mechanismus lag in einer ganz anderen Ebene: Bootstrap-5 erbt
+`white-space: nowrap` auf jede `.btn`-Klasse. Der Titel-Button
+`.task-node__edit-trigger` mit `flex-grow-1` schrumpfte deswegen
+nicht unter seinen Content-Anspruch. Zusammen mit den 44-px-
+Touch-Targets der Action-Buttons wurde die Row breiter als
+375 px, die ganze Seite horizontal scrollbar. Beim
+`scrollIntoViewIfNeeded` scrollte Playwright horizontal, und
+der Click-Punkt wanderte in die Toolbar-Region — die Toolbar
+war der Interceptor, nicht die Ursache.
+
+Der Full-Page-Screenshot (Playwright legt ihn beim Failure ab)
+zeigte den Bug sofort: Tree-Nodes reichten von x=0 bis x=750
+im 375-px-Viewport; der Delete-Button lag physisch jenseits
+des rechten Viewport-Rands.
+
+**Loesung:**
+CSS-Fix ohne Partial-/JS-Aenderung:
+- `.task-tree-editor .task-node__edit-trigger`:
+  `min-width: 0; overflow: hidden; text-overflow: ellipsis;
+   white-space: nowrap;`
+  Titel schrumpft unter Flex-Min-Content, lange Titel werden
+  mit "..." gekuerzt. Der volle Titel bleibt via title-Attribut
+  am Button erreichbar.
+- `.task-tree-editor { overflow-x: hidden; }` und
+  `.task-tree-readonly { overflow-x: hidden; }` als Safety-Net
+  gegen andere Overflow-Quellen (lange Badges,
+  Beschreibungen).
+
+**Praevention:**
+Bei Playwright-Meldungen "X intercepts pointer events" der
+Diagnose-Einstieg-Regel folgen:
+1. **Zuerst den Full-Page-Screenshot pruefen** (Playwright legt
+   ihn als `test-failed-1.png` im test-results-Ordner ab).
+   Horizontaler Overflow ist dort sofort sichtbar — die Seite
+   ist breiter als der Viewport, oder Elemente ragen ueber den
+   rechten Rand hinaus.
+2. Dann erst den DOM-Baum und Z-Index-Hierarchie ansehen.
+
+Der gemeldete Interceptor ist das Ziel des horizontalen Scrolls
+nach scrollIntoViewIfNeeded, nicht der Verursacher. DOM-Baum-
+Analyse allein fuehrt in die Irre, wenn Overflow das Problem
+ist.
+
+→ Relevant fuer kuenftige Mobile-Layout-Bugs in Event-Editor,
+  Template-Editor und spaeterem Organisator-Editor.
+
+---
+
+### 2026-04-23 — Bootstrap-5 .btn-Klasse erbt white-space: nowrap
+
+**Kontext:**
+Gleicher Kontext wie der vorherige Eintrag (I7b6). Der Titel-
+Button im Tree-Node ist ein `<button class="btn btn-link
+flex-grow-1 ...">`. Trotz `flex-grow-1` schrumpfte er nicht auf
+schmalen Viewports — er erzwang seine volle Text-Breite und
+brachte die Row ueber die Viewport-Breite hinaus.
+
+**Problem / Ueberraschung:**
+Bootstrap-5 setzt auf jede `.btn` und implizit auch auf `.btn-
+link` `white-space: nowrap`. Das verhindert den Zeilenumbruch
+im Button-Text — wuenschenswert fuer kompakte Action-Buttons,
+aber problematisch fuer Buttons mit `flex-grow-1`, die laengen-
+unabhaengig werden sollen.
+
+Flex-Children haben per Default `min-width: auto`, was
+effektiv "nicht unter min-content-Width schrumpfen" bedeutet.
+Min-content-Width eines Buttons mit `white-space: nowrap` ist
+die komplette Text-Breite. Die beiden Regeln kombinieren sich
+zum Schrumpf-Verbot.
+
+**Loesung:**
+Fuer Buttons mit `flex-grow-1` im schmalen Flex-Layout:
+```css
+button.btn {
+    min-width: 0;              /* bricht min-content-Schrumpf-Verbot */
+    overflow: hidden;          /* clippt ueberlaufenden Text */
+    text-overflow: ellipsis;   /* sichtbares "..." als Kuerzungshinweis */
+    /* white-space: nowrap bleibt — sonst bricht der Text um,
+       was mit Ellipsis nicht vertraeglich ist */
+}
+```
+Fuer den vollen Text braucht der Button ein `title`-Attribut,
+das bei Hover (Desktop) oder Long-Press (Mobile) den ganzen
+Text zeigt.
+
+**Praevention:**
+- Bei Flex-Rows mit einem `flex-grow-1` Text-Element und
+  mehreren festen Action-Elementen: `min-width: 0` + Ellipsis-
+  Regel ist Default-Pattern. `.claude/rules/05-frontend.md`
+  um einen Abschnitt "Schrumpfbare Text-Buttons in Flex-Rows"
+  erweitern.
+- Merkregel: "Wenn ein `.btn` in einem Flex-Row mit
+  `flex-grow-1` steht und bei schmalem Viewport nicht
+  schrumpft, ist es nie die Schuld vom Flex — es ist die
+  Schuld von Bootstrap's `.btn { white-space: nowrap }`."
+
+→ Siehe `src/public/css/app.css` `.task-tree-editor .task-
+  node__edit-trigger`-Block als Referenz.
+

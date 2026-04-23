@@ -145,6 +145,68 @@ $this->flash($request, 'info', 'Hinweis: ...');
 <button type="button" class="btn btn-secondary">Abbrechen</button>
 ```
 
+### Schrumpfbare Text-Buttons in Flex-Rows
+
+Bootstrap-5 setzt auf `.btn` (und `.btn-link`) `white-space:
+nowrap`. Das ist fuer kompakte Action-Buttons korrekt, blockiert
+aber Text-Buttons mit `flex-grow-1` am Schrumpfen:
+- Flex-Children haben Default `min-width: auto` (= nicht unter
+  min-content-Breite).
+- Min-content-Breite eines `.btn` ist seine volle Text-Breite
+  (wegen `white-space: nowrap`).
+- Ergebnis: der Button erzwingt seine Text-Breite, die Row wird
+  breiter als der Viewport, die Seite wird horizontal scrollbar.
+
+Symptom auf Mobile-Viewports (Playwright): "X intercepts pointer
+events" beim Klick auf rechts-ausgerichtete Action-Buttons, weil
+`scrollIntoViewIfNeeded` horizontal scrollt und Click-Punkte
+verschoben landen.
+
+**Pattern fuer schrumpfbare Text-Buttons im Flex-Row:**
+
+```css
+/* Auf den Button mit flex-grow-1, der Text enthaelt: */
+.my-flex-row .my-title-button {
+    min-width: 0;              /* bricht min-content-Schrumpf-Verbot */
+    overflow: hidden;          /* clippt ueberlaufenden Text */
+    text-overflow: ellipsis;   /* sichtbares "..." */
+    /* white-space: nowrap bleibt — Bootstrap-Default ist korrekt */
+}
+```
+
+Zusaetzlich `title`-Attribut am Button setzen, damit der volle
+Text bei Hover (Desktop) oder Long-Press (Mobile) erreichbar
+bleibt:
+
+```html
+<button type="button" class="btn btn-link flex-grow-1 ..."
+        title="<?= ViewHelper::e($fullTitle) ?>">
+    <?= ViewHelper::e($fullTitle) ?>
+</button>
+```
+
+Als Safety-Net am umgebenden Wrapper `overflow-x: hidden`
+setzen, damit andere Overflow-Quellen (Badges, Inline-Elemente)
+die Seite nicht horizontal scrollbar machen:
+
+```css
+.my-flex-container {
+    overflow-x: hidden;
+}
+```
+
+Referenz-Implementierung: `.task-tree-editor
+.task-node__edit-trigger` und `.task-tree-editor` in
+`src/public/css/app.css`.
+
+**Diagnose-Regel bei Mobile-Click-Bugs:**
+Wenn Playwright "X intercepts pointer events" meldet: ZUERST
+den Full-Page-Screenshot pruefen (`test-results/.../test-
+failed-1.png`). Horizontaler Overflow ist dort sofort sichtbar.
+Erst dann DOM-Baum + Z-Index inspizieren. Der gemeldete
+Interceptor ist oft das Ziel des horizontalen Scroll-Verschubs,
+nicht der Verursacher.
+
 ---
 
 ## Modals
