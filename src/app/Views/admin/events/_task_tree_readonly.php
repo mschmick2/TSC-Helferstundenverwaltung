@@ -1,33 +1,35 @@
 <?php
 /**
  * Partial: Read-Only-Darstellung eines Aufgabenbaum-Knotens
- * (Modul 6 I7b1 Phase 3c).
+ * (Modul 6 I7b1 Phase 3c, um Template-Kontext erweitert in I7c Phase 2).
+ *
+ * Kontext-Flag:
+ *   $context = 'event' (Default) oder 'template'.
+ *   - event:    Leaf-Zeit als "15.05.2026 10:00 – 12:00" (absolute
+ *               DATETIME-Felder start_at/end_at).
+ *   - template: Leaf-Zeit als "+30 min – +2 h 0 min" (relative Offsets
+ *               default_offset_minutes_start/end zum Event-Start).
+ *   - Assignments und Farbkodierung gibt es nur im Event-Kontext.
  *
  * Erwartet im Scope:
- *   $node                  — Aggregator-Knoten aus TaskTreeAggregator::buildTree:
- *                            ['task' => EventTask, 'children' => array,
- *                             'helpers_subtree' => int, 'hours_subtree' => float,
- *                             'leaves_subtree' => int,
- *                             'open_slots_subtree' => int|null].
- *   $depth                 — int (0 fuer Top-Level; aktuell nur fuer
- *                            semantische Zwecke, Einrueckung laeuft ueber CSS).
- *   $renderReadonlyNode    — Closure fuer rekursiven Aufruf auf Kinder
- *                            (vom Container in show.php geliefert).
- *
- * Reine Anzeige: keine Drag-Handles, keine Action-Buttons, keine
- * data-endpoint-Attribute, keine Editier-Interaktion. Bearbeiten
- * laeuft ueber den separaten Editor in admin/events/edit.php.
- *
- * XSS-Schutz: alle Freitext-Felder (title, description) per
- * ViewHelper::e() encodieren.
+ *   $node                  — Aggregator-Knoten aus (Template)TaskTreeAggregator
+ *                            ::buildTree. Struktur identisch; Status-Feld
+ *                            und open_slots_subtree nur im Event-Kontext.
+ *   $depth                 — int (0 fuer Top-Level).
+ *   $context               — 'event' | 'template' (Default: 'event').
+ *   $renderReadonlyNode    — Closure fuer rekursiven Aufruf.
  *
  * @var array $node
  * @var int $depth
+ * @var string|null $context
  * @var \Closure $renderReadonlyNode
  */
 use App\Helpers\ViewHelper;
+use App\Models\EventTask;
 
-/** @var \App\Models\EventTask $task */
+$context = $context ?? 'event';
+
+/** @var \App\Models\EventTask|\App\Models\EventTemplateTask $task */
 $task             = $node['task'];
 $isGroup          = $task->isGroup();
 $children         = (array) ($node['children'] ?? []);
@@ -36,8 +38,37 @@ $hoursSubtree     = (float) ($node['hours_subtree']     ?? 0.0);
 $leavesSubtree    = (int)   ($node['leaves_subtree']    ?? 0);
 $openSlotsSubtree = $node['open_slots_subtree'] ?? null;
 // I7b3: Belegungsstatus aus Aggregator (TaskStatus|null). null laesst die
-// bestehenden Border-Regeln greifen.
+// bestehenden Border-Regeln greifen. Templates haben IMMER null (keine
+// Assignments).
 $status           = $node['status'] ?? null;
+
+// Leaf-spezifische Felder kontext-abhaengig auslesen.
+// Die beiden Task-Modelle sind nicht signatur-kompatibel: EventTask hat
+// hasFixedSlot()/getStartAt()/getEndAt()/isContribution(), EventTemplateTask
+// hat sie nicht. Wir bauen die Leaf-Anzeige-Daten hier einmal auf.
+$isContribution = false;
+$isFixSlot      = false;
+$leafTimeLabel  = '';
+if (!$isGroup) {
+    $taskType       = $task->getTaskType();
+    $isContribution = $taskType === EventTask::TYPE_BEIGABE;
+    $slotMode       = $task->getSlotMode();
+    $isFixSlot      = $slotMode === EventTask::SLOT_FIX;
+
+    if ($isFixSlot) {
+        if ($context === 'template') {
+            /** @var \App\Models\EventTemplateTask $task */
+            $offsetStart = $task->getDefaultOffsetMinutesStart();
+            $offsetEnd   = $task->getDefaultOffsetMinutesEnd();
+            $leafTimeLabel = ViewHelper::formatOffsetMinutes($offsetStart)
+                . ' – ' . ViewHelper::formatOffsetMinutes($offsetEnd);
+        } else {
+            /** @var \App\Models\EventTask $task */
+            $leafTimeLabel = ViewHelper::formatDateTime($task->getStartAt())
+                . ' – ' . ViewHelper::formatDateTime($task->getEndAt());
+        }
+    }
+}
 ?>
 <li class="task-node-readonly<?= $isGroup ? ' task-node-readonly--group' : ' task-node-readonly--leaf' ?><?= $status !== null ? ' ' . $status->cssClass() : '' ?>"
     <?php if ($status !== null): ?>
@@ -81,7 +112,7 @@ $status           = $node['status'] ?? null;
             <span class="task-node-readonly__title">
                 <?= ViewHelper::e($task->getTitle()) ?>
             </span>
-            <?php if ($task->isContribution()): ?>
+            <?php if ($isContribution): ?>
                 <span class="badge bg-info">Beigabe</span>
             <?php else: ?>
                 <span class="badge bg-primary">Aufgabe</span>
@@ -93,10 +124,9 @@ $status           = $node['status'] ?? null;
                 </span>
             <?php endif; ?>
             <span class="task-node-readonly__summary small text-muted">
-                <?php if ($task->hasFixedSlot()): ?>
+                <?php if ($isFixSlot): ?>
                     <i class="bi bi-clock" aria-hidden="true"></i>
-                    <?= ViewHelper::formatDateTime($task->getStartAt()) ?>
-                    &ndash; <?= ViewHelper::formatDateTime($task->getEndAt()) ?>
+                    <?= ViewHelper::e($leafTimeLabel) ?>
                 <?php else: ?>
                     <i class="bi bi-clock" aria-hidden="true"></i>
                     <em>frei</em>

@@ -172,6 +172,18 @@ class EventTemplateController extends BaseController
         $categories = $this->categoryRepo->findAllActive();
         $hasDerivedEvents = $this->templateRepo->hasDerivedEvents($id);
 
+        // I7c Phase 2: Tree-Editor-Daten nur, wenn Flag an UND Template
+        // editierbar (isCurrent ist oben bereits garantiert; hier noch der
+        // hasDerivedEvents-Lock). Sonst bleibt es bei der flachen
+        // Legacy-Liste. Aggregator-Output liefert verschachtelte Struktur
+        // fuers Rendering durch das gemeinsame _task_tree_node.php-Partial.
+        $treeEditorEnabled = false;
+        $treeData = [];
+        if ($this->treeEditorEnabled() && !$hasDerivedEvents && $this->treeAggregator !== null) {
+            $treeEditorEnabled = true;
+            $treeData = $this->treeAggregator->buildTree($tasks);
+        }
+
         return $this->render($response, 'admin/event-templates/edit', [
             'title' => 'Template bearbeiten: ' . $template->getName(),
             'user' => $user,
@@ -180,6 +192,9 @@ class EventTemplateController extends BaseController
             'tasks' => $tasks,
             'categories' => $categories,
             'hasDerivedEvents' => $hasDerivedEvents,
+            'treeEditorEnabled' => $treeEditorEnabled,
+            'treeData' => $treeData,
+            'csrfToken' => $_SESSION['csrf_token'] ?? '',
             'breadcrumbs' => [
                 ['label' => 'Dashboard', 'url' => '/'],
                 ['label' => 'Templates', 'url' => '/admin/event-templates'],

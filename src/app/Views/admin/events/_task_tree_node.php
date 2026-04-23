@@ -1,42 +1,48 @@
 <?php
 /**
- * Partial: einzelner Knoten im Aufgabenbaum-Editor (Modul 6 I7b1).
+ * Partial: einzelner Knoten im Aufgabenbaum-Editor (Modul 6 I7b1,
+ * um Template-Kontext erweitert in I7c Phase 2).
+ *
+ * Kontext-Flag:
+ *   $context = 'event' (Default) oder 'template'. Steuert die URL-
+ *   Generierung fuer data-endpoint-*-Attribute. Der JS-Kern
+ *   event-task-tree.js liest diese Endpunkte aus den Attributen —
+ *   URLs sind nicht im JS fest-kodiert.
+ *
+ * Entity-ID:
+ *   $entityId — Event-ID im Event-Kontext, Template-ID im Template-
+ *   Kontext. Fuer Rueckwaerts-Kompatibilitaet liest der Partial auch
+ *   $eventId, falls $entityId nicht gesetzt ist.
  *
  * Erwartet im Scope:
- *   $node            — Aggregator-Knoten aus TaskTreeAggregator::buildTree:
- *                      [
- *                        'task' => EventTask,
- *                        'children' => array<Aggregator-Knoten>,
- *                        'helpers_subtree' => int,
- *                        'hours_subtree' => float,
- *                        'leaves_subtree' => int,
- *                        'open_slots_subtree' => int|null,
- *                      ]
- *                      Task-eigene Felder (title, description, slot_mode etc.)
- *                      werden ueber $node['task']->getX() gelesen, NICHT als
- *                      flache Keys am $node-Array.
+ *   $node            — Aggregator-Knoten aus (Template)TaskTreeAggregator
+ *                      ::buildTree. Struktur identisch; Status-Feld nur
+ *                      im Event-Kontext gesetzt.
  *   $depth           — int (0 fuer Top-Level).
  *   $csrfToken       — string (fuer noscript-Forms).
- *   $eventId         — int (fuer URL-Aufbau).
- *   $renderTaskNode  — Closure (fuer rekursiven Aufruf auf Kinder; liefert
- *                      der Container in edit.php, nicht dieses Partial).
- *   $canConvert      — bool (true wenn konvertierbar; false bei aktiven
- *                      Kindern bzw. aktiven Assignments — per Aggregator-
- *                      Daten ermittelt).
- *   $canDelete       — bool (wie canConvert; Delete-Regeln sind gleich).
- *
- * XSS-Schutz: Alle Freitext-Felder ($task->getTitle(), $task->getDescription())
- * werden per htmlspecialchars/ViewHelper::e() encodiert.
+ *   $entityId        — int (Event- oder Template-ID, je nach $context).
+ *   $eventId         — int, Rueckwaerts-Fallback wenn $entityId fehlt.
+ *   $context         — 'event' | 'template' (Default: 'event').
+ *   $renderTaskNode  — Closure fuer rekursiven Aufruf auf Kinder.
+ *   $canConvert      — bool.
+ *   $canDelete       — bool.
  *
  * @var array $node
  * @var int $depth
  * @var string $csrfToken
- * @var int $eventId
+ * @var int|null $entityId
+ * @var int|null $eventId
+ * @var string|null $context
  * @var \Closure $renderTaskNode
  */
 use App\Helpers\ViewHelper;
 
-/** @var \App\Models\EventTask $task */
+// Context + Entity-ID normalisieren (Rueckwaerts-Kompatibilitaet fuer
+// bestehende Event-Include-Stellen, die weiter $eventId setzen).
+$context  = $context  ?? 'event';
+$entityId = $entityId ?? ($eventId ?? 0);
+
+/** @var \App\Models\EventTask|\App\Models\EventTemplateTask $task */
 $task              = $node['task'];
 $isGroup           = $task->isGroup();
 $taskId            = (int)    $task->getId();
@@ -45,7 +51,9 @@ $description       = (string) ($task->getDescription() ?? '');
 $helpersSubtree    = (int)    ($node['helpers_subtree'] ?? 0);
 $hoursSubtree      = (float)  ($node['hours_subtree']   ?? 0.0);
 $leavesSubtree     = (int)    ($node['leaves_subtree']  ?? 0);
-$openSlotsSubtree  = $node['open_slots_subtree'] ?? null;  // darf null bleiben
+// open_slots_subtree kommt nur im Event-Aggregator; Template-Aggregator
+// liefert kein Feld, .. ?? null bleibt null.
+$openSlotsSubtree  = $node['open_slots_subtree'] ?? null;
 $capacityTarget    = $task->getCapacityTarget();
 $hoursDefault      = (float)  $task->getHoursDefault();
 $children          = (array)  ($node['children'] ?? []);
@@ -57,10 +65,18 @@ $canDelete  = $canDelete ?? (
     $isGroup ? empty($children) : true
 );
 
-$baseUrl = '/admin/events/' . $eventId . '/tasks/' . $taskId;
+// URL-Prefix kontext-abhaengig bauen. 'event' => /admin/events/...,
+// 'template' => /admin/event-templates/... Das JS bleibt unveraendert,
+// es liest nur die data-endpoint-*-Attribute.
+$urlPrefix = $context === 'template'
+    ? '/admin/event-templates/' . $entityId . '/tasks/'
+    : '/admin/events/'           . $entityId . '/tasks/';
+$baseUrl    = $urlPrefix . $taskId;
+$reorderUrl = $urlPrefix . 'reorder';
 
 // I7b3: Belegungsstatus aus Aggregator (TaskStatus|null). null bedeutet
-// keine Farbkodierung — bestehende Border-Regeln aus I7b1 greifen weiter.
+// keine Farbkodierung — bestehende Border-Regeln greifen weiter.
+// Templates haben IMMER null, weil ihr Aggregator keinen Status liefert.
 $status = $node['status'] ?? null;
 ?>
 <li class="task-node<?= $isGroup ? ' task-node--group' : ' task-node--leaf' ?><?= $status !== null ? ' ' . $status->cssClass() : '' ?>"
@@ -212,7 +228,7 @@ $status = $node['status'] ?? null;
     <?php if ($isGroup): ?>
         <ul class="task-tree-children list-unstyled ps-4"
             data-parent-task-id="<?= $taskId ?>"
-            data-endpoint-reorder="<?= ViewHelper::url('/admin/events/' . $eventId . '/tasks/reorder') ?>">
+            data-endpoint-reorder="<?= ViewHelper::url($reorderUrl) ?>">
             <?php foreach ($children as $child): ?>
                 <?php $renderTaskNode($child, $depth + 1); ?>
             <?php endforeach; ?>

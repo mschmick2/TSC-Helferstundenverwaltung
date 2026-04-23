@@ -1,7 +1,7 @@
 # VAES - Vereins-Arbeitsstunden-Erfassungssystem
 ## (TSC-Helferstundenverwaltung)
 
-![Version](https://img.shields.io/badge/version-1.4.4-blue)
+![Version](https://img.shields.io/badge/version-1.4.5-blue)
 ![PHP](https://img.shields.io/badge/PHP-8.x-purple)
 ![MySQL](https://img.shields.io/badge/MySQL-8.4-orange)
 

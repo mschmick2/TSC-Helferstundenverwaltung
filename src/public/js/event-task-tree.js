@@ -1,8 +1,11 @@
-// event-task-tree.js — Aufgabenbaum-Editor (Modul 6 I7b1)
+// event-task-tree.js — Aufgabenbaum-Editor (Modul 6 I7b1,
+// kontext-aware seit I7c Phase 2)
 //
 // Erwartet im DOM:
 //   <section class="task-tree-editor" id="task-tree-editor"
-//            data-event-id="..."
+//            data-context="event|template"  (Default: event)
+//            data-entity-id="..."           (event_id oder template_id)
+//            data-event-id="..."            (Rueckwaerts-Fallback)
 //            data-csrf-token="..."
 //            data-endpoint-tree="..."
 //            data-endpoint-create="..."
@@ -19,17 +22,26 @@
 //     Bei Server-Fehler: Revert ueber evt-Context.
 //   - Alle anderen Mutationen (Create/Update/Convert/Delete): auf Erfolg
 //     ein location.reload(), weil die Aggregator-Felder (helpers_subtree etc.)
-//     sonst inkonsistent bleiben. Weniger elegant als Patch-Render, aber
-//     robust und passt zum Phase-3-Scope.
+//     sonst inkonsistent bleiben.
 //   - XSS-Schutz: User-Freitext (title, description, ancestor_path) immer
 //     per textContent oder escapeHtml() — nie innerHTML mit Template-String.
+//
+// I7c-Kontext-Awareness:
+//   - URLs kommen komplett aus data-endpoint-*-Attributen (partial-gerendert),
+//     das JS kennt keine URL-Pfade fuer 'event' vs. 'template'.
+//   - Zwei Punkte sind kontext-abhaengig:
+//     (a) Zeit-Felder im Modal-Formular (datetime-local vs. number-Offset).
+//     (b) parent-ID-Feldname (parent_task_id vs. parent_template_task_id).
+//   - Der context-String wird in einer geschlossenen Variable gehalten und
+//     an buildForm / showCreateModal / collectFormData durchgereicht.
 
 (function () {
     'use strict';
 
     let treeRoot = null;
     let csrfToken = '';
-    let eventId = 0;
+    let context = 'event';
+    let entityId = 0;
     let categories = [];
 
     // =====================================================================
@@ -47,11 +59,19 @@
         }
 
         csrfToken = treeRoot.dataset.csrfToken || '';
-        eventId = parseInt(treeRoot.dataset.eventId, 10) || 0;
+        context = treeRoot.dataset.context === 'template' ? 'template' : 'event';
+        entityId = parseInt(treeRoot.dataset.entityId || treeRoot.dataset.eventId, 10) || 0;
         categories = parseCategories(treeRoot.dataset.categories);
 
         initSortables();
         treeRoot.addEventListener('click', handleClick);
+    }
+
+    // Feldnamen je Kontext. parentIdField ist der Form-Key fuer die
+    // Parent-ID beim Create; eventIdField-Relikt entfaellt im Template-
+    // Kontext, weil der Controller den Context aus der Route kennt.
+    function parentIdField() {
+        return context === 'template' ? 'parent_template_task_id' : 'parent_task_id';
     }
 
     function parseCategories(raw) {
@@ -212,16 +232,24 @@
         const data = {
             task: {
                 id: null,
-                event_id: eventId,
-                parent_task_id: parentTaskId === '' ? null : parseInt(parentTaskId, 10),
+                // Bezugs-ID (event_id oder template_id) ist nur fuer die
+                // Breadcrumb-Anzeige relevant — die Route kennt den Kontext
+                // bereits. Wir belassen das redundante Feld aus Kompatibilitaet.
+                event_id: context === 'event' ? entityId : undefined,
+                template_id: context === 'template' ? entityId : undefined,
+                [parentIdField()]: parentTaskId === '' ? null : parseInt(parentTaskId, 10),
                 is_group: 0,
                 category_id: null,
                 title: '',
                 description: '',
                 task_type: 'aufgabe',
                 slot_mode: 'fix',
-                start_at: null,
-                end_at: null,
+                // Zeit-Defaults kontext-abhaengig: event -> start_at/end_at,
+                // template -> default_offset_minutes_start/end.
+                start_at: context === 'event' ? null : undefined,
+                end_at:   context === 'event' ? null : undefined,
+                default_offset_minutes_start: context === 'template' ? null : undefined,
+                default_offset_minutes_end:   context === 'template' ? null : undefined,
                 capacity_mode: 'unbegrenzt',
                 capacity_target: null,
                 hours_default: 0,
@@ -391,21 +419,49 @@
             task.category_id ? String(task.category_id) : '',
             catOptions, 'col-md-4');
 
-        appendInput(leafWrap, 'start_at', 'Start (bei Slot=fix)',
-            formatDateTimeLocal(task.start_at), 'datetime-local', 'col-md-6');
+        // I7c Phase 2: Zeit-Felder kontext-abhaengig rendern.
+        // - Event:    start_at / end_at   (datetime-local, DATETIME-String)
+        // - Template: default_offset_minutes_start / ...end (number, Minuten
+        //   relativ zum Event-Start, negativ fuer Vorbereitungs-Tasks)
+        if (context === 'template') {
+            appendInput(
+                leafWrap,
+                'default_offset_minutes_start',
+                'Offset-Start in Minuten (relativ zum Event-Start)',
+                task.default_offset_minutes_start === null || task.default_offset_minutes_start === undefined
+                    ? ''
+                    : String(task.default_offset_minutes_start),
+                'number', 'col-md-6', false, {step: '1'}
+            );
+            appendInput(
+                leafWrap,
+                'default_offset_minutes_end',
+                'Offset-Ende in Minuten (relativ zum Event-Start)',
+                task.default_offset_minutes_end === null || task.default_offset_minutes_end === undefined
+                    ? ''
+                    : String(task.default_offset_minutes_end),
+                'number', 'col-md-6', false, {step: '1'}
+            );
+        } else {
+            appendInput(leafWrap, 'start_at', 'Start (bei Slot=fix)',
+                formatDateTimeLocal(task.start_at), 'datetime-local', 'col-md-6');
 
-        appendInput(leafWrap, 'end_at', 'Ende (bei Slot=fix)',
-            formatDateTimeLocal(task.end_at), 'datetime-local', 'col-md-6');
+            appendInput(leafWrap, 'end_at', 'Ende (bei Slot=fix)',
+                formatDateTimeLocal(task.end_at), 'datetime-local', 'col-md-6');
+        }
 
-        // parent_task_id als hidden — wichtig fuer Create, beim Edit nur
-        // Kontext-Anzeige. Backend entscheidet letztlich aus der Route.
+        // Parent-ID als hidden — Feldname kontext-abhaengig, damit der
+        // Controller die bestehende normalizeTreeFormInputs-Logik greifen
+        // laesst (event: parent_task_id, template: parent_template_task_id).
         if (mode === 'create') {
+            const parentField = parentIdField();
             const parentHidden = document.createElement('input');
             parentHidden.type = 'hidden';
-            parentHidden.name = 'parent_task_id';
-            parentHidden.value = (task.parent_task_id === null || task.parent_task_id === undefined)
+            parentHidden.name = parentField;
+            const parentVal = task[parentField];
+            parentHidden.value = (parentVal === null || parentVal === undefined)
                 ? ''
-                : String(task.parent_task_id);
+                : String(parentVal);
             form.appendChild(parentHidden);
         }
 
@@ -564,6 +620,20 @@
         if (out.parent_task_id !== undefined && out.parent_task_id === '') {
             out.parent_task_id = null;
         }
+        // Analog fuer Template-Kontext (Feldname seit I7c Phase 2).
+        if (out.parent_template_task_id !== undefined && out.parent_template_task_id === '') {
+            out.parent_template_task_id = null;
+        }
+        // Template-Offsets: leere Strings zu null, damit der Service-Null-
+        // Check greift (statt "" als ungueltiger Integer zum INSERT zu gehen).
+        ['default_offset_minutes_start', 'default_offset_minutes_end'].forEach((f) => {
+            if (out[f] === '') {
+                out[f] = null;
+            } else if (out[f] !== undefined && out[f] !== null) {
+                const n = parseInt(out[f], 10);
+                if (Number.isFinite(n)) out[f] = n;
+            }
+        });
         // is_group aus dem Create-Select als int
         if (out.is_group !== undefined) {
             out.is_group = out.is_group === '1' ? 1 : 0;

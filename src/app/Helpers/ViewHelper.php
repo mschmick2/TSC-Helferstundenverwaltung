@@ -116,6 +116,35 @@ class ViewHelper
     }
 
     /**
+     * Offset in Minuten menschenlesbar formatieren (Modul 6 I7c).
+     *
+     * Wird fuer Template-Tasks genutzt, deren Zeitfenster als relativer
+     * Offset zum Event-Start (default_offset_minutes_start/end) gespeichert
+     * ist — analog zu formatHours fuer die Stunden-Darstellung.
+     *
+     * Format (laut G1-Entscheidung C):
+     *   - |minutes| <= 60: "+30 min" / "-15 min"
+     *   - |minutes|  > 60: "+2 h 30 min" / "-1 h 0 min"
+     *
+     * Null liefert "-" damit der Aufrufer die Fallback-Anzeige nicht
+     * selbst formulieren muss.
+     */
+    public static function formatOffsetMinutes(?int $minutes): string
+    {
+        if ($minutes === null) {
+            return '-';
+        }
+        $sign = $minutes < 0 ? '-' : '+';
+        $abs  = abs($minutes);
+        if ($abs <= 60) {
+            return $sign . $abs . ' min';
+        }
+        $hours = intdiv($abs, 60);
+        $mins  = $abs % 60;
+        return $sign . $hours . ' h ' . $mins . ' min';
+    }
+
+    /**
      * Alte Formulardaten in Session speichern
      */
     public static function flashOldInput(array $data): void

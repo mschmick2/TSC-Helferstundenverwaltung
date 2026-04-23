@@ -4,9 +4,17 @@
  * @var \App\Models\EventTemplateTask[] $tasks
  * @var \App\Models\Category[] $categories
  * @var bool $hasDerivedEvents
+ * @var bool|null $treeEditorEnabled   (I7c Phase 2)
+ * @var array<int, array>|null $treeData (Aggregator-Output)
+ * @var string|null $csrfToken
  */
 use App\Helpers\ViewHelper;
 use App\Models\EventTask;
+
+$treeEditorEnabled = !empty($treeEditorEnabled);
+$treeData          = $treeData ?? [];
+$csrfTokenString   = $csrfToken ?? ($_SESSION['csrf_token'] ?? '');
+$templateIdForTree = (int) $template->getId();
 ?>
 
 <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
@@ -38,6 +46,95 @@ use App\Models\EventTask;
         Aenderungen nur ueber <strong>"Als neue Version speichern"</strong> moeglich.
     </div>
 <?php endif; ?>
+
+<?php if ($treeEditorEnabled):
+    // I7c Phase 2: hierarchischer Aufgabenbaum-Editor.
+    // Container-Closure gegen Scope-Leak in rekursiven Partials (vgl.
+    // .claude/rules/05-frontend.md "Rekursive Partials"). Setzt $context,
+    // $entityId und $csrfToken fuer die Include-Rekursion in
+    // _task_tree_node.php.
+    $renderTaskNode = function (array $node, int $depth) use (
+        &$renderTaskNode, $csrfTokenString, $templateIdForTree
+    ): void {
+        $csrfToken = $csrfTokenString;
+        $context   = 'template';
+        $entityId  = $templateIdForTree;
+        // $eventId fuer Rueckwaerts-Kompatibilitaet im Partial-Fallback
+        // belassen — $entityId wird bevorzugt; es ueberschreibt nichts.
+        $eventId   = $templateIdForTree;
+        include __DIR__ . '/../events/_task_tree_node.php';
+    };
+
+    $categoriesJson = json_encode(
+        array_map(
+            static fn($c) => [
+                'id'              => (int) $c->getId(),
+                'name'            => $c->getName(),
+                'is_contribution' => $c->isContribution(),
+            ],
+            $categories
+        ),
+        JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP
+    );
+?>
+<section class="task-tree-editor"
+         id="task-tree-editor"
+         data-context="template"
+         data-entity-id="<?= $templateIdForTree ?>"
+         data-csrf-token="<?= ViewHelper::e($csrfTokenString) ?>"
+         data-endpoint-tree="<?= ViewHelper::url('/admin/event-templates/' . $templateIdForTree . '/tasks/tree') ?>"
+         data-endpoint-create="<?= ViewHelper::url('/admin/event-templates/' . $templateIdForTree . '/tasks/node') ?>"
+         data-endpoint-reorder="<?= ViewHelper::url('/admin/event-templates/' . $templateIdForTree . '/tasks/reorder') ?>"
+         data-categories="<?= ViewHelper::e($categoriesJson) ?>">
+
+    <div class="d-flex align-items-center justify-content-between mb-2">
+        <h2 class="h4 mb-0">
+            <i class="bi bi-diagram-3" aria-hidden="true"></i>
+            Aufgabenbaum
+        </h2>
+        <button type="button" class="btn btn-primary btn-sm"
+                data-action="add-child"
+                data-parent-task-id=""
+                title="Top-Level-Knoten anlegen">
+            <i class="bi bi-plus-circle" aria-hidden="true"></i>
+            Knoten anlegen
+        </button>
+    </div>
+
+    <?php include __DIR__ . '/../events/_task_edit_modal.php'; ?>
+
+    <?php if (empty($treeData)): ?>
+        <p class="text-muted mb-0">
+            Noch keine Aufgaben. Lege den ersten Knoten oben an &mdash; ein Gruppen-
+            Knoten fasst weitere Aufgaben zusammen, ein Aufgaben-Knoten steht fuer
+            eine konkrete Helfer-Taetigkeit. Zeitfenster werden als Offset zum
+            Event-Start in Minuten gepflegt.
+        </p>
+    <?php else: ?>
+        <ul class="task-tree-root list-unstyled mb-0"
+            data-parent-task-id=""
+            data-endpoint-reorder="<?= ViewHelper::url('/admin/event-templates/' . $templateIdForTree . '/tasks/reorder') ?>">
+            <?php foreach ($treeData as $topNode): ?>
+                <?php $renderTaskNode($topNode, 0); ?>
+            <?php endforeach; ?>
+        </ul>
+    <?php endif; ?>
+
+    <noscript>
+        <div class="alert alert-warning mt-3" role="alert">
+            <strong>JavaScript aus:</strong>
+            Der Aufgabenbaum-Editor (Drag &amp; Drop, Modal) braucht JavaScript.
+            Bitte deaktiviere das Flag events.tree_editor_enabled fuer die flache
+            Legacy-Liste.
+        </div>
+    </noscript>
+</section>
+
+<script src="<?= ViewHelper::url('/js/vendor/sortablejs/Sortable.min.js') ?>"></script>
+<script src="<?= ViewHelper::url('/js/event-task-tree.js') ?>"></script>
+
+<hr class="my-4">
+<?php endif; // treeEditorEnabled ?>
 
 <?php if (!empty($tasks)): ?>
     <!-- Save as new Version -->
@@ -76,7 +173,9 @@ use App\Models\EventTask;
     </div>
 <?php endif; ?>
 
-<!-- Task-Liste mit Inline-Edit -->
+<?php if (!$treeEditorEnabled): ?>
+<!-- Task-Liste mit Inline-Edit (Legacy-Flach-UI; ersetzt durch Tree-Editor,
+     wenn events.tree_editor_enabled=1 und Template nicht hasDerivedEvents). -->
 <div class="card mb-3">
     <div class="card-header d-flex justify-content-between align-items-center">
         <h2 class="h5 mb-0"><i class="bi bi-list-task"></i> Task-Vorlagen (<?= count($tasks) ?>)</h2>
@@ -199,3 +298,4 @@ use App\Models\EventTask;
         <?php endif; ?>
     </div>
 </div>
+<?php endif; // !$treeEditorEnabled ?>
