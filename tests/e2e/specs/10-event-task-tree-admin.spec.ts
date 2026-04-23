@@ -205,6 +205,35 @@ test.describe('Aufgabenbaum-Editor — Admin-Flows (I7b1)', () => {
     await tree.cancelModal();
   });
 
+  test('I7b3: Leaf ohne Zusagen hat task-status-empty-Klasse + Badge', async ({ page }) => {
+    // Essensausgabe hat capacity_target=2, current_count=0 → EMPTY.
+    // Dieser Test deckt den Admin-Editor-Fall ab; PARTIAL/FULL werden in
+    // Spec 12 (Mitglieder-Accordion) mit echten Zusagen getestet — der
+    // Admin-Editor hat keinen Uebernehmen-Flow.
+    const login = new LoginPage(page);
+    const tree = new AdminEventTreePage(page);
+    await login.loginAs(EVENT_ADMIN);
+    await tree.gotoEdit(eventId);
+
+    const leaf = tree.nodeByTitle('Essensausgabe');
+    await expect(leaf).toHaveClass(/task-status-empty/);
+    await expect(leaf).toHaveAttribute('aria-label', /Status: keine Zusagen/);
+    await expect(leaf.locator('.task-status-badge--empty').first()).toContainText(/keine Zusage/);
+  });
+
+  test('I7b3: Gruppe mit EMPTY-Kind zeigt EMPTY-Status (Rollup)', async ({ page }) => {
+    // Thekendienst enthaelt Essensausgabe (0/2, EMPTY). Schlechtester-
+    // Kinderstatus-Rollup (G1-Entscheidung A Variante 1) → Gruppe ist EMPTY.
+    const login = new LoginPage(page);
+    const tree = new AdminEventTreePage(page);
+    await login.loginAs(EVENT_ADMIN);
+    await tree.gotoEdit(eventId);
+
+    const group = tree.nodeByTitle('Thekendienst');
+    await expect(group).toHaveClass(/task-status-empty/);
+    await expect(group).toHaveAttribute('aria-label', /Status: keine Zusagen/);
+  });
+
   test('Flag=0 → alte flache UI, Tree-Widget weg', async ({ page }) => {
     setE2eSetting('events.tree_editor_enabled', '0');
     try {

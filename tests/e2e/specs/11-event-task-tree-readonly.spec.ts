@@ -145,6 +145,25 @@ test.describe('Aufgabenbaum-Editor — Read-Only-Detail-Ansicht (I7b1 Phase 3c)'
     await tree.expectEditorVisible();
   });
 
+  test('I7b3: Read-Only-Baum zeigt Status-Klassen und Badges an Leaves', async ({ page }) => {
+    // Setup: Event hat Hallenaufbau (Gruppe) > Musik (Leaf, cap=ziel-2,
+    // keine Zusagen). Beide sollten Status EMPTY haben — kein Mitglied hat
+    // bisher uebernommen. Dies testet, dass die Read-Only-View die
+    // Status-Klassen und Badges genauso rendert wie der Editor (Konsistenz).
+    const login = new LoginPage(page);
+    const tree = new AdminEventTreePage(page);
+
+    await login.loginAs(EVENT_ADMIN);
+    await tree.gotoShow(treeEventId);
+
+    // Leaf Musik: hat capacity_target=2, current_count=0 → EMPTY.
+    const readonlyRoot = page.locator('.task-tree-readonly').first();
+    await expect(readonlyRoot.locator('.task-status-empty').first()).toBeVisible();
+    await expect(readonlyRoot.locator('.task-status-badge--empty').first()).toContainText(/keine Zusage/);
+    // Gruppe Hallenaufbau: Rollup → EMPTY.
+    await expect(readonlyRoot).toContainText(/keine Zusage/);
+  });
+
   test('Event ohne Baumstruktur rendert flache Tabelle unveraendert', async ({ page }) => {
     const login = new LoginPage(page);
     const tree = new AdminEventTreePage(page);

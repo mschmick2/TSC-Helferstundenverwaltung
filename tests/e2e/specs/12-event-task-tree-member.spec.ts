@@ -223,6 +223,59 @@ test.describe('Mitglieder-Accordion — Tree-View (I7b2)', () => {
     await acc.expectGroupVisible('Testbereich');
   });
 
+  test('I7b3: Status-Klassen und Badges + Orthogonalitaet zum Filter', async ({ page }) => {
+    // Zustand nach Setup:
+    //   Offen-Aufgabe       → capacity 0/5 → EMPTY (rot), kein Filter-Effekt.
+    //   Voll-Aufgabe        → capacity 1/1 → FULL  (gruen), Filter blendet aus.
+    //   Unbegrenzt-Aufgabe  → capacity null, 0 Zusagen → EMPTY (rot), kein
+    //                         data-open-count → bei Filter sichtbar.
+    //   Testbereich-Gruppe  → Rollup EMPTY (Offen-Aufgabe ist leer).
+    //   Voll-Bereich-Gruppe → Rollup FULL  (alle Kinder voll).
+    const login = new LoginPage(page);
+    const acc   = new MemberEventAccordionPage(page);
+
+    await login.loginAs(BOB);
+    await acc.goto(treeEventId);
+    await acc.openGroup('Testbereich');
+    await acc.openGroup('Voll-Bereich');
+
+    // Leaves: jede der drei Kategorien traegt die richtige Status-Klasse
+    // + Badge.
+    await expect(acc.leafByTitle('Offen-Aufgabe'))
+      .toHaveClass(/task-status-empty/);
+    await expect(
+      acc.leafByTitle('Offen-Aufgabe').locator('.task-status-badge--empty').first()
+    ).toContainText(/keine Zusage/);
+
+    await expect(acc.leafByTitle('Voll-Aufgabe'))
+      .toHaveClass(/task-status-full/);
+    await expect(
+      acc.leafByTitle('Voll-Aufgabe').locator('.task-status-badge--full').first()
+    ).toContainText(/voll/);
+
+    await expect(acc.leafByTitle('Unbegrenzt-Aufgabe'))
+      .toHaveClass(/task-status-empty/);
+
+    // Gruppen: Rollup propagiert den schlechtesten Kinderstatus.
+    await expect(acc.groupByTitle('Testbereich')).toHaveClass(/task-status-empty/);
+    await expect(acc.groupByTitle('Voll-Bereich')).toHaveClass(/task-status-full/);
+
+    // Orthogonalitaet: Filter blendet FULL-Elemente aus; ihre Status-Klasse
+    // bleibt korrekt am versteckten Element. Die Status-Information ist
+    // unabhaengig vom Filter-Mechanismus.
+    await acc.enableFilter();
+    await acc.expectLeafHidden('Voll-Aufgabe');
+    await acc.expectGroupHidden('Voll-Bereich');
+    // Offen-Aufgabe (EMPTY) und Unbegrenzt-Aufgabe (EMPTY, unbegrenzt) bleiben
+    // sichtbar — EMPTY hat data-open-count > 0 bzw. gar kein Attribut.
+    await acc.expectLeafVisible('Offen-Aufgabe');
+    await acc.expectLeafVisible('Unbegrenzt-Aufgabe');
+
+    // Selbst bei ausgeblendetem FULL-Element bleibt die Klasse im DOM.
+    await expect(acc.leafByTitle('Voll-Aufgabe'))
+      .toHaveClass(/task-status-full/);
+  });
+
   test('Uebernehmen-Button im Accordion funktioniert', async ({ page }) => {
     const login = new LoginPage(page);
     const acc   = new MemberEventAccordionPage(page);

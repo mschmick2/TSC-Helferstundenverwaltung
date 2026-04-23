@@ -52,23 +52,25 @@ final class TaskTreeAggregator
      * Tree mit verschachtelten children und Aggregaten je Gruppe.
      *
      * @param EventTask[] $tasks Alle aktiven Tasks eines Events (flach).
-     * @param array<int,int> $assignmentCounts Optional: Map task_id -> Anzahl
-     *     aktiver Zusagen. Wenn gegeben (siehe
-     *     EventTaskAssignmentRepository::countActiveByEvent), wird
-     *     `open_slots_subtree` als Summe von max(0, helpers - active) ueber
-     *     alle Leaves im Subtree befuellt. Wenn leer (Default), bleibt
-     *     `open_slots_subtree` null (I7a-Verhalten, fuer Editor-Sicht
-     *     ausreichend).
+     * @param array<int,int>|null $assignmentCounts Optional: Map task_id ->
+     *     Anzahl aktiver Zusagen. Wenn uebergeben (auch als leeres Array),
+     *     werden `open_slots_subtree` und `status` pro Knoten berechnet —
+     *     fehlende Task-IDs gelten als 0 Zusagen. Wenn null (Default),
+     *     bleiben beide Felder null (I7a-Verhalten, fuer Editor-Sicht
+     *     ausreichend). Unterscheidung null-vs-[] ist wichtig: leer heisst
+     *     "Event hat keine Zusagen, alle Leaves sind EMPTY"; null heisst
+     *     "Aufrufer liefert keine Zusagen-Info".
      * @return array<int, array{
      *     task: EventTask,
      *     children: array,
      *     helpers_subtree: int,
      *     hours_subtree: float,
      *     leaves_subtree: int,
-     *     open_slots_subtree: int|null
+     *     open_slots_subtree: int|null,
+     *     status: TaskStatus|null
      * }>
      */
-    public function buildTree(array $tasks, array $assignmentCounts = []): array
+    public function buildTree(array $tasks, ?array $assignmentCounts = null): array
     {
         // Index nach parent-ID (0 = Top-Level, weil int-Keys hashbar sind)
         $byParent = [];
@@ -192,10 +194,10 @@ final class TaskTreeAggregator
      * Rekursiver Aufbau der Tree-Knoten samt Subtree-Aggregaten.
      *
      * @param array<int, EventTask[]> $byParent Geschwister-Map (Key 0 = Top-Level).
-     * @param array<int,int> $assignmentCounts Map task_id -> aktive Zusagen.
-     *     Leeres Array deaktiviert die open_slots_subtree-Berechnung
-     *     (open_slots_subtree bleibt null, I7a-Default) und setzt auch
-     *     'status' auf null (I7b3: ohne Zusage-Zahlen keine Farbkodierung).
+     * @param array<int,int>|null $assignmentCounts Map task_id -> aktive
+     *     Zusagen. null deaktiviert die open_slots_subtree-/status-Berechnung
+     *     (beide Felder bleiben null, I7a-Default). Ein Array — auch ein
+     *     leeres — aktiviert sie; fehlende Task-IDs gelten als 0 Zusagen.
      * @return array<int, array{
      *     task: EventTask,
      *     children: array,
@@ -206,9 +208,9 @@ final class TaskTreeAggregator
      *     status: TaskStatus|null
      * }>
      */
-    private function assemble(array $byParent, int $parentKey, array $assignmentCounts = []): array
+    private function assemble(array $byParent, int $parentKey, ?array $assignmentCounts = null): array
     {
-        $countsActive = $assignmentCounts !== [];
+        $countsActive = $assignmentCounts !== null;
         $out = [];
         foreach ($byParent[$parentKey] ?? [] as $task) {
             $children = $this->assemble($byParent, (int) $task->getId(), $assignmentCounts);
