@@ -265,4 +265,63 @@ final class TaskTreeAggregator
         }
         return $out;
     }
+
+    /**
+     * Liefert alle Leaves des Events als flache Liste in Depth-First-
+     * Baum-Reihenfolge (Modul 6 I7b4). Gruppen erscheinen nicht in der
+     * Liste — sie haben keinen eigenen Zeitpunkt; ihr Titel wandert in
+     * das Feld `ancestor_path` der ihnen untergeordneten Leaves.
+     *
+     * Die Liste ist bewusst NICHT nach start_at sortiert — der Konsument
+     * (Controller oder View) sortiert stabil per usort(). PHP 8+ garantiert
+     * die Stabilitaet von usort, wodurch die Depth-First-Reihenfolge als
+     * Sekundaer-Sortier-Schluessel erhalten bleibt (Zweck: Tasks mit
+     * gleichem start_at landen in Baum-Reihenfolge).
+     *
+     * @param EventTask[] $tasks Flaches Task-Array des Events (alle Knoten).
+     * @param array<int,int>|null $assignmentCounts Optional: Map task_id ->
+     *     Anzahl aktiver Zusagen. Siehe buildTree() fuer Semantik.
+     * @return list<array{
+     *     task: EventTask,
+     *     status: TaskStatus|null,
+     *     helpers: int,
+     *     open_slots: int|null,
+     *     ancestor_path: list<string>
+     * }>
+     */
+    public function flattenToList(array $tasks, ?array $assignmentCounts = null): array
+    {
+        $tree = $this->buildTree($tasks, $assignmentCounts);
+        $out = [];
+        $this->collectLeaves($tree, [], $out);
+        return $out;
+    }
+
+    /**
+     * Rekursiver Helfer zu flattenToList(): traversiert den Tree
+     * depth-first und legt pro Leaf einen Eintrag im Out-Array ab.
+     *
+     * @param array<int, array{task: EventTask, children: array, status: TaskStatus|null, helpers_subtree: int, open_slots_subtree: int|null}> $nodes
+     * @param list<string> $ancestorTitles Titel der Gruppen-Vorfahren, Wurzel zuerst.
+     * @param list<array{task: EventTask, status: TaskStatus|null, helpers: int, open_slots: int|null, ancestor_path: list<string>}> $out
+     */
+    private function collectLeaves(array $nodes, array $ancestorTitles, array &$out): void
+    {
+        foreach ($nodes as $node) {
+            $task = $node['task'];
+            if ($task->isGroup()) {
+                $next = $ancestorTitles;
+                $next[] = $task->getTitle();
+                $this->collectLeaves($node['children'], $next, $out);
+            } else {
+                $out[] = [
+                    'task'          => $task,
+                    'status'        => $node['status'],
+                    'helpers'       => $node['helpers_subtree'],
+                    'open_slots'    => $node['open_slots_subtree'],
+                    'ancestor_path' => $ancestorTitles,
+                ];
+            }
+        }
+    }
 }

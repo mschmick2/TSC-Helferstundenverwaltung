@@ -636,7 +636,9 @@ return [
             $c->get(EventOrganizerRepository::class),
             $c->get(UserRepository::class),
             $c->get(\App\Services\EventAssignmentService::class),
-            $c->get('settings')
+            $c->get('settings'),
+            $c->get(\App\Services\TaskTreeAggregator::class),
+            $c->get(\App\Services\SettingsService::class)
         );
     },
 ];

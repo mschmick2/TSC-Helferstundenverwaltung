@@ -703,6 +703,74 @@ class EventAdminController extends BaseController
     }
 
     // =========================================================================
+    // GET /admin/events/{eventId}/tasks-by-date  (Modul 6 I7b4)
+    //
+    // Chronologische Leaves-Liste fuer Admins. Read-Only; Task-Titel werden
+    // als Link auf /admin/events/{eventId} gerendert, weil der Admin-Kontext
+    // die volle Bearbeitungs-UI dort erreicht. Gleiche View wie im
+    // Organisator-Kontext; nur linkTaskTitles=true unterscheidet.
+    // =========================================================================
+
+    public function tasksByDate(Request $request, Response $response): Response
+    {
+        $eventId = (int) $this->routeArgs($request)['eventId'];
+
+        if (!$this->treeEditorEnabled()) {
+            return $response->withStatus(404);
+        }
+
+        $user = $request->getAttribute('user');
+        $this->assertEventEditPermission($user, $eventId, $this->organizerRepo);
+
+        $event = $this->eventRepo->findById($eventId);
+        if ($event === null) {
+            return $response->withStatus(404);
+        }
+
+        if ($this->assignmentRepo === null || $this->treeAggregator === null) {
+            return $response->withStatus(404);
+        }
+
+        $tasks            = $this->taskRepo->findByEvent($eventId);
+        $assignmentCounts = $this->assignmentRepo->countActiveByEvent($eventId);
+        $flatList         = $this->treeAggregator->flattenToList($tasks, $assignmentCounts);
+
+        // Primary-Sort: start_at asc (nulls last). PHP-8-usort ist stabil —
+        // die Depth-First-Baum-Reihenfolge aus flattenToList bleibt als
+        // Sekundaer-Sortier-Schluessel erhalten.
+        usort($flatList, static function (array $a, array $b): int {
+            $aStart = $a['task']->getStartAt();
+            $bStart = $b['task']->getStartAt();
+            if ($aStart === null && $bStart === null) {
+                return 0;
+            }
+            if ($aStart === null) {
+                return 1;
+            }
+            if ($bStart === null) {
+                return -1;
+            }
+            return strcmp($aStart, $bStart);
+        });
+
+        return $this->render($response, 'admin/events/tasks_by_date', [
+            'title' => 'Aufgaben nach Datum — ' . $event->getTitle(),
+            'user' => $user,
+            'settings' => $this->settings,
+            'event' => $event,
+            'flatList' => $flatList,
+            // Admin-Kontext: Titel als Link auf Admin-Detail-Seite.
+            'linkTaskTitles' => true,
+            'breadcrumbs' => [
+                ['label' => 'Dashboard', 'url' => '/'],
+                ['label' => 'Events', 'url' => '/admin/events'],
+                ['label' => $event->getTitle(), 'url' => '/admin/events/' . $eventId],
+                ['label' => 'Aufgaben nach Datum'],
+            ],
+        ]);
+    }
+
+    // =========================================================================
     // Private Helfer
     // =========================================================================
 

@@ -13,6 +13,8 @@ use App\Repositories\EventTaskAssignmentRepository;
 use App\Repositories\EventTaskRepository;
 use App\Repositories\UserRepository;
 use App\Services\EventAssignmentService;
+use App\Services\SettingsService;
+use App\Services\TaskTreeAggregator;
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
 
@@ -31,7 +33,9 @@ class OrganizerEventController extends BaseController
         private EventOrganizerRepository $organizerRepo,
         private UserRepository $userRepo,
         private EventAssignmentService $assignmentService,
-        private array $settings
+        private array $settings,
+        private ?TaskTreeAggregator $treeAggregator = null,
+        private ?SettingsService $settingsService = null
     ) {
     }
 
@@ -209,5 +213,80 @@ class OrganizerEventController extends BaseController
         }
 
         return $this->redirect($response, '/organizer/events');
+    }
+
+    // =========================================================================
+    // GET /organizer/events/{eventId}/tasks-by-date  (Modul 6 I7b4)
+    //
+    // Chronologische Leaves-Liste fuer Organisatoren des Events. Read-Only;
+    // Task-Titel werden NICHT als Link gerendert, weil die Admin-Detail-Seite
+    // durch RoleMiddleware event_admin-gebunden ist und Organisatoren dort
+    // einen 403 bekommen wuerden. Der non-modale Organisator-Editor folgt
+    // in I7e.
+    // =========================================================================
+
+    public function tasksByDate(Request $request, Response $response): Response
+    {
+        $user = $request->getAttribute('user');
+        $eventId = (int) $this->routeArgs($request)['eventId'];
+
+        // Flag-Gate: hinter events.tree_editor_enabled. Konsistent mit
+        // I7b1/I7b2/I7b3.
+        if ($this->settingsService === null
+            || $this->settingsService->getString('events.tree_editor_enabled', '0') !== '1'
+            || $this->treeAggregator === null
+        ) {
+            return $response->withStatus(404);
+        }
+
+        // Owner-Check: Organisator-Group hat keine RoleMiddleware; ein
+        // Nicht-Organisator darf das Event nicht sehen. 403 statt 404, damit
+        // die Existenz des Events nicht geraten werden muss.
+        if (!$this->organizerRepo->isOrganizer($eventId, (int) $user->getId())) {
+            return $response->withStatus(403);
+        }
+
+        $event = $this->eventRepo->findById($eventId);
+        if ($event === null) {
+            return $response->withStatus(404);
+        }
+
+        $tasks            = $this->taskRepo->findByEvent($eventId);
+        $assignmentCounts = $this->assignmentRepo->countActiveByEvent($eventId);
+        $flatList         = $this->treeAggregator->flattenToList($tasks, $assignmentCounts);
+
+        // Primary-Sort: start_at asc (nulls last). PHP-8-usort ist stabil —
+        // die Depth-First-Baum-Reihenfolge aus flattenToList bleibt als
+        // Sekundaer-Sortier-Schluessel erhalten.
+        usort($flatList, static function (array $a, array $b): int {
+            $aStart = $a['task']->getStartAt();
+            $bStart = $b['task']->getStartAt();
+            if ($aStart === null && $bStart === null) {
+                return 0;
+            }
+            if ($aStart === null) {
+                return 1;
+            }
+            if ($bStart === null) {
+                return -1;
+            }
+            return strcmp($aStart, $bStart);
+        });
+
+        return $this->render($response, 'organizer/events/tasks_by_date', [
+            'title' => 'Aufgaben nach Datum — ' . $event->getTitle(),
+            'user' => $user,
+            'settings' => $this->settings,
+            'event' => $event,
+            'flatList' => $flatList,
+            // Organisator sieht reine Liste, ohne Link auf Admin-Detail-Seite.
+            // RoleMiddleware an /admin/events/{id} liefert sonst 403.
+            'linkTaskTitles' => false,
+            'breadcrumbs' => [
+                ['label' => 'Dashboard', 'url' => '/'],
+                ['label' => 'Als Organisator', 'url' => '/organizer/events'],
+                ['label' => $event->getTitle() . ' — Aufgaben nach Datum'],
+            ],
+        ]);
     }
 }

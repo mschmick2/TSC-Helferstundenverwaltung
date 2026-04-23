@@ -216,6 +216,11 @@ return function (App $app): void {
         $group->post('/events/{eventId:[0-9]+}/tasks/{taskId:[0-9]+}',
             [EventAdminController::class, 'updateTaskNode']);
 
+        // Sortierbare Task-Liste (Modul 6 I7b4) — read-only chronologische
+        // Leaves-Liste. Hinter events.tree_editor_enabled. Admin-Kontext.
+        $group->get('/events/{eventId:[0-9]+}/tasks-by-date',
+            [EventAdminController::class, 'tasksByDate']);
+
         // Event-Templates (I1: CRUD; I4: Task-Editor, Versionierung, Ableitung)
         $group->get('/event-templates', [EventTemplateController::class, 'index']);
         $group->post('/event-templates', [EventTemplateController::class, 'store']);
@@ -298,6 +303,14 @@ return function (App $app): void {
         $group->post(
             '/assignments/{id:[0-9]+}/reject-cancel',
             [OrganizerEventController::class, 'rejectCancel']
+        );
+
+        // Sortierbare Task-Liste (Modul 6 I7b4) — read-only chronologische
+        // Leaves-Liste. Hinter events.tree_editor_enabled. Owner-Check
+        // intern im Controller via EventOrganizerRepository::isOrganizer.
+        $group->get(
+            '/events/{eventId:[0-9]+}/tasks-by-date',
+            [OrganizerEventController::class, 'tasksByDate']
         );
     })
         ->add(CsrfMiddleware::class)
