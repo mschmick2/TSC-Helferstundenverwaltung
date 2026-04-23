@@ -456,8 +456,12 @@ final class EventTemplateService
 
     /**
      * ENUM-Allowlist-Validierung fuer Task-Inputs (G4-Muster aus I1).
+     *
+     * Wird seit I7c auch von TemplateTaskTreeService delegiert (Service-
+     * Delegation statt Validation-Duplikat laut I7c G1-Entscheidung A).
+     * Stateless — kein interner Zustand, keine Nebenwirkung.
      */
-    private function validateTaskData(array $data): array
+    public function validateTaskData(array $data): array
     {
         $title = trim((string) ($data['title'] ?? ''));
         if ($title === '') {

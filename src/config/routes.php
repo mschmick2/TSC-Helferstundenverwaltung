@@ -238,6 +238,25 @@ return function (App $app): void {
             [EventTemplateController::class, 'deriveForm']);
         $group->post('/event-templates/{id:[0-9]+}/derive',
             [EventTemplateController::class, 'deriveStore']);
+
+        // Template-Aufgabenbaum-Editor (Modul 6 I7c) — hinter Settings-Flag
+        // events.tree_editor_enabled. Parallel zu den Event-Tree-Endpunkten.
+        $group->get('/event-templates/{templateId:[0-9]+}/tasks/tree',
+            [EventTemplateController::class, 'showTaskTree']);
+        $group->post('/event-templates/{templateId:[0-9]+}/tasks/node',
+            [EventTemplateController::class, 'createTaskNode']);
+        $group->post('/event-templates/{templateId:[0-9]+}/tasks/reorder',
+            [EventTemplateController::class, 'reorderTasks']);
+        $group->post('/event-templates/{templateId:[0-9]+}/tasks/{taskId:[0-9]+}/move',
+            [EventTemplateController::class, 'moveTaskNode']);
+        $group->post('/event-templates/{templateId:[0-9]+}/tasks/{taskId:[0-9]+}/convert',
+            [EventTemplateController::class, 'convertTaskNode']);
+        $group->post('/event-templates/{templateId:[0-9]+}/tasks/{taskId:[0-9]+}/tree-delete',
+            [EventTemplateController::class, 'deleteTaskNode']);
+        $group->get('/event-templates/{templateId:[0-9]+}/tasks/{taskId:[0-9]+}/edit',
+            [EventTemplateController::class, 'editTaskNode']);
+        $group->post('/event-templates/{templateId:[0-9]+}/tasks/{taskId:[0-9]+}',
+            [EventTemplateController::class, 'updateTaskNode']);
     })
         ->add(new RoleMiddleware(['event_admin', 'administrator']))
         ->add(CsrfMiddleware::class)

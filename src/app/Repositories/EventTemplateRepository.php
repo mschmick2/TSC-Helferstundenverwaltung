@@ -486,4 +486,74 @@ class EventTemplateRepository
         }
         return $count;
     }
+
+    // =========================================================================
+    // Tree-Editor-Operationen (Modul 6 I7c)
+    //
+    // Die meisten Tree-Operationen (moveTask, convertTaskToGroup,
+    // convertTaskToLeaf, getTaskDepth, isTaskDescendantOf,
+    // countActiveTaskChildren) existieren bereits aus der I7a-Vorbereitung und
+    // werden vom neuen TemplateTaskTreeService genutzt. Hier ergaenzt werden
+    // nur die beiden Methoden, die I7a noch nicht hat:
+    //
+    //   - reorderTaskSiblings: Parent-Geschwister-Reorder mit Step 10,
+    //     analog zu EventTaskRepository::reorderSiblings (die bestehende
+    //     reorderTasks() oben setzt sort_order als index-0/1/2 ueber ALLE
+    //     Tasks eines Templates und stammt aus dem flachen I4-Editor).
+    //   - maxSubtreeDepth: fuer Move-Validation (Subtree darf nicht unter
+    //     eine Gruppe umgehaengt werden, die MaxDepth sprengt).
+    //
+    // Templates haben kein Soft-Delete auf Task-Ebene (hartes DELETE via
+    // deleteTask() oben) und keine Assignments — daher auch keine
+    // countActiveAssignments-Analoge.
+    // =========================================================================
+
+    /**
+     * Geschwister einer Ebene neu sortieren. sort_order in Schritten von 10
+     * (analog zu EventTaskRepository::reorderSiblings — billige Einzelmoves
+     * ohne Re-Numbering moeglich). Defense-in-Depth via template_id-Filter.
+     */
+    public function reorderTaskSiblings(int $templateId, array $orderedIds): void
+    {
+        $stmt = $this->pdo->prepare(
+            "UPDATE event_template_tasks
+             SET sort_order = :ord
+             WHERE id = :id AND template_id = :tid"
+        );
+        $step = 10;
+        foreach (array_values($orderedIds) as $index => $taskId) {
+            $stmt->execute([
+                'ord' => ($index + 1) * $step,
+                'id'  => (int) $taskId,
+                'tid' => $templateId,
+            ]);
+        }
+    }
+
+    /**
+     * Maximal-Tiefe des Subtrees unter einem Knoten (0 = nur der Knoten
+     * selbst, 1 = hat Kinder, ...). Wird beim Move validiert: ein Knoten
+     * mit tiefem Subtree darf nicht unter eine Gruppe umgehaengt werden,
+     * wenn dadurch die Maximaltiefe ueberschritten wuerde.
+     */
+    public function maxSubtreeDepth(int $taskId): int
+    {
+        $stmt = $this->pdo->prepare(
+            "SELECT id FROM event_template_tasks
+             WHERE parent_template_task_id = :pid"
+        );
+        $stmt->execute(['pid' => $taskId]);
+        $children = $stmt->fetchAll(PDO::FETCH_COLUMN);
+        if ($children === false || count($children) === 0) {
+            return 0;
+        }
+        $max = 0;
+        foreach ($children as $childId) {
+            $depth = 1 + $this->maxSubtreeDepth((int) $childId);
+            if ($depth > $max) {
+                $max = $depth;
+            }
+        }
+        return $max;
+    }
 }

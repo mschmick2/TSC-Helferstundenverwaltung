@@ -237,6 +237,21 @@ return [
         return new \App\Services\TaskTreeAggregator();
     },
 
+    // --- Modul 6 I7c: Template-Aufgabenbaum ---------------------------------
+    \App\Services\TemplateTaskTreeService::class => function (ContainerInterface $c): \App\Services\TemplateTaskTreeService {
+        return new \App\Services\TemplateTaskTreeService(
+            $c->get(PDO::class),
+            $c->get(EventTemplateRepository::class),
+            $c->get(SettingsRepository::class),
+            $c->get(AuditService::class),
+            $c->get(\App\Services\EventTemplateService::class)
+        );
+    },
+
+    \App\Services\TemplateTaskTreeAggregator::class => function (): \App\Services\TemplateTaskTreeAggregator {
+        return new \App\Services\TemplateTaskTreeAggregator();
+    },
+
     // --- Modul 6 I5: Kalender + iCal -----------------------------------------
     \App\Services\IcalService::class => function (): \App\Services\IcalService {
         return new \App\Services\IcalService();
@@ -588,7 +603,10 @@ return [
             $c->get(CategoryRepository::class),
             $c->get(AuditService::class),
             $c->get(\App\Services\EventTemplateService::class),
-            $c->get('settings')
+            $c->get('settings'),
+            $c->get(\App\Services\TemplateTaskTreeService::class),
+            $c->get(\App\Services\TemplateTaskTreeAggregator::class),
+            $c->get(SettingsService::class)
         );
     },
 
