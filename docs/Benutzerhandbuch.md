@@ -775,6 +775,41 @@ Die Detailansicht eines Events zeigt:
 - Bereits belegte Plaetze (mit Namen der Helfer, soweit Sichtbarkeit konfiguriert)
 - Freie Plaetze als Schaltflaeche **Aufgabe uebernehmen**
 
+**Hierarchische Aufgabenansicht (optional, ab VAES 1.4.1)**
+
+Hat der Event-Administrator die Aufgaben eines Events in eine
+Baumstruktur gegliedert (z.B. *Thekendienst > Essensausgabe >
+Nachmittagsschicht*), rendert die Event-Detailseite keinen Karten-
+Block mehr, sondern eine aufklappbare Baumansicht (HTML-
+`<details>`-Elemente, ohne JavaScript bedienbar).
+
+- **Gruppen aufklappen / zuklappen:** Klick auf den Gruppen-Titel,
+  Enter- oder Leertaste bei Tastatur-Fokus. Gruppen, in denen es
+  noch offene Plaetze gibt, sind beim Laden automatisch aufgeklappt;
+  voll belegte Gruppen starten eingeklappt, sind aber manuell
+  oeffenbar.
+- **Offen-Badge:** Neben jedem Gruppen-Titel steht die Zahl der
+  offenen Plaetze im gesamten Teilbaum (z.B. `3 offen`). Voll
+  belegte Gruppen bekommen ein `voll`-Badge.
+- **Filter "Nur offene Plaetze anzeigen":** Der Schalter oben an
+  der Baumansicht blendet voll belegte Leaves und Gruppen per CSS
+  aus. Sind nach dem Filtern keine Aufgaben mehr uebrig, erscheint
+  ein Hinweis *"Aktuell keine offenen Plaetze verfuegbar."*. Der
+  Filter ist rein clientseitig — kein Seiten-Reload, keine
+  Speicherung zwischen Browser-Sessions. Standard ist der Filter
+  aus (alle Aufgaben sichtbar).
+- **Aufgabe uebernehmen / Status:** Jeder Leaf (konkrete Aufgabe)
+  zeigt denselben Uebernehmen-Button wie die Karten-Ansicht. Flow
+  und Rueckgabe (*"Bereits zugesagt"*, *"Ausgebucht"*) sind 1:1
+  gleich — die Hierarchie aendert nur die Darstellung, nicht das
+  Verhalten.
+
+Der Administrator kann die Baumansicht jederzeit deaktivieren; das
+Event faellt dann auf die flache Karten-Ansicht zurueck. Ist kein
+Baumstruktur-Editor eingeschaltet oder hat das Event nur Top-Level-
+Aufgaben ohne Gruppen, erscheint weiterhin die flache Karten-Ansicht
+wie oben beschrieben.
+
 **Aufgabe uebernehmen:**
 1. Klicken Sie bei einer Aufgabe mit freien Plaetzen auf **Aufgabe uebernehmen**.
 2. Bestaetigen Sie die Sicherheitsabfrage.
