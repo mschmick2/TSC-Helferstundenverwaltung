@@ -288,4 +288,58 @@ class ViewHelperTest extends TestCase
     {
         $this->assertSame('0,00', ViewHelper::formatHours(0.0));
     }
+
+    // =========================================================================
+    // formatOffsetMinutes (Modul 6 I7c)
+    // =========================================================================
+
+    /** @test */
+    public function format_offset_minutes_positive_klein_einstellig(): void
+    {
+        self::assertSame('+30 min', ViewHelper::formatOffsetMinutes(30));
+    }
+
+    /** @test */
+    public function format_offset_minutes_positive_grenze_60(): void
+    {
+        // <= 60 bleibt in min
+        self::assertSame('+60 min', ViewHelper::formatOffsetMinutes(60));
+    }
+
+    /** @test */
+    public function format_offset_minutes_positive_gross_gemischt(): void
+    {
+        // > 60 wird in h + min aufgesplittet
+        self::assertSame('+2 h 30 min', ViewHelper::formatOffsetMinutes(150));
+    }
+
+    /** @test */
+    public function format_offset_minutes_positive_gross_ohne_rest(): void
+    {
+        self::assertSame('+2 h 0 min', ViewHelper::formatOffsetMinutes(120));
+    }
+
+    /** @test */
+    public function format_offset_minutes_negative_klein(): void
+    {
+        self::assertSame('-15 min', ViewHelper::formatOffsetMinutes(-15));
+    }
+
+    /** @test */
+    public function format_offset_minutes_negative_gross(): void
+    {
+        self::assertSame('-1 h 15 min', ViewHelper::formatOffsetMinutes(-75));
+    }
+
+    /** @test */
+    public function format_offset_minutes_null_returns_dash(): void
+    {
+        self::assertSame('-', ViewHelper::formatOffsetMinutes(null));
+    }
+
+    /** @test */
+    public function format_offset_minutes_null_value_positive(): void
+    {
+        self::assertSame('+0 min', ViewHelper::formatOffsetMinutes(0));
+    }
 }
