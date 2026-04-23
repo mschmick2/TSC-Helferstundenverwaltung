@@ -546,4 +546,107 @@ final class EventAdminControllerTreeInvariantsTest extends TestCase
             . '$hasTreeStructure)" enthalten — sonst greift der Baum-Pfad inkonsistent.'
         );
     }
+
+    // =========================================================================
+    // Gruppe H — Task-Status-Farbkodierung (Phase 4 I7b3)
+    // =========================================================================
+
+    public function test_serializeTreeForJson_includes_status_field(): void
+    {
+        $code = $this->read(self::CONTROLLER_PATH);
+        $body = $this->methodBody($code, 'serializeTreeForJson');
+
+        self::assertNotSame('', $body, 'serializeTreeForJson() fehlt.');
+        self::assertMatchesRegularExpression(
+            "/'status'\\s*=>/",
+            $body,
+            'serializeTreeForJson() muss ein status-Feld pro Knoten setzen '
+            . '(I7b3 Phase 2). Ohne das Feld koennte JS den Status nicht ueber '
+            . 'die showTaskTree-JSON-Response konsumieren.'
+        );
+        // Der Wert kommt aus $node['status']?->value — nullsafe, damit null-
+        // Status korrekt als JSON-null gerendert wird.
+        self::assertStringContainsString(
+            "\$node['status']?->value",
+            $body,
+            'serializeTreeForJson() muss nullsafe auf ->value zugreifen, damit '
+            . 'Aggregator-Nullwerte als JSON-null durchgereicht werden.'
+        );
+    }
+
+    public function test_task_tree_node_partial_renders_status_class(): void
+    {
+        $partial = $this->read(self::PARTIAL_EDITOR);
+
+        // $status-Variable kommt aus $node['status'].
+        self::assertMatchesRegularExpression(
+            "/\\\$status\\s*=\\s*\\\$node\\['status'\\]/",
+            $partial,
+            '_task_tree_node.php muss $status aus $node[\'status\'] ziehen.'
+        );
+
+        // cssClass() wird als CSS-Klasse am Wurzel-LI ausgegeben.
+        self::assertStringContainsString(
+            '$status->cssClass()',
+            $partial,
+            '_task_tree_node.php muss $status->cssClass() als Status-Klasse am '
+            . '<li> ausgeben.'
+        );
+    }
+
+    public function test_task_tree_node_partial_renders_status_badge(): void
+    {
+        $partial = $this->read(self::PARTIAL_EDITOR);
+
+        // Badge-Klasse task-status-badge--<status->value>.
+        self::assertStringContainsString(
+            'task-status-badge--',
+            $partial,
+            '_task_tree_node.php muss Status-Badge mit '
+            . 'task-status-badge--<value>-Modifier rendern.'
+        );
+        self::assertStringContainsString(
+            '$status->badgeLabel()',
+            $partial,
+            '_task_tree_node.php muss den Badge-Text ueber badgeLabel() '
+            . 'rendern, nicht hart-kodieren.'
+        );
+    }
+
+    public function test_task_tree_node_partial_respects_null_status(): void
+    {
+        $partial = $this->read(self::PARTIAL_EDITOR);
+
+        // Status-Rendering muss unter if ($status !== null)-Guard stehen,
+        // damit bei null-Status keine leere CSS-Klasse oder leeres Badge
+        // erscheint.
+        self::assertMatchesRegularExpression(
+            '/if\s*\(\s*\$status\s*!==\s*null\s*\).*?task-status-badge/s',
+            $partial,
+            '_task_tree_node.php darf das Status-Badge nur bei '
+            . '($status !== null) rendern.'
+        );
+    }
+
+    public function test_task_tree_readonly_partial_renders_status_same_pattern(): void
+    {
+        $partial = $this->read(self::PARTIAL_READONLY);
+
+        self::assertStringContainsString(
+            '$status->cssClass()',
+            $partial,
+            '_task_tree_readonly.php muss $status->cssClass() rendern '
+            . '(Konsistenz zum Editor-Partial).'
+        );
+        self::assertStringContainsString(
+            '$status->badgeLabel()',
+            $partial,
+            '_task_tree_readonly.php muss $status->badgeLabel() rendern.'
+        );
+        self::assertMatchesRegularExpression(
+            '/if\s*\(\s*\$status\s*!==\s*null\s*\)/',
+            $partial,
+            '_task_tree_readonly.php muss null-Toleranz per if-Guard haben.'
+        );
+    }
 }

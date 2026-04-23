@@ -460,4 +460,95 @@ final class MemberEventAccordionInvariantsTest extends TestCase
             . 'beibehalten (CAP_MAXIMUM + voll belegt).'
         );
     }
+
+    // =========================================================================
+    // Gruppe F — Task-Status-Farbkodierung (Phase 4 I7b3)
+    // =========================================================================
+
+    public function test_accordion_leaf_renders_status_class(): void
+    {
+        $partial = $this->read(self::PARTIAL_ACC);
+
+        // $status wird aus $node['status'] gezogen — gleiches Pattern wie in
+        // den Admin-Partials.
+        self::assertMatchesRegularExpression(
+            "/\\\$status\\s*=\\s*\\\$node\\['status'\\]/",
+            $partial,
+            '_task_group_accordion.php muss $status aus $node[\'status\'] '
+            . 'ziehen (I7b3).'
+        );
+
+        // cssClass() wird an <div class="task-group-accordion-leaf ...">
+        // angehangen.
+        self::assertStringContainsString(
+            '$status->cssClass()',
+            $partial,
+            '_task_group_accordion.php muss $status->cssClass() am Leaf-<div> '
+            . 'rendern.'
+        );
+    }
+
+    public function test_accordion_group_renders_status_class(): void
+    {
+        $partial = $this->read(self::PARTIAL_ACC);
+
+        // Die Status-Klasse muss sowohl am Gruppen-details- als auch am
+        // Leaf-div-Element rendern — Gruppen-Rollup ist die wichtigere
+        // Signal-Ebene (G1-Entscheidung 4). Beide Zweige im Partial setzen
+        // $status->cssClass(), also muss der Ausdruck mindestens zweimal
+        // vorkommen. Ein Regex ueber den Tag selbst ist fragil, weil die
+        // eingebetteten PHP-Short-Echo-Tags Zeichen enthalten, die
+        // Negative-Charsets abschneiden.
+        self::assertGreaterThanOrEqual(
+            2,
+            substr_count($partial, '$status->cssClass()'),
+            '_task_group_accordion.php muss $status->cssClass() zweimal '
+            . 'rendern: einmal am Gruppen-<details>, einmal am Leaf-<div>.'
+        );
+        // Zusatz-Kontext: der Gruppen-Pfad steht im if ($isGroup)-Zweig
+        // und enthaelt "task-group-accordion-group".
+        self::assertStringContainsString(
+            'task-group-accordion-group',
+            $partial,
+            '_task_group_accordion.php muss die Gruppen-Klasse weiterhin '
+            . 'rendern (Regression-Schutz).'
+        );
+    }
+
+    public function test_accordion_respects_null_status(): void
+    {
+        $partial = $this->read(self::PARTIAL_ACC);
+
+        // Badge und ARIA-Label nur bei status !== null. Ohne Zusage-Zahlen
+        // bleibt der Partial optisch wie vor I7b3 — orthogonal zur
+        // Flag-Integration.
+        self::assertMatchesRegularExpression(
+            '/if\s*\(\s*\$status\s*!==\s*null\s*\).*?task-status-badge/s',
+            $partial,
+            '_task_group_accordion.php darf das Status-Badge nur bei '
+            . '($status !== null) rendern.'
+        );
+    }
+
+    public function test_accordion_aria_label_follows_status(): void
+    {
+        $partial = $this->read(self::PARTIAL_ACC);
+
+        // aria-label wird aus $status->ariaLabel() gespeist — nicht hart
+        // kodiert, damit Screen-Reader-Text zentral im Enum gepflegt bleibt.
+        self::assertStringContainsString(
+            '$status->ariaLabel()',
+            $partial,
+            '_task_group_accordion.php muss aria-label via '
+            . '$status->ariaLabel() rendern (Screen-Reader-Fallback, '
+            . 'WCAG-Pflicht).'
+        );
+        // aria-label-Attribut steht unter if-Guard (null-Toleranz).
+        self::assertMatchesRegularExpression(
+            '/if\s*\(\s*\$status\s*!==\s*null\s*\).*?aria-label/s',
+            $partial,
+            '_task_group_accordion.php darf aria-label nur bei '
+            . '($status !== null) rendern.'
+        );
+    }
 }
