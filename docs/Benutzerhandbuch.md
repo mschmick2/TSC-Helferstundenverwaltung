@@ -829,6 +829,42 @@ Baumstruktur-Editor eingeschaltet oder hat das Event nur Top-Level-
 Aufgaben ohne Gruppen, erscheint weiterhin die flache Karten-Ansicht
 wie oben beschrieben.
 
+**Aufgaben nach Datum (ab VAES 1.4.4)**
+
+Organisatoren und Administratoren koennen ergaenzend zur Baumansicht
+eine chronologische Uebersicht aller Aufgaben eines Events aufrufen.
+Die Ansicht beantwortet die Planungsfrage *"was steht als naechstes
+an, und an welchem Tag?"* ohne durch die Baumhierarchie zu klicken.
+
+- **Admin-Ansicht:** `/admin/events/{event-id}/tasks-by-date`. Titel
+  sind als Link ins Admin-Detail des Events hinterlegt, damit Sie
+  direkt in den vollen Editor springen koennen.
+- **Organisator-Ansicht:** `/organizer/events/{event-id}/tasks-by-date`.
+  Reine Lese-Ansicht — die Titel sind nicht verlinkt, weil der Admin-
+  Bereich fuer Organisatoren ohne event_admin-Rolle nicht zugaenglich
+  ist. Der non-modale Organisator-Editor folgt in einem spaeteren
+  Release.
+
+Darstellung:
+- Pro Tag eine Sektion mit vollem Datum als Ueberschrift
+  (z.B. *"Montag, 15. Mai 2026"*). Darunter die Aufgaben des Tages
+  in der Reihenfolge ihres Beginns.
+- Aufgaben ohne feste Startzeit (variables Zeitfenster) landen in
+  einer eigenen Sektion *"Ohne feste Zeitvorgabe"* am Ende der Liste,
+  sortiert nach Baum-Reihenfolge.
+- Pro Aufgabe werden Titel, Start/Ende, Gruppen-Pfad (z.B.
+  *"Thekendienst > Spaetschicht"*) und die Helfer-Kapazitaet
+  angezeigt. Die Farbkodierung aus dem Belegungsstatus (Rot / Gelb /
+  Gruen) greift ebenso.
+- Die Ansicht ist reine Uebersicht — Aufgaben koennen hier nicht
+  uebernommen oder abgelehnt werden. Dafuer wechseln Sie in die
+  Event-Detailseite (Admin-Kontext) oder in die Mitglieder-Ansicht.
+
+Wenn der Event-Administrator die Baumstruktur-Funktion deaktiviert
+oder ein Organisator auf ein Event zugreift, dessen Organisator er
+nicht ist, liefern die Routen 404 bzw. 403 — konsistent zur
+Absicherung der uebrigen Event-Bereiche.
+
 **Aufgabe uebernehmen:**
 1. Klicken Sie bei einer Aufgabe mit freien Plaetzen auf **Aufgabe uebernehmen**.
 2. Bestaetigen Sie die Sicherheitsabfrage.
