@@ -839,7 +839,7 @@ class EventAdminController extends BaseController
         $treeData         = $this->treeAggregator->buildTree($flatTasks, $assignmentCounts);
         $flatList         = $this->treeAggregator->flattenToList($flatTasks, $assignmentCounts);
         $this->sortFlatListByStart($flatList);
-        $summary          = $this->computeBelegungsSummary($treeData, $flatList);
+        $summary          = $this->computeBelegungsSummary($treeData, $flatList, $assignmentCounts);
 
         $organizers       = $this->organizerRepo->listForEvent($eventId);
         $taskCategories   = $this->categoryRepo->findAllActive();
@@ -1376,19 +1376,26 @@ class EventAdminController extends BaseController
     /**
      * Aggregiert Belegungs-Zahlen fuer die Editor-Sidebar.
      *
+     * Achtung zur Semantik (I7e-A Phase 2c, nachgebessert aus Smoke):
+     *   - `helpers_total` = Summe der capacity_target-Werte (Helfer-Soll).
+     *   - `zusagen_aktiv` = tatsaechliche aktive Zusagen aus
+     *     `$assignmentCounts` (countActiveByEvent).
+     *
      * @param array $tree     Root-Nodes aus TaskTreeAggregator::buildTree
      * @param list<array{task:EventTask, status:?TaskStatus, helpers:int, open_slots:?int, ancestor_path:list<string>}> $flatList
+     * @param array<int,int> $assignmentCounts  task_id -> Anzahl aktive Zusagen
      * @return array{
      *     leaf_count:int,
      *     group_count:int,
      *     helpers_total:int,
+     *     zusagen_aktiv:int,
      *     open_slots:int,
      *     open_slots_known:bool,
      *     hours_default_total:float,
      *     status_counts:array{empty:int, partial:int, full:int}
      * }
      */
-    private function computeBelegungsSummary(array $tree, array $flatList): array
+    private function computeBelegungsSummary(array $tree, array $flatList, array $assignmentCounts = []): array
     {
         $helpersTotal   = 0;
         $openSlotsTotal = 0;
@@ -1411,6 +1418,8 @@ class EventAdminController extends BaseController
             }
         }
 
+        $zusagenAktiv = array_sum(array_map('intval', $assignmentCounts));
+
         $groupCount = 0;
         $this->walkTreeForSummary($tree, $groupCount);
 
@@ -1418,6 +1427,7 @@ class EventAdminController extends BaseController
             'leaf_count'          => count($flatList),
             'group_count'         => $groupCount,
             'helpers_total'       => $helpersTotal,
+            'zusagen_aktiv'       => $zusagenAktiv,
             'open_slots'          => $openSlotsTotal,
             'open_slots_known'    => $openSlotsKnown,
             'hours_default_total' => $hoursTotal,

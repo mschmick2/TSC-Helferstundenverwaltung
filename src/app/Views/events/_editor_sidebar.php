@@ -147,6 +147,11 @@ $statusCounts = $summary['status_counts'] ?? ['empty' => 0, 'partial' => 0, 'ful
 
                 <dt class="col-7 text-muted fw-normal">Aktive Zusagen</dt>
                 <dd class="col-5 text-end mb-0">
+                    <?= (int) ($summary['zusagen_aktiv'] ?? 0) ?>
+                </dd>
+
+                <dt class="col-7 text-muted fw-normal">Helfer-Soll</dt>
+                <dd class="col-5 text-end mb-0">
                     <?= (int) ($summary['helpers_total'] ?? 0) ?>
                 </dd>
 

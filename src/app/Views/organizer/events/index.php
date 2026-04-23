@@ -67,6 +67,14 @@ use App\Models\EventTaskAssignment;
                                 </span>
                             </div>
 
+                            <?php if ($treeEditorEnabled ?? false): ?>
+                                <a href="<?= ViewHelper::url('/organizer/events/' . (int) $e->getId() . '/editor') ?>"
+                                   class="btn btn-outline-primary btn-sm mb-2">
+                                    <i class="bi bi-diagram-3 me-1" aria-hidden="true"></i>
+                                    Editor-Ansicht
+                                </a>
+                            <?php endif; ?>
+
                             <?php if (!$hasTasks): ?>
                                 <small class="text-muted d-block">Keine Aufgaben definiert.</small>
                             <?php else: ?>

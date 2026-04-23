@@ -120,6 +120,12 @@ class OrganizerEventController extends BaseController
             ];
         }
 
+        // I7e-A Phase 2c: Editor-Link in der Event-Card nur anzeigen, wenn
+        // das Tree-Editor-Feature-Flag aktiv ist. Sonst bleibt der Link in
+        // Strato-Produktion (flag=0) unsichtbar.
+        $treeEditorEnabled = $this->settingsService !== null
+            && $this->settingsService->getString('events.tree_editor_enabled', '0') === '1';
+
         return $this->render($response, 'organizer/events/index', [
             'title' => 'Als Organisator',
             'user' => $user,
@@ -128,6 +134,7 @@ class OrganizerEventController extends BaseController
             'eventSummaries' => $eventSummaries,
             'pendingReviews' => $pendingReviews,
             'reviewContext' => $reviewContext,
+            'treeEditorEnabled' => $treeEditorEnabled,
             'breadcrumbs' => [
                 ['label' => 'Dashboard', 'url' => '/'],
                 ['label' => 'Als Organisator'],

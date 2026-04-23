@@ -64,6 +64,21 @@ if ($conflict !== null) {
 
 <h1 class="h3 mb-3"><i class="bi bi-pencil-square"></i> Event bearbeiten</h1>
 
+<?php if ($treeEditorEnabled ?? false): ?>
+    <div class="alert alert-info d-flex align-items-center mb-4" role="alert">
+        <i class="bi bi-info-circle-fill me-2 fs-5" aria-hidden="true"></i>
+        <div class="flex-grow-1">
+            <strong>Neue Editor-Ansicht verfuegbar.</strong>
+            Der non-modale Editor bietet Sidebar-Zusammenfassung und
+            verbesserte Navigation durch den Aufgabenbaum.
+        </div>
+        <a href="<?= ViewHelper::url('/admin/events/' . (int) $event->getId() . '/editor') ?>"
+           class="btn btn-primary btn-sm ms-3">
+            Editor oeffnen
+        </a>
+    </div>
+<?php endif; ?>
+
 <?php if ($conflict !== null): ?>
     <div class="alert alert-warning" role="alert">
         <h2 class="h5 alert-heading">

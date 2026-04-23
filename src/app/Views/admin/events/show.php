@@ -40,6 +40,13 @@ $statusMeta = $statusLabels[$event->getStatus()] ?? ['class' => 'secondary', 'la
         <a href="<?= ViewHelper::url('/admin/events/' . (int) $event->getId() . '/edit') ?>" class="btn btn-outline-primary">
             <i class="bi bi-pencil"></i> Bearbeiten
         </a>
+        <?php if ($treeEditorEnabled ?? false): ?>
+            <a href="<?= ViewHelper::url('/admin/events/' . (int) $event->getId() . '/editor') ?>"
+               class="btn btn-outline-primary">
+                <i class="bi bi-diagram-3" aria-hidden="true"></i>
+                Editor-Ansicht
+            </a>
+        <?php endif; ?>
         <?php if ($event->getStatus() === 'entwurf'): ?>
             <form method="POST" action="<?= ViewHelper::url('/admin/events/' . (int) $event->getId() . '/publish') ?>" class="d-inline">
                 <?= ViewHelper::csrfField() ?>
