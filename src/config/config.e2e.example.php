@@ -16,7 +16,7 @@
 return [
     'app' => [
         'name' => 'VAES (E2E)',
-        'version' => '1.4.5-e2e',
+        'version' => '1.4.6-e2e',
         'url' => 'http://localhost:8001',
         'base_path' => '',
         'debug' => true,

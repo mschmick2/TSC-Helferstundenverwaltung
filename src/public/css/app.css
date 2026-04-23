@@ -79,6 +79,18 @@ main {
  * Aufgabenbaum-Editor (Modul 6 I7b1)
  * ========================================================================= */
 
+/* I7b6: Safety-Net gegen horizontalen Overflow. Auf Viewports
+ * <= 390 px konnte der Tree-Node-Row zusammen mit den 44-px-Touch-
+ * Action-Buttons und dem nicht-schrumpfenden Titel-Button breiter
+ * als 375 px rendern — die gesamte Seite wurde horizontal scrollbar
+ * und die Delete-Buttons landeten ausserhalb des sichtbaren Bereichs.
+ * overflow-x:hidden am Wrapper fuehrt stattdessen zum sauberen
+ * Abschneiden (der Titel-Ellipsis-Regel unten liefert einen
+ * kontrollierten, sichtbaren Kuerzungsversuch VOR dem Clipping). */
+.task-tree-editor {
+    overflow-x: hidden;
+}
+
 .task-tree-editor .task-tree-root,
 .task-tree-editor .task-tree-children {
     padding-left: 0;
@@ -132,9 +144,20 @@ main {
     outline-offset: 2px;
 }
 
-/* Edit-Trigger bleibt vom Cursor her klickbar — Link-Optik */
+/* Edit-Trigger bleibt vom Cursor her klickbar — Link-Optik.
+ *
+ * I7b6: Bootstrap-5-.btn erbt white-space:nowrap, dadurch schrumpfte
+ * der Titel-Button trotz flex-grow-1 nicht unter seine Text-Breite
+ * und verursachte Horizontal-Overflow auf 375-px-Viewports. min-width:0
+ * bricht das Flex-min-content-Default-Verhalten, text-overflow:ellipsis
+ * kuerzt lange Titel mit "..." auf die verfuegbare Breite. Der volle
+ * Titel bleibt via title-Attribut am Button erreichbar. */
 .task-tree-editor .task-node__edit-trigger {
     cursor: pointer;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .task-tree-editor .task-node__edit-trigger:hover {
@@ -183,6 +206,14 @@ main {
     padding-left: 0;
     margin-bottom: 0;
     list-style: none;
+    /* I7b6: Safety-Net gegen horizontalen Overflow auf Mobile.
+     * Der Read-Only-Partial hat zwar flex-wrap und word-break-Title,
+     * aber lange Inhalte (Badge-Ketten, Beschreibungen) koennten
+     * trotzdem das Viewport ausweiten. overflow-x:hidden schneidet
+     * sauber ab statt die Seite horizontal scrollbar zu machen.
+     * Wird auf jeder verschachtelten Ebene wirksam, was gewuenscht
+     * ist (kumulatives Clipping). */
+    overflow-x: hidden;
 }
 
 /* Verschachtelte Listen erben Einrueckung + Leitlinie.
