@@ -741,4 +741,44 @@ final class EventAdminControllerTreeInvariantsTest extends TestCase
             . 'events/_task_list_by_date.php einbinden (DRY mit Organizer-View).'
         );
     }
+
+    // =========================================================================
+    // Gruppe J — IDOR-Schutz (G4 Dim 3, Security-Fix)
+    // =========================================================================
+
+    public function test_mutating_actions_check_task_belongs_to_event(): void
+    {
+        // Regressions-Schutz fuer den G4-ROT-Fix (siehe Organizer-Counterpart).
+        // Der Admin-Controller war durch event_admin-Rolle begrenzt, hatte
+        // aber dasselbe Service-Delegation-Muster und darum dieselbe Luecke.
+        $code = $this->read(self::CONTROLLER_PATH);
+        $actionsNeedingScopeCheck = [
+            'moveTaskNode',
+            'convertTaskNode',
+            'deleteTaskNode',
+            'updateTaskNode',
+        ];
+        foreach ($actionsNeedingScopeCheck as $action) {
+            $body = $this->methodBody($code, $action);
+            self::assertNotSame('', $body, "Action $action() fehlt.");
+            self::assertMatchesRegularExpression(
+                '/\$task->getEventId\(\)\s*!==\s*\$eventId/',
+                $body,
+                "EventAdminController::$action() muss pruefen, dass "
+                . "\$task->getEventId() === \$eventId (IDOR-Schutz, G4 Dim 3)."
+            );
+            self::assertMatchesRegularExpression(
+                '/\$this->taskRepo->findById\(\s*\$taskId\s*\)/',
+                $body,
+                "EventAdminController::$action() muss taskRepo->findById(\$taskId) "
+                . "aufrufen, um das Task-Objekt fuer den Scope-Check zu laden."
+            );
+            self::assertMatchesRegularExpression(
+                '/return\s+\$response->withStatus\(\s*404\s*\)/',
+                $body,
+                "EventAdminController::$action() muss 404 zurueckgeben, wenn "
+                . "Task nicht zum Event gehoert."
+            );
+        }
+    }
 }

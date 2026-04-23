@@ -559,4 +559,78 @@ final class OrganizerEventEditControllerInvariantsTest extends TestCase
             );
         }
     }
+
+    // =========================================================================
+    // Gruppe J — IDOR-Schutz (G4 Dim 3, Security-Fix)
+    // =========================================================================
+
+    public function test_mutating_actions_check_task_belongs_to_event(): void
+    {
+        // Regressions-Schutz fuer den G4-ROT-Fix: jede mutierende Tree-Action
+        // muss pruefen, dass die uebergebene Task-ID auch zum Event aus der
+        // Route gehoert. Ohne diesen Cross-Check konnte ein Organisator von
+        // Event A Tasks in Event B manipulieren, indem er die Task-ID von B
+        // in die POST-Route von A steckte. Muster: mirror von editTaskNode
+        // (Phase 1).
+        $code = $this->read(self::CONTROLLER_PATH);
+        $actionsNeedingScopeCheck = [
+            'moveTaskNode',
+            'convertTaskNode',
+            'deleteTaskNode',
+            'updateTaskNode',
+        ];
+        foreach ($actionsNeedingScopeCheck as $action) {
+            $body = $this->methodBody($code, $action);
+            self::assertNotSame('', $body, "Action $action() fehlt.");
+            self::assertMatchesRegularExpression(
+                '/\$task->getEventId\(\)\s*!==\s*\$eventId/',
+                $body,
+                "OrganizerEventEditController::$action() muss pruefen, dass "
+                . "\$task->getEventId() === \$eventId (IDOR-Schutz, G4 Dim 3)."
+            );
+            self::assertMatchesRegularExpression(
+                '/\$this->taskRepo->findById\(\s*\$taskId\s*\)/',
+                $body,
+                "OrganizerEventEditController::$action() muss taskRepo->findById(\$taskId) "
+                . "aufrufen, um das Task-Objekt fuer den Scope-Check zu laden."
+            );
+            self::assertMatchesRegularExpression(
+                '/return\s+\$response->withStatus\(\s*404\s*\)/',
+                $body,
+                "OrganizerEventEditController::$action() muss 404 zurueckgeben, "
+                . "wenn Task nicht zum Event gehoert (kein 403 — Existenz der "
+                . "Task-ID in einem fremden Event soll nicht geraten werden)."
+            );
+        }
+    }
+
+    public function test_scope_check_follows_isOrganizer_precedes_service_call(): void
+    {
+        $code = $this->read(self::CONTROLLER_PATH);
+        $actions = ['moveTaskNode', 'convertTaskNode', 'deleteTaskNode', 'updateTaskNode'];
+        foreach ($actions as $action) {
+            $body = $this->methodBody($code, $action);
+
+            $posIsOrg     = strpos($body, 'isOrganizer(');
+            $posScopeCheck = strpos($body, '$task->getEventId()');
+            $posService   = strpos($body, '$this->treeService->');
+
+            self::assertNotFalse($posIsOrg, "$action: isOrganizer-Check fehlt.");
+            self::assertNotFalse($posScopeCheck, "$action: Scope-Check fehlt.");
+            self::assertNotFalse($posService, "$action: Service-Call fehlt.");
+
+            self::assertLessThan(
+                $posScopeCheck,
+                $posIsOrg,
+                "$action: isOrganizer MUSS vor dem Scope-Check laufen "
+                . "(403 vor 404 bei fehlender Organizer-Rolle)."
+            );
+            self::assertLessThan(
+                $posService,
+                $posScopeCheck,
+                "$action: Scope-Check MUSS vor dem Service-Call laufen, "
+                . "sonst operiert der Service auf einer fremden Task-ID."
+            );
+        }
+    }
 }

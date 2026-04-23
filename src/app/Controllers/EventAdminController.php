@@ -948,6 +948,14 @@ class EventAdminController extends BaseController
         $this->assertEventEditPermission($user, $eventId, $this->organizerRepo);
         $actorId = (int) $user->getId();
 
+        // IDOR-Schutz (G4 Dim 3): Task muss zum Event aus der Route gehoeren.
+        // Gleiches Muster wie editTaskNode. TaskTreeService::move akzeptiert
+        // nur eine taskId ohne Event-Scope, darum Cross-Check hier.
+        $task = $this->taskRepo->findById($taskId);
+        if ($task === null || $task->getEventId() !== $eventId) {
+            return $response->withStatus(404);
+        }
+
         $data = (array) $request->getParsedBody();
         $newParentId = array_key_exists('new_parent_id', $data) && $data['new_parent_id'] !== null && $data['new_parent_id'] !== ''
             ? (int) $data['new_parent_id']
@@ -1015,6 +1023,12 @@ class EventAdminController extends BaseController
         $this->assertEventEditPermission($user, $eventId, $this->organizerRepo);
         $actorId = (int) $user->getId();
 
+        // IDOR-Schutz (G4 Dim 3): siehe moveTaskNode.
+        $task = $this->taskRepo->findById($taskId);
+        if ($task === null || $task->getEventId() !== $eventId) {
+            return $response->withStatus(404);
+        }
+
         $data   = $this->normalizeTreeFormInputs((array) $request->getParsedBody());
         $target = $data['target'] ?? null;
 
@@ -1054,6 +1068,12 @@ class EventAdminController extends BaseController
         $user = $request->getAttribute('user');
         $this->assertEventEditPermission($user, $eventId, $this->organizerRepo);
         $actorId = (int) $user->getId();
+
+        // IDOR-Schutz (G4 Dim 3): siehe moveTaskNode.
+        $task = $this->taskRepo->findById($taskId);
+        if ($task === null || $task->getEventId() !== $eventId) {
+            return $response->withStatus(404);
+        }
 
         try {
             $this->treeService->softDeleteNode($taskId, $actorId);
@@ -1137,6 +1157,12 @@ class EventAdminController extends BaseController
         $user = $request->getAttribute('user');
         $this->assertEventEditPermission($user, $eventId, $this->organizerRepo);
         $actorId = (int) $user->getId();
+
+        // IDOR-Schutz (G4 Dim 3): siehe moveTaskNode.
+        $task = $this->taskRepo->findById($taskId);
+        if ($task === null || $task->getEventId() !== $eventId) {
+            return $response->withStatus(404);
+        }
 
         $data = $this->normalizeTreeFormInputs((array) $request->getParsedBody());
 

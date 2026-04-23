@@ -468,6 +468,14 @@ class EventTemplateController extends BaseController
             return $response->withStatus(404);
         }
 
+        // IDOR-Schutz (G4 Dim 3): Task muss zum Template aus der Route gehoeren.
+        // Gleiches Muster wie editTaskNode. TemplateTaskTreeService::move
+        // akzeptiert nur eine taskId ohne Template-Scope.
+        $task = $this->templateRepo->findTaskById($taskId);
+        if ($task === null || $task->getTemplateId() !== $templateId) {
+            return $response->withStatus(404);
+        }
+
         $user = $request->getAttribute('user');
         $actorId = (int) $user->getId();
         $data = (array) $request->getParsedBody();
@@ -497,6 +505,12 @@ class EventTemplateController extends BaseController
         $taskId     = (int) $args['taskId'];
 
         if (!$this->treeEditorEnabled() || $this->treeService === null) {
+            return $response->withStatus(404);
+        }
+
+        // IDOR-Schutz (G4 Dim 3): siehe moveTaskNode.
+        $task = $this->templateRepo->findTaskById($taskId);
+        if ($task === null || $task->getTemplateId() !== $templateId) {
             return $response->withStatus(404);
         }
 
@@ -539,6 +553,12 @@ class EventTemplateController extends BaseController
         $taskId     = (int) $args['taskId'];
 
         if (!$this->treeEditorEnabled() || $this->treeService === null) {
+            return $response->withStatus(404);
+        }
+
+        // IDOR-Schutz (G4 Dim 3): siehe moveTaskNode.
+        $task = $this->templateRepo->findTaskById($taskId);
+        if ($task === null || $task->getTemplateId() !== $templateId) {
             return $response->withStatus(404);
         }
 
@@ -606,6 +626,12 @@ class EventTemplateController extends BaseController
         $taskId     = (int) $args['taskId'];
 
         if (!$this->treeEditorEnabled() || $this->treeService === null) {
+            return $response->withStatus(404);
+        }
+
+        // IDOR-Schutz (G4 Dim 3): siehe moveTaskNode.
+        $task = $this->templateRepo->findTaskById($taskId);
+        if ($task === null || $task->getTemplateId() !== $templateId) {
             return $response->withStatus(404);
         }
 

@@ -510,4 +510,44 @@ final class EventTemplateControllerTreeInvariantsTest extends TestCase
             . 'haben, die je Kontext den richtigen Feldnamen liefert.'
         );
     }
+
+    // =========================================================================
+    // IDOR-Schutz (G4 Dim 3, Security-Fix)
+    // =========================================================================
+
+    public function test_mutating_actions_check_task_belongs_to_template(): void
+    {
+        // Regressions-Schutz fuer G4-Fix: analog zu Event-Controllern, aber
+        // mit Template-Scope. Ohne den Check konnte ein Template-Admin Tasks
+        // in fremden Templates manipulieren.
+        $code = $this->read(self::CONTROLLER_PATH);
+        $actionsNeedingScopeCheck = [
+            'moveTaskNode',
+            'convertTaskNode',
+            'deleteTaskNode',
+            'updateTaskNode',
+        ];
+        foreach ($actionsNeedingScopeCheck as $action) {
+            $body = $this->methodBody($code, $action);
+            self::assertNotSame('', $body, "Action $action() fehlt.");
+            self::assertMatchesRegularExpression(
+                '/\$task->getTemplateId\(\)\s*!==\s*\$templateId/',
+                $body,
+                "EventTemplateController::$action() muss pruefen, dass "
+                . "\$task->getTemplateId() === \$templateId (IDOR-Schutz, G4 Dim 3)."
+            );
+            self::assertMatchesRegularExpression(
+                '/\$this->templateRepo->findTaskById\(\s*\$taskId\s*\)/',
+                $body,
+                "EventTemplateController::$action() muss templateRepo->findTaskById"
+                . "(\$taskId) aufrufen, um das Task-Objekt fuer den Scope-Check zu laden."
+            );
+            self::assertMatchesRegularExpression(
+                '/return\s+\$response->withStatus\(\s*404\s*\)/',
+                $body,
+                "EventTemplateController::$action() muss 404 zurueckgeben, wenn "
+                . "Task nicht zum Template gehoert."
+            );
+        }
+    }
 }
