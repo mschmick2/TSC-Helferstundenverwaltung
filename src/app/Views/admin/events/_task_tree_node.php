@@ -1,13 +1,23 @@
 <?php
 /**
  * Partial: einzelner Knoten im Aufgabenbaum-Editor (Modul 6 I7b1,
- * um Template-Kontext erweitert in I7c Phase 2).
+ * um Template-Kontext erweitert in I7c Phase 2, um Prefix-Override
+ * erweitert in I7e-A Phase 2).
  *
  * Kontext-Flag:
- *   $context = 'event' (Default) oder 'template'. Steuert die URL-
- *   Generierung fuer data-endpoint-*-Attribute. Der JS-Kern
+ *   $context = 'event' (Default) oder 'template'. Steuert die Default-
+ *   URL-Generierung fuer data-endpoint-*-Attribute. Der JS-Kern
  *   event-task-tree.js liest diese Endpunkte aus den Attributen —
  *   URLs sind nicht im JS fest-kodiert.
+ *
+ * URL-Prefix-Override:
+ *   $urlPrefix (I7e-A Phase 2). Optional. Wenn gesetzt, ueberschreibt
+ *   es die Default-Formel und wird als Basis fuer alle data-endpoint-*-
+ *   Attribute verwendet. Erwartet mit abschliessendem '/tasks/'.
+ *   Beispiel fuer den Organisator-Editor:
+ *     $urlPrefix = '/organizer/events/' . $eventId . '/tasks/';
+ *   Fehlt die Variable, greift die bisherige Default-Formel (Admin
+ *   bzw. Template-URLs). So bleiben bestehende Includes unveraendert.
  *
  * Entity-ID:
  *   $entityId — Event-ID im Event-Kontext, Template-ID im Template-
@@ -23,6 +33,8 @@
  *   $entityId        — int (Event- oder Template-ID, je nach $context).
  *   $eventId         — int, Rueckwaerts-Fallback wenn $entityId fehlt.
  *   $context         — 'event' | 'template' (Default: 'event').
+ *   $urlPrefix       — string|null, Override des URL-Prefixes
+ *                      (muss mit '/tasks/' enden).
  *   $renderTaskNode  — Closure fuer rekursiven Aufruf auf Kinder.
  *   $canConvert      — bool.
  *   $canDelete       — bool.
@@ -33,6 +45,7 @@
  * @var int|null $entityId
  * @var int|null $eventId
  * @var string|null $context
+ * @var string|null $urlPrefix
  * @var \Closure $renderTaskNode
  */
 use App\Helpers\ViewHelper;
@@ -68,9 +81,17 @@ $canDelete  = $canDelete ?? (
 // URL-Prefix kontext-abhaengig bauen. 'event' => /admin/events/...,
 // 'template' => /admin/event-templates/... Das JS bleibt unveraendert,
 // es liest nur die data-endpoint-*-Attribute.
-$urlPrefix = $context === 'template'
-    ? '/admin/event-templates/' . $entityId . '/tasks/'
-    : '/admin/events/'           . $entityId . '/tasks/';
+//
+// I7e-A Phase 2: Ein explizit gesetztes $urlPrefix vom Container
+// (z.B. Organisator-Editor mit '/organizer/events/{id}/tasks/') hat
+// Vorrang vor der Default-Formel. Muss auf '/tasks/' enden, weil die
+// Endpunkt-Segmente ('reorder', '{taskId}/move', ...) direkt
+// angehaengt werden.
+$urlPrefix = $urlPrefix ?? (
+    $context === 'template'
+        ? '/admin/event-templates/' . $entityId . '/tasks/'
+        : '/admin/events/'           . $entityId . '/tasks/'
+);
 $baseUrl    = $urlPrefix . $taskId;
 $reorderUrl = $urlPrefix . 'reorder';
 

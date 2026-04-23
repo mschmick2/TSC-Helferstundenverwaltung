@@ -669,6 +669,7 @@ return [
             $c->get(EventOrganizerRepository::class),
             $c->get(\App\Services\TaskTreeService::class),
             $c->get(\App\Services\TaskTreeAggregator::class),
+            $c->get(CategoryRepository::class),
             $c->get(\App\Services\SettingsService::class),
             $c->get('settings')
         );

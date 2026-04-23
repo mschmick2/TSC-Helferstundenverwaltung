@@ -595,3 +595,74 @@ main {
         padding: 0.5rem 0.75rem;
     }
 }
+
+/* =============================================================================
+   Modul 6 I7e-A Phase 2 — Non-modaler Event-Editor (Sidebar + Highlight)
+   ============================================================================= */
+
+/*
+ * Sticky Sidebar auf Desktop (ab lg). Der sticky top-Offset laesst die
+ * VAES-Navbar frei (ca. 70px inkl. Breadcrumb-Padding) und sorgt dafuer,
+ * dass die Sidebar beim Scrollen sichtbar bleibt. Max-height limitiert
+ * die Panel-3-Liste auf 1 Viewport-Hoehe minus Header, sonst wird die
+ * chronologische Aufgabenliste zu lang.
+ */
+.editor-sidebar-sticky {
+    position: sticky;
+    top: 1rem;
+    max-height: calc(100vh - 2rem);
+    overflow-y: auto;
+}
+
+/* Innerhalb eines Offcanvas brauchen wir keinen sticky-Kontext, weil
+   das Offcanvas bereits gescrollt ist — overflow an der aside uebernimmt
+   das Offcanvas-Body-Scrolling. */
+.offcanvas .editor-sidebar {
+    margin: 0;
+}
+
+/* Kompakter Zeilen-Abstand in der chronologischen Aufgabenliste.
+   Die li erben Bootstrap-Padding vom list-group-item — der innere
+   Button (data-sidebar-scroll-target) uebernimmt das Padding, damit
+   die gesamte Zeile klickbar ist. */
+.editor-sidebar__chronlist .list-group-item {
+    border-left: 4px solid transparent;
+}
+
+/* Border-Left-Farbcode fuer Leaf-Status in der Sidebar-Liste —
+   orientiert sich an den Tree-Status-Klassen aus I7b3. */
+.editor-sidebar__chronlist .list-group-item.task-status-empty {
+    border-left-color: var(--bs-danger);
+}
+.editor-sidebar__chronlist .list-group-item.task-status-partial {
+    border-left-color: var(--bs-warning);
+}
+.editor-sidebar__chronlist .list-group-item.task-status-full {
+    border-left-color: var(--bs-success);
+}
+
+/*
+ * Scroll-Highlight: Pulst einen Tree-Knoten kurz, nachdem ein Klick
+ * auf den Sidebar-Eintrag den Knoten in den Viewport gescrollt hat.
+ * box-shadow-Animation, damit die ursprueglichen Border-Farben der
+ * Status-Klassen nicht ueberschrieben werden.
+ */
+@keyframes vaesEditorPulse {
+    0%   { box-shadow: 0 0 0 0 rgba(13, 110, 253, 0.55); }
+    70%  { box-shadow: 0 0 0 10px rgba(13, 110, 253, 0);  }
+    100% { box-shadow: 0 0 0 0 rgba(13, 110, 253, 0);    }
+}
+
+.task-node--highlighted > .task-node__row {
+    animation: vaesEditorPulse 1.5s ease-out;
+    border-radius: 0.25rem;
+}
+
+/* Reduced-Motion-Nutzer bekommen statt Pulse eine ruhige Farb-
+   Hervorhebung. Pflicht nach WCAG AA. */
+@media (prefers-reduced-motion: reduce) {
+    .task-node--highlighted > .task-node__row {
+        animation: none;
+        background-color: rgba(13, 110, 253, 0.1);
+    }
+}

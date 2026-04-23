@@ -8,7 +8,7 @@
 use App\Helpers\VersionHelper;
 use App\Helpers\ViewHelper;
 
-$appVersion = $settings['app']['version'] ?? '1.4.6';
+$appVersion = $settings['app']['version'] ?? '1.4.7';
 $vereinsname = $settings['verein']['name'] ?? 'VAES';
 
 // Modul 7 I2: Pending Cross-Tab-Broadcasts serialisieren (z. B. nach Logout).

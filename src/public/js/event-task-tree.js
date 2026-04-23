@@ -801,12 +801,75 @@
     }
 
     // =====================================================================
+    // I7e-A Phase 2 — Sidebar-zu-Tree-Scroll-Highlight
+    //
+    // Die Editor-Sidebar rendert pro Leaf einen Button mit
+    // data-sidebar-scroll-target="<task_id>". Ein Klick scrollt den
+    // zugehoerigen Knoten im Tree-Widget in den Viewport und pulst
+    // die CSS-Klasse .task-node--highlighted fuer 1.5 Sekunden. Das
+    // gibt visuelles Feedback, wo der Knoten im Tree steht.
+    //
+    // Event-Delegation am document — funktioniert fuer die Desktop-
+    // Sidebar (col-lg-4) und fuer die Offcanvas-Instanz gleichzeitig,
+    // ohne dass wir wissen muessen, welche DOM-Instanz geklickt wurde.
+    // =====================================================================
+
+    function initSidebarScrollHighlight() {
+        const HIGHLIGHT_MS = 1500;
+        document.addEventListener('click', (event) => {
+            const trigger = event.target.closest('[data-sidebar-scroll-target]');
+            if (!trigger) {
+                return;
+            }
+            const taskId = trigger.getAttribute('data-sidebar-scroll-target');
+            if (!taskId) {
+                return;
+            }
+            const treeRoot = document.getElementById('task-tree-editor');
+            if (!treeRoot) {
+                return;
+            }
+            // Auf exakten Treffer im Tree zielen — der selector deckt
+            // beliebige Verschachtelung im Baum ab.
+            const targetNode = treeRoot.querySelector(
+                '.task-node[data-task-id="' + CSS.escape(taskId) + '"]'
+            );
+            if (!targetNode) {
+                return;
+            }
+
+            // Offcanvas (Mobile/Tablet) vor dem Scroll schliessen, sonst
+            // verdeckt das Canvas das Ziel. Bootstrap-5 liefert die API.
+            const offcanvasEl = document.getElementById('editorSidebarOffcanvas');
+            if (offcanvasEl && offcanvasEl.classList.contains('show')
+                && typeof window.bootstrap !== 'undefined'
+                && window.bootstrap.Offcanvas) {
+                const inst = window.bootstrap.Offcanvas.getInstance(offcanvasEl);
+                if (inst) {
+                    inst.hide();
+                }
+            }
+
+            targetNode.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            targetNode.classList.add('task-node--highlighted');
+            window.setTimeout(() => {
+                targetNode.classList.remove('task-node--highlighted');
+            }, HIGHLIGHT_MS);
+        });
+    }
+
+    // =====================================================================
     // Bootstrap
     // =====================================================================
 
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', initTaskTree);
-    } else {
+    function boot() {
         initTaskTree();
+        initSidebarScrollHighlight();
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', boot);
+    } else {
+        boot();
     }
 })();

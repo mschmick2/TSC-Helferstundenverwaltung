@@ -8,6 +8,8 @@ use App\Exceptions\BusinessRuleException;
 use App\Exceptions\ValidationException;
 use App\Helpers\ViewHelper;
 use App\Models\Event;
+use App\Models\EventTask;
+use App\Models\TaskStatus;
 use App\Repositories\CategoryRepository;
 use App\Repositories\EventOrganizerRepository;
 use App\Repositories\EventRepository;
@@ -831,12 +833,29 @@ class EventAdminController extends BaseController
             return $response->withStatus(404);
         }
 
+        // Tree + Sidebar-Daten Server-seitig aggregieren (I7e-A Phase 2).
+        $flatTasks        = $this->taskRepo->findByEvent($eventId);
+        $assignmentCounts = $this->assignmentRepo->countActiveByEvent($eventId);
+        $treeData         = $this->treeAggregator->buildTree($flatTasks, $assignmentCounts);
+        $flatList         = $this->treeAggregator->flattenToList($flatTasks, $assignmentCounts);
+        $this->sortFlatListByStart($flatList);
+        $summary          = $this->computeBelegungsSummary($treeData, $flatList);
+
+        $organizers       = $this->organizerRepo->listForEvent($eventId);
+        $taskCategories   = $this->categoryRepo->findAllActive();
+
         return $this->render($response, 'admin/events/editor', [
-            'title'    => 'Editor: ' . $event->getTitle(),
-            'user'     => $user,
-            'settings' => $this->settings,
-            'event'    => $event,
-            'breadcrumbs' => [
+            'title'           => 'Editor: ' . $event->getTitle(),
+            'user'            => $user,
+            'settings'        => $this->settings,
+            'event'           => $event,
+            'treeData'        => $treeData,
+            'flatList'        => $flatList,
+            'summary'         => $summary,
+            'organizers'      => $organizers,
+            'taskCategories'  => $taskCategories,
+            'csrfTokenString' => $_SESSION['csrf_token'] ?? '',
+            'breadcrumbs'     => [
                 ['label' => 'Dashboard', 'url' => '/'],
                 ['label' => 'Events', 'url' => '/admin/events'],
                 ['label' => $event->getTitle(), 'url' => '/admin/events/' . $eventId],
@@ -1320,5 +1339,106 @@ class EventAdminController extends BaseController
         $this->scheduler->cancel("event:{$eventId}:reminder:7d");
         $this->scheduler->cancel("event:{$eventId}:reminder:24h");
         $this->scheduler->cancel("event:{$eventId}:completion_reminder");
+    }
+
+    // =========================================================================
+    // Sidebar-Helpers (I7e-A Phase 2). Bewusste Duplikate in
+    // OrganizerEventEditController — Symmetrie zwischen den beiden
+    // showEditor-Implementierungen. Trait-Extraktion bleibt an
+    // Follow-up n gekoppelt (gemeinsam mit den Tree-Action-Helpern).
+    // =========================================================================
+
+    /**
+     * Sortiert die flache Aufgabenliste nach Startzeit. Tasks ohne
+     * Startzeit wandern ans Ende.
+     *
+     * @param list<array{task:EventTask, status:?TaskStatus, helpers:int, open_slots:?int, ancestor_path:list<string>}> $flatList
+     */
+    private function sortFlatListByStart(array &$flatList): void
+    {
+        usort($flatList, static function (array $a, array $b): int {
+            /** @var EventTask $ta */
+            $ta = $a['task'];
+            /** @var EventTask $tb */
+            $tb = $b['task'];
+            $sa = $ta->getStartAt();
+            $sb = $tb->getStartAt();
+            if ($sa === null || $sa === '') {
+                return $sb === null || $sb === '' ? 0 : 1;
+            }
+            if ($sb === null || $sb === '') {
+                return -1;
+            }
+            return strcmp($sa, $sb);
+        });
+    }
+
+    /**
+     * Aggregiert Belegungs-Zahlen fuer die Editor-Sidebar.
+     *
+     * @param array $tree     Root-Nodes aus TaskTreeAggregator::buildTree
+     * @param list<array{task:EventTask, status:?TaskStatus, helpers:int, open_slots:?int, ancestor_path:list<string>}> $flatList
+     * @return array{
+     *     leaf_count:int,
+     *     group_count:int,
+     *     helpers_total:int,
+     *     open_slots:int,
+     *     open_slots_known:bool,
+     *     hours_default_total:float,
+     *     status_counts:array{empty:int, partial:int, full:int}
+     * }
+     */
+    private function computeBelegungsSummary(array $tree, array $flatList): array
+    {
+        $helpersTotal   = 0;
+        $openSlotsTotal = 0;
+        $openSlotsKnown = true;
+        $hoursTotal     = 0.0;
+        $statusCounts   = ['empty' => 0, 'partial' => 0, 'full' => 0];
+
+        foreach ($flatList as $entry) {
+            $helpersTotal += (int) $entry['helpers'];
+            $hoursTotal   += (float) $entry['task']->getHoursDefault();
+
+            if ($entry['open_slots'] === null) {
+                $openSlotsKnown = false;
+            } else {
+                $openSlotsTotal += (int) $entry['open_slots'];
+            }
+
+            if ($entry['status'] instanceof TaskStatus) {
+                $statusCounts[$entry['status']->value]++;
+            }
+        }
+
+        $groupCount = 0;
+        $this->walkTreeForSummary($tree, $groupCount);
+
+        return [
+            'leaf_count'          => count($flatList),
+            'group_count'         => $groupCount,
+            'helpers_total'       => $helpersTotal,
+            'open_slots'          => $openSlotsTotal,
+            'open_slots_known'    => $openSlotsKnown,
+            'hours_default_total' => $hoursTotal,
+            'status_counts'       => $statusCounts,
+        ];
+    }
+
+    /**
+     * Rekursiver Walker fuer Gruppen-Count (Sidebar-Panel 2).
+     *
+     * @param array $nodes
+     */
+    private function walkTreeForSummary(array $nodes, int &$groupCount): void
+    {
+        foreach ($nodes as $node) {
+            /** @var EventTask $task */
+            $task = $node['task'];
+            if ($task->isGroup()) {
+                $groupCount++;
+                $this->walkTreeForSummary((array) ($node['children'] ?? []), $groupCount);
+            }
+        }
     }
 }
