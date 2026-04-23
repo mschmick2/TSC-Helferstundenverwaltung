@@ -649,4 +649,96 @@ final class EventAdminControllerTreeInvariantsTest extends TestCase
             '_task_tree_readonly.php muss null-Toleranz per if-Guard haben.'
         );
     }
+
+    // =========================================================================
+    // Gruppe I — Sortierbare Task-Liste (Modul 6 I7b4)
+    // =========================================================================
+
+    public function test_tasksByDate_action_exists_and_uses_treeEditorEnabled_flag(): void
+    {
+        $code = $this->read(self::CONTROLLER_PATH);
+        $body = $this->methodBody($code, 'tasksByDate');
+
+        self::assertNotSame(
+            '',
+            $body,
+            'EventAdminController::tasksByDate() muss existieren (I7b4).'
+        );
+        self::assertMatchesRegularExpression(
+            '/!\s*\$this->treeEditorEnabled\(\)/',
+            $body,
+            'tasksByDate() muss das Flag events.tree_editor_enabled '
+            . 'pruefen und bei 0 mit 404 abbrechen — konsistent zu '
+            . 'showTaskTree/createTaskNode.'
+        );
+    }
+
+    public function test_tasksByDate_calls_assertEventEditPermission(): void
+    {
+        $code = $this->read(self::CONTROLLER_PATH);
+        $body = $this->methodBody($code, 'tasksByDate');
+
+        self::assertStringContainsString(
+            'assertEventEditPermission',
+            $body,
+            'tasksByDate() darf Event-Daten nur nach Permission-Pruefung '
+            . 'rendern (event_admin oder Organizer des Events).'
+        );
+    }
+
+    public function test_tasksByDate_uses_flattenToList_and_renders_admin_view(): void
+    {
+        $code = $this->read(self::CONTROLLER_PATH);
+        $body = $this->methodBody($code, 'tasksByDate');
+
+        self::assertMatchesRegularExpression(
+            '/\$this->treeAggregator->flattenToList\s*\(/',
+            $body,
+            'tasksByDate() muss flattenToList() aufrufen, nicht buildTree().'
+        );
+        self::assertStringContainsString(
+            "'admin/events/tasks_by_date'",
+            $body,
+            'tasksByDate() rendert die Admin-Container-View '
+            . '(admin/events/tasks_by_date.php).'
+        );
+        self::assertMatchesRegularExpression(
+            "/'linkTaskTitles'\s*=>\s*true/",
+            $body,
+            'Admin-Kontext muss linkTaskTitles=true setzen, damit die '
+            . 'Titel als Link auf /admin/events/{id} gerendert werden.'
+        );
+    }
+
+    public function test_tasksByDate_sorts_by_start_at_with_nulls_last(): void
+    {
+        $code = $this->read(self::CONTROLLER_PATH);
+        $body = $this->methodBody($code, 'tasksByDate');
+
+        self::assertMatchesRegularExpression(
+            '/usort\s*\(\s*\$flatList/',
+            $body,
+            'tasksByDate() muss flatList nach start_at stabil per usort '
+            . 'sortieren (PHP 8+ garantiert Stabilitaet; DFS-Reihenfolge '
+            . 'bleibt Sekundaer-Schluessel).'
+        );
+        self::assertMatchesRegularExpression(
+            '/getStartAt\(\)/',
+            $body,
+            'usort-Vergleich muss getStartAt() nutzen.'
+        );
+    }
+
+    public function test_admin_tasks_by_date_view_includes_shared_partial(): void
+    {
+        $view = (string) file_get_contents(
+            __DIR__ . '/../../../src/app/Views/admin/events/tasks_by_date.php'
+        );
+        self::assertStringContainsString(
+            "include __DIR__ . '/../../events/_task_list_by_date.php'",
+            $view,
+            'admin/events/tasks_by_date.php muss das gemeinsame Partial '
+            . 'events/_task_list_by_date.php einbinden (DRY mit Organizer-View).'
+        );
+    }
 }
