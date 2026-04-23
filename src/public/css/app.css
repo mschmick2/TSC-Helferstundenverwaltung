@@ -446,3 +446,29 @@ main {
     background-color: var(--bs-success);
     color: var(--bs-white);
 }
+
+/* =========================================================================
+ * Fullscreen-Scrollable-Modals auf Mobile stabilisieren (Modul 6 I7b5)
+ * =========================================================================
+ * Bootstrap-5.3-Flex-Hoehen-Kollision bei der Kombination
+ * `modal-fullscreen-md-down` + `modal-dialog-scrollable`: auf schmalen
+ * Viewports (Chromium-Mobile-Emulation + echte iOS/Android) schrumpft das
+ * .modal-body ohne min-height:0 nicht unter seinen Content-Anspruch. Der
+ * Body ueberfliesst dann den sticky Footer, sodass Form-Elemente die
+ * Click-Region des Save-Buttons abdecken. Playwright-Symptom: "subtree
+ * intercepts pointer events" beim Save-Click auf mobile-se/mobile-14.
+ *
+ * Der Selector ist bewusst auf die Klassenkombination gelegt, nicht auf
+ * #task-edit-modal — greift auch fuer zukuenftige Fullscreen-Scrollable-
+ * Modals ohne weiteren Pflegeaufwand.
+ */
+.modal-fullscreen-md-down.modal-dialog-scrollable .modal-content {
+    height: 100%;
+    max-height: 100vh;
+}
+
+.modal-fullscreen-md-down.modal-dialog-scrollable .modal-body {
+    flex: 1 1 0;
+    min-height: 0;
+    overflow-y: auto;
+}
