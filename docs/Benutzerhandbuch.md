@@ -803,6 +803,25 @@ Block mehr, sondern eine aufklappbare Baumansicht (HTML-
   und Rueckgabe (*"Bereits zugesagt"*, *"Ausgebucht"*) sind 1:1
   gleich — die Hierarchie aendert nur die Darstellung, nicht das
   Verhalten.
+- **Belegungsstatus — Farbkodierung (ab VAES 1.4.2):** Jede Aufgabe
+  und jede Gruppe traegt links einen farbigen Rand und ein Textbadge,
+  das den aktuellen Belegungsstand auf einen Blick anzeigt:
+    - **Rot / "keine Zusage":** Aufgabe hat noch keine Zusagen; Gruppe
+      enthaelt mindestens einen leeren Leaf. Hier ist Hilfe am
+      dringendsten erwuenscht.
+    - **Gelb / "teilweise":** Aufgabe ist angefangen, aber das
+      Helferziel ist noch nicht erreicht. Unbegrenzte Aufgaben
+      (beliebig viele Helfer) bleiben dauerhaft gelb, sobald die erste
+      Zusage eintrifft — FULL ist definitionsgemaess unerreichbar.
+    - **Gruen / "voll":** Helferziel ist erreicht oder ueberschritten;
+      bei Gruppen sind alle Kinder voll.
+
+  Der Gruppen-Status richtet sich nach dem **schlechtesten Kinderstatus**
+  (Rot > Gelb > Gruen). Eine Gruppe wird also erst dann gruen, wenn
+  wirklich jeder enthaltene Leaf voll ist. Die Farbkodierung ist eine
+  visuelle Zusatzinformation; die Textbadges und ARIA-Label garantieren,
+  dass der Status auch fuer Screen-Reader und bei Farbsinn-Einschraenkung
+  (z.B. Rot-Gruen-Schwaeche) eindeutig erkennbar ist.
 
 Der Administrator kann die Baumansicht jederzeit deaktivieren; das
 Event faellt dann auf die flache Karten-Ansicht zurueck. Ist kein
