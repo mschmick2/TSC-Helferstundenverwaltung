@@ -394,3 +394,55 @@ main {
 ) .task-group-accordion-empty {
     display: block;
 }
+
+/* =========================================================================
+ * Task-Status-Farbkodierung (Modul 6 I7b3)
+ * =========================================================================
+ * Ampel rot-gelb-gruen (G1-Entscheidung B, WCAG-konform via Text-Badge und
+ * ARIA-Label). Border-Left-Akzent plus Hintergrund-Tinting. Die Klassen
+ * ueberschreiben bestehende border-left-Regeln aus I7b1/I7b2 (Editor-Node
+ * und Accordion-Leaf hatten eine Primary-Farbe). Das ist gewollt: Status
+ * hat Prioritaet vor dem bisherigen Design-Token. Wenn status null (keine
+ * assignmentCounts), wird keine task-status-*-Klasse gesetzt — die bis-
+ * herigen Border-Regeln greifen weiter.
+ */
+
+.task-status-empty {
+    border-left: 4px solid var(--bs-danger);
+    background-color: var(--bs-danger-bg-subtle);
+}
+
+.task-status-partial {
+    border-left: 4px solid var(--bs-warning);
+    background-color: var(--bs-warning-bg-subtle);
+}
+
+.task-status-full {
+    border-left: 4px solid var(--bs-success);
+    background-color: var(--bs-success-bg-subtle);
+}
+
+/* Status-Badge im Task-Header: kompakt, zusaetzlich zum Typ-Badge. */
+.task-status-badge {
+    font-size: 0.75rem;
+    padding: 0.25em 0.5em;
+    border-radius: 0.25rem;
+    margin-left: 0.25rem;
+    white-space: nowrap;
+    font-weight: 500;
+}
+
+.task-status-badge--empty {
+    background-color: var(--bs-danger);
+    color: var(--bs-white);
+}
+
+.task-status-badge--partial {
+    background-color: var(--bs-warning);
+    color: var(--bs-dark);
+}
+
+.task-status-badge--full {
+    background-color: var(--bs-success);
+    color: var(--bs-white);
+}

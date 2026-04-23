@@ -35,8 +35,14 @@ $helpersSubtree   = (int)   ($node['helpers_subtree']   ?? 0);
 $hoursSubtree     = (float) ($node['hours_subtree']     ?? 0.0);
 $leavesSubtree    = (int)   ($node['leaves_subtree']    ?? 0);
 $openSlotsSubtree = $node['open_slots_subtree'] ?? null;
+// I7b3: Belegungsstatus aus Aggregator (TaskStatus|null). null laesst die
+// bestehenden Border-Regeln greifen.
+$status           = $node['status'] ?? null;
 ?>
-<li class="task-node-readonly<?= $isGroup ? ' task-node-readonly--group' : ' task-node-readonly--leaf' ?>">
+<li class="task-node-readonly<?= $isGroup ? ' task-node-readonly--group' : ' task-node-readonly--leaf' ?><?= $status !== null ? ' ' . $status->cssClass() : '' ?>"
+    <?php if ($status !== null): ?>
+    aria-label="<?= ViewHelper::e($status->ariaLabel()) ?>"
+    <?php endif; ?>>
     <div class="task-node-readonly__row d-flex align-items-center flex-wrap gap-2 py-1">
         <span class="task-node-readonly__icon" aria-hidden="true">
             <?php if ($isGroup): ?>
@@ -51,6 +57,12 @@ $openSlotsSubtree = $node['open_slots_subtree'] ?? null;
                 <?= ViewHelper::e($task->getTitle()) ?>
             </strong>
             <span class="badge bg-light text-secondary border">Gruppe</span>
+            <?php if ($status !== null): ?>
+                <span class="task-status-badge task-status-badge--<?= $status->value ?>"
+                      title="<?= ViewHelper::e($status->ariaLabel()) ?>">
+                    <?= ViewHelper::e($status->badgeLabel()) ?>
+                </span>
+            <?php endif; ?>
             <span class="task-node-readonly__summary small text-muted">
                 <?= $leavesSubtree ?>
                 <?= $leavesSubtree === 1 ? 'Aufgabe' : 'Aufgaben' ?>
@@ -73,6 +85,12 @@ $openSlotsSubtree = $node['open_slots_subtree'] ?? null;
                 <span class="badge bg-info">Beigabe</span>
             <?php else: ?>
                 <span class="badge bg-primary">Aufgabe</span>
+            <?php endif; ?>
+            <?php if ($status !== null): ?>
+                <span class="task-status-badge task-status-badge--<?= $status->value ?>"
+                      title="<?= ViewHelper::e($status->ariaLabel()) ?>">
+                    <?= ViewHelper::e($status->badgeLabel()) ?>
+                </span>
             <?php endif; ?>
             <span class="task-node-readonly__summary small text-muted">
                 <?php if ($task->hasFixedSlot()): ?>

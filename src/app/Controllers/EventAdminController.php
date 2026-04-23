@@ -1102,6 +1102,9 @@ class EventAdminController extends BaseController
                 'hours_subtree'      => $node['hours_subtree'],
                 'leaves_subtree'     => $node['leaves_subtree'],
                 'open_slots_subtree' => $node['open_slots_subtree'],
+                // I7b3: Status als String-Value des TaskStatus-Enums, null
+                // wenn Aggregator ohne assignmentCounts aufgerufen wurde.
+                'status'             => $node['status']?->value,
                 'children'           => $this->serializeTreeForJson($node['children']),
             ];
         }

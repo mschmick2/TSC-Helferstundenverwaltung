@@ -47,6 +47,11 @@ use App\Models\EventTask;
 /** @var EventTask $task */
 $task    = $node['task'];
 $isGroup = $task->isGroup();
+// I7b3: Belegungsstatus aus Aggregator (TaskStatus|null). Bei null
+// bleibt der bestehende I7b2-Akzent-Border sichtbar; bei gesetztem
+// Status ueberschreiben die task-status-*-Klassen den Border und fuegen
+// ein Hintergrund-Tinting hinzu.
+$status  = $node['status'] ?? null;
 ?>
 
 <?php if ($isGroup): ?>
@@ -58,8 +63,11 @@ $isGroup = $task->isGroup();
     // offen; sonst eingeklappt (Nutzer kann manuell auffalten).
     $startOpen = $openSlotsSubtree !== null && $openSlotsSubtree > 0;
     ?>
-    <details class="task-group-accordion-group depth-<?= (int) $depth ?>"
+    <details class="task-group-accordion-group depth-<?= (int) $depth ?><?= $status !== null ? ' ' . $status->cssClass() : '' ?>"
              <?= $startOpen ? 'open' : '' ?>
+             <?php if ($status !== null): ?>
+             aria-label="<?= ViewHelper::e($status->ariaLabel()) ?>"
+             <?php endif; ?>
              <?php if ($openSlotsSubtree !== null): ?>
              data-open-count="<?= (int) $openSlotsSubtree ?>"
              <?php endif; ?>>
@@ -67,6 +75,12 @@ $isGroup = $task->isGroup();
             <span class="task-group-accordion-title">
                 <i class="bi bi-folder" aria-hidden="true"></i>
                 <strong><?= ViewHelper::e($task->getTitle()) ?></strong>
+                <?php if ($status !== null): ?>
+                    <span class="task-status-badge task-status-badge--<?= $status->value ?>"
+                          title="<?= ViewHelper::e($status->ariaLabel()) ?>">
+                        <?= ViewHelper::e($status->badgeLabel()) ?>
+                    </span>
+                <?php endif; ?>
             </span>
             <span class="task-group-accordion-badges">
                 <?php if ($openSlotsSubtree !== null && $openSlotsSubtree > 0): ?>
@@ -115,7 +129,10 @@ $isGroup = $task->isGroup();
         && $capTarget !== null
         && $currentCount >= $capTarget;
     ?>
-    <div class="task-group-accordion-leaf depth-<?= (int) $depth ?>"
+    <div class="task-group-accordion-leaf depth-<?= (int) $depth ?><?= $status !== null ? ' ' . $status->cssClass() : '' ?>"
+         <?php if ($status !== null): ?>
+         aria-label="<?= ViewHelper::e($status->ariaLabel()) ?>"
+         <?php endif; ?>
          <?php if ($openCount !== null): ?>
          data-open-count="<?= (int) $openCount ?>"
          <?php endif; ?>>
@@ -128,6 +145,12 @@ $isGroup = $task->isGroup();
                     <span class="badge bg-info">Beigabe</span>
                 <?php else: ?>
                     <span class="badge bg-primary">Aufgabe</span>
+                <?php endif; ?>
+                <?php if ($status !== null): ?>
+                    <span class="task-status-badge task-status-badge--<?= $status->value ?>"
+                          title="<?= ViewHelper::e($status->ariaLabel()) ?>">
+                        <?= ViewHelper::e($status->badgeLabel()) ?>
+                    </span>
                 <?php endif; ?>
             </span>
             <small class="text-muted">

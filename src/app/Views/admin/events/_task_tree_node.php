@@ -58,10 +58,17 @@ $canDelete  = $canDelete ?? (
 );
 
 $baseUrl = '/admin/events/' . $eventId . '/tasks/' . $taskId;
+
+// I7b3: Belegungsstatus aus Aggregator (TaskStatus|null). null bedeutet
+// keine Farbkodierung — bestehende Border-Regeln aus I7b1 greifen weiter.
+$status = $node['status'] ?? null;
 ?>
-<li class="task-node<?= $isGroup ? ' task-node--group' : ' task-node--leaf' ?>"
+<li class="task-node<?= $isGroup ? ' task-node--group' : ' task-node--leaf' ?><?= $status !== null ? ' ' . $status->cssClass() : '' ?>"
     data-task-id="<?= $taskId ?>"
     data-is-group="<?= $isGroup ? '1' : '0' ?>"
+    <?php if ($status !== null): ?>
+    aria-label="<?= ViewHelper::e($status->ariaLabel()) ?>"
+    <?php endif; ?>
     data-endpoint-move="<?= ViewHelper::url($baseUrl . '/move') ?>"
     data-endpoint-convert="<?= ViewHelper::url($baseUrl . '/convert') ?>"
     data-endpoint-delete="<?= ViewHelper::url($baseUrl . '/tree-delete') ?>"
@@ -93,6 +100,13 @@ $baseUrl = '/admin/events/' . $eventId . '/tasks/' . $taskId;
                 title="<?= ViewHelper::e($title) ?>">
             <?= ViewHelper::e($title) ?>
         </button>
+
+        <?php if ($status !== null): ?>
+            <span class="task-status-badge task-status-badge--<?= $status->value ?>"
+                  title="<?= ViewHelper::e($status->ariaLabel()) ?>">
+                <?= ViewHelper::e($status->badgeLabel()) ?>
+            </span>
+        <?php endif; ?>
 
         <span class="task-node__badges small text-muted d-none d-md-inline">
             <?php if ($isGroup): ?>
