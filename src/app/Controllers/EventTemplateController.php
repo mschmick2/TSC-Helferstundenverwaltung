@@ -107,6 +107,19 @@ class EventTemplateController extends BaseController
         $versions = $this->templateRepo->findAllVersionsByRoot($rootId);
         $hasDerivedEvents = $this->templateRepo->hasDerivedEvents($id);
 
+        // I7c Phase 3: Read-Preview-Tree nur, wenn das Feature-Flag an ist
+        // UND das Template eine Hierarchie hat (mindestens eine Gruppe oder
+        // einen geschachtelten Knoten). Flache Legacy-Templates behalten
+        // die bisherige flache Task-Liste — ein einstufiger Tree waere
+        // visuell Overhead ohne Mehrwert.
+        $treePreviewData = null;
+        if ($this->treeEditorEnabled()
+            && $this->treeAggregator !== null
+            && $this->hasTreeStructure($tasks)
+        ) {
+            $treePreviewData = $this->treeAggregator->buildTree($tasks);
+        }
+
         return $this->render($response, 'admin/event-templates/show', [
             'title' => 'Template: ' . $template->getName(),
             'user' => $user,
@@ -115,6 +128,7 @@ class EventTemplateController extends BaseController
             'tasks' => $tasks,
             'versions' => $versions,
             'hasDerivedEvents' => $hasDerivedEvents,
+            'treePreviewData' => $treePreviewData,
             'breadcrumbs' => [
                 ['label' => 'Dashboard', 'url' => '/'],
                 ['label' => 'Events', 'url' => '/admin/events'],
@@ -658,6 +672,25 @@ class EventTemplateController extends BaseController
         }
         $value = $this->settingsService->getString('events.tree_editor_enabled', '0');
         return $value === '1' || $value === 'true';
+    }
+
+    /**
+     * Prueft, ob die Task-Liste eine Hierarchie enthaelt
+     * (mindestens eine Gruppe oder ein Kind-Knoten). Analog zum
+     * hasTreeStructure-Check in EventAdminController::show(). Flache
+     * Bestands-Templates liefern false — der Read-Preview-Tree wird
+     * dann nicht gerendert.
+     *
+     * @param \App\Models\EventTemplateTask[] $tasks
+     */
+    private function hasTreeStructure(array $tasks): bool
+    {
+        foreach ($tasks as $task) {
+            if ($task->isGroup() || $task->getParentTemplateTaskId() !== null) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**

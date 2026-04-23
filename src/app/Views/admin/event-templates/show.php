@@ -3,8 +3,12 @@
  * @var \App\Models\EventTemplate $template
  * @var \App\Models\EventTemplateTask[] $tasks
  * @var \App\Models\EventTemplate[] $versions
+ * @var array<int, array>|null $treePreviewData  (I7c Phase 3: Aggregator-
+ *      Output, gefuellt nur bei Flag an UND vorhandener Baumstruktur)
  */
 use App\Helpers\ViewHelper;
+
+$showTreePreview = isset($treePreviewData) && $treePreviewData !== null;
 ?>
 
 <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
@@ -53,6 +57,35 @@ use App\Helpers\ViewHelper;
     </div>
 <?php endif; ?>
 
+<?php if ($showTreePreview):
+    // I7c Phase 3: Read-Preview-Tree fuer hierarchische Templates.
+    // Aktiv nur bei Flag an UND hasTreeStructure — flache Legacy-
+    // Templates landen im else-Branch und behalten ihre einfache
+    // Liste. Container-Closure gegen Scope-Leak in der rekursiven
+    // Kinder-Schleife des _task_tree_readonly.php-Partials.
+    $renderReadonlyNode = function (array $node, int $depth) use (
+        &$renderReadonlyNode
+    ): void {
+        $context = 'template';
+        include __DIR__ . '/../events/_task_tree_readonly.php';
+    };
+?>
+<section class="event-template-tree-preview card mb-3">
+    <div class="card-header">
+        <h2 class="h5 mb-0">
+            <i class="bi bi-diagram-3" aria-hidden="true"></i>
+            Aufgabenbaum (Vorschau)
+        </h2>
+    </div>
+    <div class="card-body">
+        <ul class="task-tree-readonly list-unstyled mb-0">
+            <?php foreach ($treePreviewData as $topNode): ?>
+                <?php $renderReadonlyNode($topNode, 0); ?>
+            <?php endforeach; ?>
+        </ul>
+    </div>
+</section>
+<?php else: ?>
 <div class="card mb-3">
     <div class="card-header">
         <h2 class="h5 mb-0"><i class="bi bi-list-task"></i> Task-Vorlagen</h2>
@@ -90,6 +123,7 @@ use App\Helpers\ViewHelper;
         <?php endif; ?>
     </div>
 </div>
+<?php endif; // $showTreePreview ?>
 
 <?php if (count($versions) > 1): ?>
     <div class="card mb-3">
