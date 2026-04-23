@@ -172,17 +172,29 @@ class EventTemplateController extends BaseController
         $categories = $this->categoryRepo->findAllActive();
         $hasDerivedEvents = $this->templateRepo->hasDerivedEvents($id);
 
-        // I7c Phase 2: Tree-Editor-Daten nur, wenn Flag an UND Template
-        // editierbar (isCurrent ist oben bereits garantiert; hier noch der
-        // hasDerivedEvents-Lock). Sonst bleibt es bei der flachen
-        // Legacy-Liste. Aggregator-Output liefert verschachtelte Struktur
-        // fuers Rendering durch das gemeinsame _task_tree_node.php-Partial.
-        $treeEditorEnabled = false;
+        // I7c Phase 2b: Drei-Mode-Logik.
+        //   - 'legacy'   — Tree-Flag aus oder kein Aggregator. Flache
+        //                  Legacy-Liste wie pre-I7c.
+        //   - 'editor'   — Flag an, Template editierbar. Voller Drag-and-
+        //                  Drop-Editor mit SortableJS und Modal.
+        //   - 'readonly' — Flag an, aber Template gesperrt
+        //                  (hasDerivedEvents oder nicht-aktuelle Version).
+        //                  Hierarchische Read-Only-Ansicht via
+        //                  _task_tree_readonly.php. Admin sieht die
+        //                  Struktur, kann aber nicht editieren — der
+        //                  klassische Fallback auf die flache Liste
+        //                  wuerde die Baum-Information visuell verstecken.
+        $treeMode = 'legacy';
         $treeData = [];
-        if ($this->treeEditorEnabled() && !$hasDerivedEvents && $this->treeAggregator !== null) {
-            $treeEditorEnabled = true;
+        if ($this->treeEditorEnabled() && $this->treeAggregator !== null) {
+            $isLocked = $hasDerivedEvents || !$template->isCurrent();
+            $treeMode = $isLocked ? 'readonly' : 'editor';
             $treeData = $this->treeAggregator->buildTree($tasks);
         }
+        // Backward-Compat fuer bestehende View-Referenzen: editor-Modus
+        // impliziert den frueheren $treeEditorEnabled-Bool. readonly- und
+        // legacy-Mode implizieren false (kein Editor-Rendering).
+        $treeEditorEnabled = $treeMode === 'editor';
 
         return $this->render($response, 'admin/event-templates/edit', [
             'title' => 'Template bearbeiten: ' . $template->getName(),
@@ -192,6 +204,7 @@ class EventTemplateController extends BaseController
             'tasks' => $tasks,
             'categories' => $categories,
             'hasDerivedEvents' => $hasDerivedEvents,
+            'treeMode' => $treeMode,
             'treeEditorEnabled' => $treeEditorEnabled,
             'treeData' => $treeData,
             'csrfToken' => $_SESSION['csrf_token'] ?? '',

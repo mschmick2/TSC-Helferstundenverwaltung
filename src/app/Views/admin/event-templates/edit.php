@@ -4,14 +4,15 @@
  * @var \App\Models\EventTemplateTask[] $tasks
  * @var \App\Models\Category[] $categories
  * @var bool $hasDerivedEvents
- * @var bool|null $treeEditorEnabled   (I7c Phase 2)
- * @var array<int, array>|null $treeData (Aggregator-Output)
+ * @var string|null $treeMode           (I7c Phase 2b: 'editor'|'readonly'|'legacy')
+ * @var bool|null $treeEditorEnabled    (Backward-Compat: $treeMode === 'editor')
+ * @var array<int, array>|null $treeData (Aggregator-Output; gefuellt bei editor + readonly)
  * @var string|null $csrfToken
  */
 use App\Helpers\ViewHelper;
 use App\Models\EventTask;
 
-$treeEditorEnabled = !empty($treeEditorEnabled);
+$treeMode          = $treeMode ?? 'legacy';
 $treeData          = $treeData ?? [];
 $csrfTokenString   = $csrfToken ?? ($_SESSION['csrf_token'] ?? '');
 $templateIdForTree = (int) $template->getId();
@@ -47,7 +48,7 @@ $templateIdForTree = (int) $template->getId();
     </div>
 <?php endif; ?>
 
-<?php if ($treeEditorEnabled):
+<?php if ($treeMode === 'editor'):
     // I7c Phase 2: hierarchischer Aufgabenbaum-Editor.
     // Container-Closure gegen Scope-Leak in rekursiven Partials (vgl.
     // .claude/rules/05-frontend.md "Rekursive Partials"). Setzt $context,
@@ -134,7 +135,56 @@ $templateIdForTree = (int) $template->getId();
 <script src="<?= ViewHelper::url('/js/event-task-tree.js') ?>"></script>
 
 <hr class="my-4">
-<?php endif; // treeEditorEnabled ?>
+<?php elseif ($treeMode === 'readonly'):
+    // I7c Phase 2b: hierarchische Read-Only-Ansicht fuer gesperrte
+    // Templates (hasDerivedEvents oder nicht-aktuelle Version). Der Admin
+    // sieht die Baumstruktur, kann aber nicht editieren. Die
+    // _task_tree_readonly.php-Partials nutzen das $context='template'-
+    // Zeit-Rendering aus Phase 2 (Offsets als "+30 min" / "+2 h 30 min").
+    //
+    // Container-Closure gegen Scope-Leak in rekursiven Partials — die
+    // Kinder-<ul>-Schleife in _task_tree_readonly.php ruft
+    // $renderReadonlyNode auf jedem child.
+    $renderReadonlyNode = function (array $node, int $depth) use (
+        &$renderReadonlyNode
+    ): void {
+        $context = 'template';
+        include __DIR__ . '/../events/_task_tree_readonly.php';
+    };
+?>
+<section class="event-template-tree-readonly card mb-3">
+    <div class="card-header">
+        <h2 class="h5 mb-0">
+            <i class="bi bi-diagram-3" aria-hidden="true"></i>
+            Aufgabenbaum (Read-Only)
+        </h2>
+    </div>
+    <div class="card-body">
+        <p class="text-muted mb-3">
+            Dieses Template ist gesperrt &mdash; es wurden bereits Events
+            daraus abgeleitet oder die Version ist nicht mehr die aktuelle.
+            Die Baumstruktur wird zur Ansicht gezeigt; Aenderungen sind nur
+            ueber
+            <strong>&bdquo;Als neue Version speichern&ldquo;</strong>
+            moeglich.
+        </p>
+
+        <?php if (empty($treeData)): ?>
+            <p class="text-muted fst-italic mb-0">
+                Dieses Template hat keine Aufgaben.
+            </p>
+        <?php else: ?>
+            <ul class="task-tree-readonly list-unstyled mb-0">
+                <?php foreach ($treeData as $topNode): ?>
+                    <?php $renderReadonlyNode($topNode, 0); ?>
+                <?php endforeach; ?>
+            </ul>
+        <?php endif; ?>
+    </div>
+</section>
+
+<hr class="my-4">
+<?php endif; // treeMode branches ?>
 
 <?php if (!empty($tasks)): ?>
     <!-- Save as new Version -->
@@ -173,9 +223,10 @@ $templateIdForTree = (int) $template->getId();
     </div>
 <?php endif; ?>
 
-<?php if (!$treeEditorEnabled): ?>
-<!-- Task-Liste mit Inline-Edit (Legacy-Flach-UI; ersetzt durch Tree-Editor,
-     wenn events.tree_editor_enabled=1 und Template nicht hasDerivedEvents). -->
+<?php if ($treeMode === 'legacy'): ?>
+<!-- Task-Liste mit Inline-Edit (Legacy-Flach-UI; aktiv nur, wenn das
+     events.tree_editor_enabled-Flag aus ist. Bei aktivem Flag rendert
+     der Editor- oder Readonly-Modus oben die hierarchische Ansicht. -->
 <div class="card mb-3">
     <div class="card-header d-flex justify-content-between align-items-center">
         <h2 class="h5 mb-0"><i class="bi bi-list-task"></i> Task-Vorlagen (<?= count($tasks) ?>)</h2>
@@ -298,4 +349,4 @@ $templateIdForTree = (int) $template->getId();
         <?php endif; ?>
     </div>
 </div>
-<?php endif; // !$treeEditorEnabled ?>
+<?php endif; // $treeMode === 'legacy' ?>
