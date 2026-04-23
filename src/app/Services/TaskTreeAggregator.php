@@ -6,6 +6,7 @@ namespace App\Services;
 
 use App\Helpers\TreeWalkLimits;
 use App\Models\EventTask;
+use App\Models\TaskStatus;
 
 /**
  * Read-only Helfer fuer den hierarchischen Aufgabenbaum (Modul 6 I7a).
@@ -34,6 +35,15 @@ use App\Models\EventTask;
  *                                       I7a bewusst null, damit der Renderer
  *                                       in I7b die Property nur fuellen muss
  *                                       — kein API-Bruch.)
+ *     'status'              => TaskStatus|null   (I7b3: EMPTY/PARTIAL/FULL
+ *                                       pro Leaf basierend auf
+ *                                       capacity_target + aktive Zusagen;
+ *                                       pro Gruppe als schlechtester Status
+ *                                       aller Kinder — G1-Entscheidung A
+ *                                       Variante 1. null, wenn
+ *                                       assignmentCounts leer oder Gruppe
+ *                                       ohne Kinder — Views rendern dann
+ *                                       keine Farbe.)
  *   ]
  */
 final class TaskTreeAggregator
@@ -80,6 +90,26 @@ final class TaskTreeAggregator
         unset($siblings);
 
         return $this->assemble($byParent, 0, $assignmentCounts);
+    }
+
+    /**
+     * Status-Rollup fuer eine Gruppe: schlechtester Kinderstatus gewinnt
+     * (G1-Entscheidung A Variante 1). null-Statuswerte (z.B. Kind ist eine
+     * leere Gruppe) werden gefiltert, bevor worst() laeuft — sie tragen
+     * keine Aussage und duerfen den Rollup nicht verfaelschen. Eine Gruppe
+     * ohne auswertbare Kinder bekommt selbst null.
+     *
+     * @param array<int, array{status: TaskStatus|null}> $children
+     */
+    private function rollupGroupStatus(array $children): ?TaskStatus
+    {
+        $childStatuses = [];
+        foreach ($children as $child) {
+            if ($child['status'] !== null) {
+                $childStatuses[] = $child['status'];
+            }
+        }
+        return TaskStatus::worst($childStatuses);
     }
 
     /**
@@ -164,14 +194,16 @@ final class TaskTreeAggregator
      * @param array<int, EventTask[]> $byParent Geschwister-Map (Key 0 = Top-Level).
      * @param array<int,int> $assignmentCounts Map task_id -> aktive Zusagen.
      *     Leeres Array deaktiviert die open_slots_subtree-Berechnung
-     *     (open_slots_subtree bleibt null, I7a-Default).
+     *     (open_slots_subtree bleibt null, I7a-Default) und setzt auch
+     *     'status' auf null (I7b3: ohne Zusage-Zahlen keine Farbkodierung).
      * @return array<int, array{
      *     task: EventTask,
      *     children: array,
      *     helpers_subtree: int,
      *     hours_subtree: float,
      *     leaves_subtree: int,
-     *     open_slots_subtree: int|null
+     *     open_slots_subtree: int|null,
+     *     status: TaskStatus|null
      * }>
      */
     private function assemble(array $byParent, int $parentKey, array $assignmentCounts = []): array
@@ -181,6 +213,7 @@ final class TaskTreeAggregator
         foreach ($byParent[$parentKey] ?? [] as $task) {
             $children = $this->assemble($byParent, (int) $task->getId(), $assignmentCounts);
             $openSlots = 0;
+            $status    = null;
 
             if ($task->isGroup()) {
                 $helpers = 0;
@@ -194,6 +227,9 @@ final class TaskTreeAggregator
                         $openSlots += $child['open_slots_subtree'] ?? 0;
                     }
                 }
+                if ($countsActive) {
+                    $status = $this->rollupGroupStatus($children);
+                }
             } else {
                 // Leaf: capacity_target=NULL bedeutet "unbegrenzt" — fuer das
                 // Rollup zaehlen wir 0 als bekannten Bedarf, damit "5 offen"
@@ -204,6 +240,14 @@ final class TaskTreeAggregator
                 if ($countsActive) {
                     $taken = $assignmentCounts[(int) $task->getId()] ?? 0;
                     $openSlots = max(0, $helpers - $taken);
+                    // I7b3: Leaf-Status aus capacity_target + aktueller
+                    // Zusage-Anzahl. Bei unbegrenzten Leaves (capacity_target
+                    // null) wird die Sonderlogik in TaskStatus::forLeaf
+                    // angewendet — FULL nie erreicht.
+                    $status = TaskStatus::forLeaf(
+                        $task->getCapacityTarget(),
+                        $taken
+                    );
                 }
             }
 
@@ -214,6 +258,7 @@ final class TaskTreeAggregator
                 'hours_subtree'      => $hours,
                 'leaves_subtree'     => $leaves,
                 'open_slots_subtree' => $countsActive ? $openSlots : null,
+                'status'             => $status,
             ];
         }
         return $out;
