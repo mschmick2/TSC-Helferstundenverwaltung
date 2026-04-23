@@ -868,3 +868,99 @@ keine Leaks zum Container. Das Partial ruft im Kinder-Loop nur noch
   Container-Closures in `edit.php`, `show.php` als Referenz.
 
 <!-- Neue Eintraege hier unten anfuegen, nicht oben. Append-Only. -->
+
+---
+
+### 2026-04-23 — Bestandsanalyse mit nur Grep uebersieht JS-gefuellte Partials
+
+**Kontext:**
+Modul 6 I7c Phase 2 — Architect-Plan nahm an, das JS bleibt im
+Partial-Generalisierungs-Umbau unveraendert. Der Plan war "URLs kommen
+per data-endpoint-*-Attribute aus dem Partial; JS ist endpoint-
+agnostisch".
+
+**Problem / Ueberraschung:**
+Die Annahme war halb-richtig: die URLs kommen tatsaechlich aus data-
+Attributen. Aber das `_task_edit_modal.php` ist nur ein Skelett-
+Container — der Modal-Body (das Formular mit den Feldern!) wird erst
+nach fetch() vom JS via DOM-APIs aufgebaut. Feldnamen wie `start_at`/
+`end_at` vs. `default_offset_minutes_start/end` stehen nicht im
+Partial, sondern hart im `buildForm()` des JS. Eine reine Partial-
+Generalisierung ohne JS-Anpassung haette den Template-Kontext mit
+den Event-Feldnamen serialisiert und das Backend haette die Inputs
+verworfen.
+
+Der Architect-Plan hat ausdruecklich "JS-Kern unveraendert, Endpoint-
+Agnostik bestaetigt" als Deliverable-3-Erwartung genannt — das war
+basierend auf einer Bestandsanalyse, die nur File-Inhalte las und
+nicht die Laufzeit-Semantik pruefte.
+
+**Loesung:**
+JS-Kern wurde kontext-aware gemacht via
+- `dataset.context` am Wrapper (mit Default `'event'`),
+- `dataset.entityId` mit Fallback auf `dataset.eventId`,
+- `parentIdField()`-Helfer fuer Form-Feldnamen,
+- kontext-abhaengige Zeit-Felder in `buildForm()` und Default-Werte
+  in `showCreateModal()`.
+
+**Praevention:**
+Bei Architect-Plaenen, die "JS greift nicht in die Aenderung rein"
+annehmen, IMMER zusaetzlich pruefen: ruft der Partial nur das Modal-
+Skelett, oder rendert er auch Inhalt? Wenn der Inhalt vom JS gebaut
+wird (DOM-APIs, buildForm-Stil), ist die Partial-Generalisierung
+unvollstaendig — das JS selbst muss kontext-aware werden.
+
+→ Relevant fuer kuenftige UI-Generalisierungen (z.B. I7e Organisator-
+  Editor): Bestandsanalyse muss Laufzeit-Rendering-Pfade einschliessen,
+  nicht nur Dateiinhalte. Konkreter Check: fuer jedes betroffene
+  Partial "rendert es Inhalt oder nur Container?" — bei Container
+  Modal-JS pruefen.
+
+---
+
+### 2026-04-23 — Drei-Mode-View-Zustand statt Editor-vs-Legacy-Binaer
+
+**Kontext:**
+Modul 6 I7c Phase 2 — Template-Editor-Integration in edit.php. Die
+Phase-2-Implementierung hatte nur zwei Zustaende: Tree-Editor (bei
+Flag an und editierbarem Template) vs. flache Legacy-Liste
+(sonst). Das schliesst "Template gesperrt, aber User will trotzdem
+die Hierarchie sehen" als Fall mit ein — waehrend der G1-Plan einen
+dedizierten Read-Only-Modus vorsah.
+
+**Problem / Ueberraschung:**
+Der binaere Editor-vs-Legacy-Switch hat einen Template-Admin, der
+nach `deriveEvent` die Struktur seiner Vorlage nur noch ansehen
+wollte, auf die flache Liste geworfen — die Baum-Information war
+visuell weg, obwohl sie im Schema da ist. Der G1-Plan nannte das
+explizit als vorzugsweise Variante ("Read-Only-Tree, damit Admin die
+Struktur sieht, aber nicht editieren kann"); der Coder hatte den
+Hinweis beim Schreiben uebersehen und kein expliziter G3-Check
+hat es gefangen, weil G3 erst in Phase 4 kommt.
+
+Der User entdeckte die Abweichung durch direkte Frage und loeste die
+Nachbesserung Phase 2b aus.
+
+**Loesung:**
+Drei-Mode-Variable `$treeMode ∈ {'legacy', 'editor', 'readonly'}`:
+
+- `'editor'` — Flag an, editierbar (isCurrent, kein hasDerivedEvents).
+- `'readonly'` — Flag an, Lock greift. Hierarchische Ansicht via
+  `_task_tree_readonly.php` + Info-Zeile "Als neue Version speichern".
+- `'legacy'` — Flag aus oder Aggregator nicht verfuegbar.
+
+`$treeEditorEnabled` bleibt als Abgeleitet-Bool fuer Rueckwaerts-Kompat.
+
+**Praevention:**
+- Bei View-Zustaenden, die mit Business-Rule-Locks zusammenhaengen,
+  erst die Zustandsmaschine vollstaendig skizzieren (n Zustaende,
+  Uebergaenge), dann implementieren. Binaer-Switches sind ein Red
+  Flag, wenn mehr als zwei distinkte Zustaende existieren.
+- G1-Plan-Hinweise zu Read-Only-Fallbacks sind bindend — im G3-Review
+  explizit gegen den Plan pruefen, nicht nur gegen die Implementierung.
+- Fuer aehnliche Faelle (I7e Organisator-Editor wird auch
+  verschiedene Berechtigungs-Zustaende haben): Drei-Mode-Muster
+  als Default-Denkweise uebernehmen.
+
+→ Siehe `admin/event-templates/edit.php` als Referenz-Implementierung.
+

@@ -1353,6 +1353,42 @@ Zeigt alle Vorlagen mit Name, Anzahl Aufgaben und Anzahl Events, die aus dieser 
 
 **Tipp:** Beim Erstellen eines neuen Events kann die Vorlage als **Basis** ausgewaehlt werden -- Sie muessen dann nur Datum, Ort und event-spezifische Details eintragen.
 
+#### Aufgabenbaum in Vorlagen (ab VAES 1.4.5)
+
+Vorlagen unterstuetzen den gleichen hierarchischen Aufgabenbaum-Editor
+wie Events (siehe 12.4). Sobald der Tree-Editor systemweit freigeschaltet
+ist (Einstellung **events.tree_editor_enabled**), erscheint beim
+Bearbeiten einer Vorlage der Baum-Editor statt der flachen Task-Liste.
+
+Zeitangaben in Vorlagen sind **Offsets** in Minuten relativ zum Event-
+Start:
+
+- **`+30 min`** bedeutet "30 Minuten nach Event-Start".
+- **`+2 h 30 min`** bedeutet "2 Stunden und 30 Minuten nach Event-Start".
+- **Negative Werte** (`-15 min`) sind fuer Vorbereitungs-Aufgaben
+  zugelassen (z.B. Aufbau 30 Minuten vor Event-Beginn).
+
+Beim Ableiten eines Events aus der Vorlage rechnet das System die
+Offsets mit dem konkreten Event-Startdatum in absolute Zeitpunkte um.
+
+Drei Ansichten je nach Zustand der Vorlage:
+
+- **Editor-Modus** — bei aktiver Version ohne abgeleitete Events:
+  voller Drag-and-Drop-Editor, Knoten anlegen / verschieben /
+  konvertieren / loeschen wie im Event-Editor.
+- **Read-Only-Modus** — wenn aus der Vorlage bereits Events abgeleitet
+  wurden oder die Vorlage eine aeltere Version ist: die Baum-Struktur
+  bleibt sichtbar, aber ohne Editier-Aktionen. Eine Info-Zeile weist
+  auf *"Als neue Version speichern"* hin.
+- **Legacy-Flache-Liste** — wenn das Flag ausgeschaltet ist oder die
+  Vorlage noch keine Hierarchie hat: bisheriges Verhalten aus
+  aelteren Versionen, ohne Tree.
+
+Auf der **Detail-Seite** einer Vorlage (nicht im Editor) wird der Baum
+ebenfalls als Read-Preview angezeigt, wenn die Vorlage eine Hierarchie
+enthaelt -- nuetzlich fuer den schnellen Ueberblick vor dem Ableiten
+eines Events.
+
 #### Vorlage loeschen
 
 Vorlagen koennen jederzeit geloescht werden. Bereits erzeugte Events bleiben unberuehrt, da die Aufgaben im Event-Datensatz kopiert (nicht verlinkt) sind.
