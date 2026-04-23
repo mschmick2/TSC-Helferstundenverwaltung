@@ -659,4 +659,18 @@ return [
             $c->get(\App\Services\SettingsService::class)
         );
     },
+
+    // --- Modul 6 I7e-A: Non-modaler Organisator-Editor ---------------------
+    \App\Controllers\OrganizerEventEditController::class => function (ContainerInterface $c): \App\Controllers\OrganizerEventEditController {
+        return new \App\Controllers\OrganizerEventEditController(
+            $c->get(EventRepository::class),
+            $c->get(EventTaskRepository::class),
+            $c->get(EventTaskAssignmentRepository::class),
+            $c->get(EventOrganizerRepository::class),
+            $c->get(\App\Services\TaskTreeService::class),
+            $c->get(\App\Services\TaskTreeAggregator::class),
+            $c->get(\App\Services\SettingsService::class),
+            $c->get('settings')
+        );
+    },
 ];

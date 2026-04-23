@@ -13,6 +13,7 @@ use App\Controllers\EventTemplateController;
 use App\Controllers\IcalController;
 use App\Controllers\MemberEventController;
 use App\Controllers\OrganizerEventController;
+use App\Controllers\OrganizerEventEditController;
 use App\Controllers\ReportController;
 use App\Controllers\TargetHoursController;
 use App\Controllers\UserController;
@@ -196,6 +197,13 @@ return function (App $app): void {
         $group->post('/events/{eventId:[0-9]+}/tasks/{taskId:[0-9]+}/delete',
             [EventAdminController::class, 'deleteTask']);
 
+        // Non-modaler Editor (Modul 6 I7e-A Phase 1) — Feature-Parity-Route
+        // zum neuen Organizer-Editor. Die acht Tree-Action-POST-Routen
+        // unter /admin/events/{eventId}/tasks/* bleiben unveraendert und
+        // werden vom neuen Editor wiederverwendet.
+        $group->get('/events/{eventId:[0-9]+}/editor',
+            [EventAdminController::class, 'showEditor']);
+
         // Aufgabenbaum-Editor (Modul 6 I7b1) — hinter Settings-Flag
         // events.tree_editor_enabled. Zugriff zusaetzlich durch
         // assertEventEditPermission pro Action auf Organizer-Ebene gefiltert.
@@ -330,6 +338,46 @@ return function (App $app): void {
         $group->get(
             '/events/{eventId:[0-9]+}/tasks-by-date',
             [OrganizerEventController::class, 'tasksByDate']
+        );
+
+        // Non-modaler Organisator-Editor (Modul 6 I7e-A Phase 1).
+        // Parallel zu den Admin-Tree-Actions unter /admin/events/*, aber
+        // mit isOrganizer-Check im Controller statt RoleMiddleware.
+        $group->get(
+            '/events/{eventId:[0-9]+}/editor',
+            [OrganizerEventEditController::class, 'showEditor']
+        );
+        $group->get(
+            '/events/{eventId:[0-9]+}/tasks/tree',
+            [OrganizerEventEditController::class, 'showTaskTree']
+        );
+        $group->post(
+            '/events/{eventId:[0-9]+}/tasks/node',
+            [OrganizerEventEditController::class, 'createTaskNode']
+        );
+        $group->post(
+            '/events/{eventId:[0-9]+}/tasks/reorder',
+            [OrganizerEventEditController::class, 'reorderTasks']
+        );
+        $group->post(
+            '/events/{eventId:[0-9]+}/tasks/{taskId:[0-9]+}/move',
+            [OrganizerEventEditController::class, 'moveTaskNode']
+        );
+        $group->post(
+            '/events/{eventId:[0-9]+}/tasks/{taskId:[0-9]+}/convert',
+            [OrganizerEventEditController::class, 'convertTaskNode']
+        );
+        $group->post(
+            '/events/{eventId:[0-9]+}/tasks/{taskId:[0-9]+}/tree-delete',
+            [OrganizerEventEditController::class, 'deleteTaskNode']
+        );
+        $group->get(
+            '/events/{eventId:[0-9]+}/tasks/{taskId:[0-9]+}/edit',
+            [OrganizerEventEditController::class, 'editTaskNode']
+        );
+        $group->post(
+            '/events/{eventId:[0-9]+}/tasks/{taskId:[0-9]+}',
+            [OrganizerEventEditController::class, 'updateTaskNode']
         );
     })
         ->add(CsrfMiddleware::class)

@@ -801,6 +801,51 @@ class EventAdminController extends BaseController
     }
 
     // =========================================================================
+    // Non-modaler Editor (Modul 6 I7e-A Phase 1) — Feature-Parity-Route
+    // zum neuen Organizer-Editor. Die acht Tree-Action-POST-Routen unter
+    // /admin/events/{id}/tasks/* (showTaskTree, createTaskNode, ...) bleiben
+    // unveraendert und werden vom neuen Editor wiederverwendet.
+    // =========================================================================
+
+    /**
+     * GET /admin/events/{eventId}/editor — Non-modaler Editor-Einstieg.
+     * Phase 1: Stub-View. Phase 2 bringt Sidebar + Tree-Widget-Integration.
+     */
+    public function showEditor(Request $request, Response $response): Response
+    {
+        $eventId = (int) $this->routeArgs($request)['eventId'];
+
+        if (!$this->treeEditorEnabled()) {
+            return $response->withStatus(404);
+        }
+
+        $user = $request->getAttribute('user');
+        // Gleiches Auth-Pattern wie showTaskTree: event_admin-RoleMiddleware
+        // greift bereits an der Route-Group; assertEventEditPermission
+        // akzeptiert zusaetzlich Organisator-Membership und wirft
+        // AuthorizationException fuer Fremd-User.
+        $this->assertEventEditPermission($user, $eventId, $this->organizerRepo);
+
+        $event = $this->eventRepo->findById($eventId);
+        if ($event === null) {
+            return $response->withStatus(404);
+        }
+
+        return $this->render($response, 'admin/events/editor', [
+            'title'    => 'Editor: ' . $event->getTitle(),
+            'user'     => $user,
+            'settings' => $this->settings,
+            'event'    => $event,
+            'breadcrumbs' => [
+                ['label' => 'Dashboard', 'url' => '/'],
+                ['label' => 'Events', 'url' => '/admin/events'],
+                ['label' => $event->getTitle(), 'url' => '/admin/events/' . $eventId],
+                ['label' => 'Editor'],
+            ],
+        ]);
+    }
+
+    // =========================================================================
     // Tree-Editor (Modul 6 I7b1) — hinter Settings-Flag events.tree_editor_enabled
     // =========================================================================
 
