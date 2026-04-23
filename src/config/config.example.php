@@ -12,7 +12,7 @@ return [
     // ==========================================================================
     'app' => [
         'name' => 'VAES',
-        'version' => '1.4.0',
+        'version' => '1.4.1',
         'url' => 'https://192.168.3.98/helferstunden',  // Volle URL inkl. Unterpfad (fuer E-Mail-Links)
         'base_path' => '/helferstunden',  // Unterpfad fuer Unterverzeichnis-Installation, '' fuer Root
         'debug' => false,  // Auf Produktion: IMMER false!

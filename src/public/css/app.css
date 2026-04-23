@@ -345,3 +345,52 @@ main {
         min-height: 2.75rem;
     }
 }
+
+/* -------------------------------------------------------------------------
+ * Filter "Nur offene Plaetze anzeigen" (I7b2 Phase 3)
+ * -------------------------------------------------------------------------
+ * Toggle-Switch ist sticky oben am Accordion-Container, damit er auch bei
+ * langen Baeumen erreichbar bleibt. Aktiver Filter blendet Leaves und
+ * Gruppen mit data-open-count="0" per CSS aus. Unbegrenzte Leaves (ohne
+ * data-open-count-Attribut) bleiben sichtbar (Architect-Antwort B).
+ */
+
+.task-group-accordion-filter {
+    top: 0;
+    z-index: 10;
+    background-color: var(--bs-body-bg, #fff);
+    border-bottom: 1px solid var(--bs-gray-200, #e9ecef);
+    margin-bottom: 0.5rem;
+}
+
+.task-group-accordion.filter-open-only [data-open-count="0"] {
+    display: none;
+}
+
+/* Abgeschwaechte Farbe fuer volle Tasks im Default-Modus (ohne Filter) */
+.task-group-accordion:not(.filter-open-only) .task-group-accordion-leaf[data-open-count="0"] {
+    opacity: 0.6;
+}
+
+/* Empty-State: per Default ausgeblendet. Der :has()-Selector zeigt ihn
+ * nur, wenn der Filter aktiv ist UND keine Elemente mehr sichtbar waeren:
+ *   - KEINE Gruppe mit data-open-count != "0"
+ *   - KEIN Leaf mit data-open-count != "0"
+ *   - KEIN Leaf ohne data-open-count-Attribut (unbegrenzt).
+ * :has() ist seit 2024 breit unterstuetzt (Chrome 105+, Safari 15.4+,
+ * Firefox 121+); aeltere Browser sehen den Empty-State nicht, sehen aber
+ * einen leeren Accordion-Container — akzeptabler Degradations-Zustand.
+ */
+.task-group-accordion-empty {
+    display: none;
+}
+
+.task-group-accordion.filter-open-only:not(
+    :has(
+        .task-group-accordion-group:not([data-open-count="0"]),
+        .task-group-accordion-leaf:not([data-open-count="0"]),
+        .task-group-accordion-leaf:not([data-open-count])
+    )
+) .task-group-accordion-empty {
+    display: block;
+}

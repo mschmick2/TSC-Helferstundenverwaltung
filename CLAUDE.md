@@ -21,7 +21,7 @@
 | **Tests** | PHPUnit 10.5 (`src/vendor/bin/phpunit`) |
 | **Git-Workflow** | Feature-Branches → main, Conventional Commits Pflicht |
 | **Repo** | https://github.com/mschmick2/TSC-Helferstundenverwaltung |
-| **Version** | 1.4.0 |
+| **Version** | 1.4.1 |
 
 ---
 

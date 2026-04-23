@@ -38,21 +38,39 @@ $showAccordion = !empty($treeEditorEnabled) && !empty($hasTreeStructure);
     <?php if (empty($treeData)): ?>
         <p class="text-muted">Noch keine Aufgaben definiert.</p>
     <?php else: ?>
-        <div class="task-group-accordion">
-            <?php
-            // Container-Closure-Rekursion (G9-I7b1-Muster): use-by-reference
-            // fuer Self-Call, kapselt $node/$depth pro Aufruf, kein Scope-Leak
-            // wie bei naked-include im foreach.
-            $renderAccordionNode = function (array $node, int $depth) use (
-                &$renderAccordionNode, $taskMeta, $event, $user
-            ): void {
-                include __DIR__ . '/_task_group_accordion.php';
-            };
-            foreach ($treeData as $rootNode) {
-                $renderAccordionNode($rootNode, 0);
-            }
-            ?>
+        <div class="task-group-accordion-wrapper">
+            <div class="task-group-accordion-filter sticky-top py-2">
+                <div class="form-check form-switch mb-0">
+                    <input class="form-check-input" type="checkbox"
+                           role="switch" id="filter-open-only"
+                           aria-label="Nur Aufgaben mit offenen Plaetzen zeigen">
+                    <label class="form-check-label" for="filter-open-only">
+                        Nur offene Plaetze anzeigen
+                    </label>
+                </div>
+            </div>
+
+            <div class="task-group-accordion">
+                <?php
+                // Container-Closure-Rekursion (G9-I7b1-Muster): use-by-reference
+                // fuer Self-Call, kapselt $node/$depth pro Aufruf, kein Scope-Leak
+                // wie bei naked-include im foreach.
+                $renderAccordionNode = function (array $node, int $depth) use (
+                    &$renderAccordionNode, $taskMeta, $event, $user
+                ): void {
+                    include __DIR__ . '/_task_group_accordion.php';
+                };
+                foreach ($treeData as $rootNode) {
+                    $renderAccordionNode($rootNode, 0);
+                }
+                ?>
+
+                <p class="task-group-accordion-empty text-muted text-center py-3 fst-italic mb-0">
+                    Aktuell keine offenen Plaetze verfuegbar.
+                </p>
+            </div>
         </div>
+        <script src="<?= ViewHelper::url('/js/event-task-tree-filter.js') ?>" defer></script>
     <?php endif; ?>
 <?php elseif (empty($tasks)): ?>
     <p class="text-muted">Noch keine Aufgaben definiert.</p>
