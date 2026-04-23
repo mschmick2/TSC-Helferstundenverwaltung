@@ -329,15 +329,51 @@ test.describe('Non-modaler Editor (I7e-A Phase 2/2c)', () => {
     await expect(editor.treeNodeById(taskId)).toHaveClass(/task-node--highlighted/);
   });
 
-  test('C2: Scroll-Highlight auf Leaf in eingeklappter Gruppe (Follow-up — Skip)', async ({ page }, testInfo) => {
-    // Der Phase-2-JS-Code ruft scrollIntoView aber expandiert die Eltern-
-    // Gruppen nicht automatisch. Wenn die Gruppe kollabiert ist, bleibt der
-    // Leaf weiter display:none und ist nicht sichtbar. Auto-Expand bei
-    // Scroll-Target ist als Follow-up markiert; Test hier nur als
-    // Platzhalter, damit das Fehlen bewusst dokumentiert bleibt.
-    test.skip(true, 'Auto-Expand der Eltern-Gruppen beim Scroll-Highlight ist Follow-up.');
-    await Promise.resolve(page); // eslint-disable-line @typescript-eslint/no-unused-expressions
-    void testInfo;
+  test('C2: Scroll-Highlight auto-expand-et eingeklappte Eltern-Gruppen', async ({ page }, testInfo) => {
+    test.skip(
+      testInfo.project.name !== 'headed' && testInfo.project.name !== 'headless',
+      'Desktop-Only (Sidebar-Panel-3-Button).'
+    );
+    // Follow-up u aus G6: wenn das Scroll-Ziel in einer kollabierten Gruppe
+    // liegt, ist das <ul> der Kinderliste display:none. Vor dem
+    // scrollIntoView muessen alle Ancestor-Gruppen aufgeklappt werden.
+    const login  = new LoginPage(page);
+    const editor = new NonModalEditorPage(page);
+    await login.loginAs(EVENT_ADMIN);
+    await editor.gotoAdmin(eventId);
+
+    // Zuerst alle Gruppen einklappen, damit die Leaves unter ihnen
+    // display:none sind.
+    await editor.clickCollapseAll();
+    await expect(editor.groupNodeByTitle('Aufbau-/Abbau'))
+      .toHaveClass(/task-node--collapsed/);
+    await expect(editor.groupNodeByTitle('Kuechendienst'))
+      .toHaveClass(/task-node--collapsed/);
+
+    // "Essensausgabe" ist Kind der Gruppe "Kuechendienst" und hat einen
+    // eindeutigen Titel (keine Substring-Kollision mit dem Gruppen-Titel).
+    // Im kollabierten Zustand ist er ueber die Kind-UL display:none der
+    // Gruppe versteckt.
+    const leafNode = editor.treeNodeByTitle('Essensausgabe');
+    await expect(leafNode).not.toBeVisible();
+
+    // Klick auf den entsprechenden Sidebar-Scroll-Target-Button.
+    const leafTaskIdAttr = await leafNode.getAttribute('data-task-id');
+    const leafTaskId = parseInt(leafTaskIdAttr as string, 10);
+    expect(leafTaskId).toBeGreaterThan(0);
+
+    await editor.clickScrollTarget(leafTaskId);
+
+    // Eltern-Gruppe wurde automatisch aufgeklappt.
+    await expect(editor.groupNodeByTitle('Kuechendienst'))
+      .not.toHaveClass(/task-node--collapsed/);
+    // Der Leaf ist jetzt sichtbar und hat die Highlight-Klasse.
+    await expect(leafNode).toBeVisible();
+    await expect(leafNode).toHaveClass(/task-node--highlighted/);
+    // Die andere Gruppe bleibt unveraendert kollabiert — Auto-Expand
+    // zielt nur auf Ancestors des Ziels, nicht auf alle Gruppen.
+    await expect(editor.groupNodeByTitle('Aufbau-/Abbau'))
+      .toHaveClass(/task-node--collapsed/);
   });
 
   test('C3: Mobile — Klick im Offcanvas schliesst Offcanvas und hebt Tree-Node hervor', async ({ page }, testInfo) => {

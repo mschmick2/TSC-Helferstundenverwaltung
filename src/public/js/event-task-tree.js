@@ -850,6 +850,22 @@
                 }
             }
 
+            // Auto-Expand der Ancestor-Gruppen (Follow-up u, G6). Wenn das
+            // Ziel in einer eingeklappten Gruppe liegt, ist das <ul> der
+            // Kind-Liste per CSS display:none — scrollIntoView traefe ein
+            // unsichtbares Element. Alle Eltern-Gruppen aufklappen, bis das
+            // Ziel erreicht ist; per-Node-Chevron dreht sich automatisch
+            // mit (CSS-Rotation reagiert auf das Fehlen von
+            // .task-node--collapsed).
+            let ancestor = targetNode.parentElement;
+            while (ancestor && ancestor !== treeRoot) {
+                if (ancestor.classList
+                    && ancestor.classList.contains('task-node--collapsed')) {
+                    ancestor.classList.remove('task-node--collapsed');
+                }
+                ancestor = ancestor.parentElement;
+            }
+
             targetNode.scrollIntoView({ behavior: 'smooth', block: 'center' });
             targetNode.classList.add('task-node--highlighted');
             window.setTimeout(() => {
