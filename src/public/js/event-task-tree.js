@@ -859,12 +859,67 @@
     }
 
     // =====================================================================
+    // I7e-A Phase 2c — Per-Node-Collapse + Expand/Collapse-All
+    //
+    // Dreifacher Mechanismus im gleichen Event-Delegation-Listener:
+    //
+    //   1. [data-action="toggle-node"] innerhalb einer Task-Zeile:
+    //      togglt die Klasse .task-node--collapsed auf dem umgebenden
+    //      Gruppen-<li>. CSS blendet die Kind-UL ein/aus.
+    //   2. [data-action="expand-all"] im Tree-Header: entfernt
+    //      .task-node--collapsed von allen Gruppen-<li> im Editor.
+    //   3. [data-action="collapse-all"] im Tree-Header: setzt
+    //      .task-node--collapsed auf allen Gruppen-<li>.
+    //
+    // Keine Animation, kein Zustand-Persistieren — ein Page-Reload
+    // zeigt immer den expandierten Default. Das ist bewusst: der Tree
+    // hat pro Event eine andere Struktur; State-Persistenz pro Event-ID
+    // waere Scope-Creep.
+    // =====================================================================
+
+    function initTreeCollapseControls() {
+        const editor = document.getElementById('task-tree-editor');
+        if (!editor) {
+            return;
+        }
+
+        editor.addEventListener('click', (event) => {
+            const toggle = event.target.closest('[data-action="toggle-node"]');
+            if (!toggle) {
+                return;
+            }
+            const groupLi = toggle.closest('.task-node--group');
+            if (!groupLi) {
+                return;
+            }
+            groupLi.classList.toggle('task-node--collapsed');
+        });
+
+        document.addEventListener('click', (event) => {
+            const trigger = event.target.closest(
+                '[data-action="expand-all"], [data-action="collapse-all"]'
+            );
+            if (!trigger) {
+                return;
+            }
+            const action = trigger.getAttribute('data-action');
+            const groups = editor.querySelectorAll('.task-node--group');
+            if (action === 'expand-all') {
+                groups.forEach((li) => li.classList.remove('task-node--collapsed'));
+            } else if (action === 'collapse-all') {
+                groups.forEach((li) => li.classList.add('task-node--collapsed'));
+            }
+        });
+    }
+
+    // =====================================================================
     // Bootstrap
     // =====================================================================
 
     function boot() {
         initTaskTree();
         initSidebarScrollHighlight();
+        initTreeCollapseControls();
     }
 
     if (document.readyState === 'loading') {

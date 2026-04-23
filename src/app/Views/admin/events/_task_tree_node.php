@@ -112,6 +112,18 @@ $status = $node['status'] ?? null;
     data-endpoint-edit="<?= ViewHelper::url($baseUrl . '/edit') ?>"
     data-endpoint-update="<?= ViewHelper::url($baseUrl) ?>">
     <div class="task-node__row d-flex align-items-center gap-2 py-1">
+        <?php if ($isGroup): ?>
+            <button type="button"
+                    class="task-node__toggle btn btn-link btn-sm p-0 border-0 text-body"
+                    data-action="toggle-node"
+                    title="Gruppe ein-/ausklappen"
+                    aria-label="Gruppe ein-/ausklappen">
+                <i class="bi bi-chevron-down" aria-hidden="true"></i>
+            </button>
+        <?php else: ?>
+            <span class="task-node__toggle-spacer" aria-hidden="true"></span>
+        <?php endif; ?>
+
         <span class="task-node__handle text-muted"
               data-sortable-handle
               role="button"

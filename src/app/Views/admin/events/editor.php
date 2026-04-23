@@ -75,7 +75,7 @@ $categoriesJson = json_encode(
                     <i class="bi bi-diagram-3" aria-hidden="true"></i>
                     Aufgabenbaum
                 </h2>
-                <div class="d-flex gap-2">
+                <div class="task-tree-editor__toolbar d-flex gap-2">
                     <button type="button"
                             class="btn btn-outline-secondary btn-sm d-lg-none"
                             data-bs-toggle="offcanvas"
@@ -84,15 +84,34 @@ $categoriesJson = json_encode(
                             title="Sidebar einblenden"
                             aria-label="Sidebar einblenden">
                         <i class="bi bi-layout-sidebar-inset-reverse" aria-hidden="true"></i>
-                        Sidebar
+                        <span class="d-none d-sm-inline">Sidebar</span>
+                    </button>
+
+                    <button type="button"
+                            class="btn btn-outline-secondary btn-sm"
+                            data-action="expand-all"
+                            title="Alle Gruppen ausklappen"
+                            aria-label="Alle Gruppen ausklappen">
+                        <i class="bi bi-arrows-expand" aria-hidden="true"></i>
+                        <span class="d-none d-sm-inline">Alle ausklappen</span>
+                    </button>
+
+                    <button type="button"
+                            class="btn btn-outline-secondary btn-sm"
+                            data-action="collapse-all"
+                            title="Alle Gruppen einklappen"
+                            aria-label="Alle Gruppen einklappen">
+                        <i class="bi bi-arrows-collapse" aria-hidden="true"></i>
+                        <span class="d-none d-sm-inline">Alle einklappen</span>
                     </button>
 
                     <button type="button" class="btn btn-primary btn-sm"
                             data-action="add-child"
                             data-parent-task-id=""
-                            title="Top-Level-Knoten anlegen">
+                            title="Top-Level-Knoten anlegen"
+                            aria-label="Top-Level-Knoten anlegen">
                         <i class="bi bi-plus-circle" aria-hidden="true"></i>
-                        Knoten anlegen
+                        <span class="d-none d-sm-inline">Knoten anlegen</span>
                     </button>
                 </div>
             </div>
