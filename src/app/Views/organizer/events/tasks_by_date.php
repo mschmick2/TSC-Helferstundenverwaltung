@@ -1,13 +1,15 @@
 <?php
 /**
- * Modul 6 I7b4 Phase 1 — Sortierbare Task-Liste, Organisator-Container.
+ * Modul 6 I7b4 Phase 2 — Sortierbare Task-Liste, Organisator-Container.
  *
- * Read-only Chronologie der Leaves eines Events. Phase 1 rendert die Liste
- * inline und minimal; Phase 2 extrahiert das in ein gemeinsames Partial
- * mit Datums-Sektionierung und erweitert das Styling.
+ * Read-only Chronologie der Leaves eines Events. Rendert das gemeinsame
+ * Partial _task_list_by_date.php mit linkTaskTitles=false, weil die
+ * Admin-Detail-Seite /admin/events/{id} per RoleMiddleware
+ * event_admin-gebunden ist (Organisator wuerde 403 bekommen). Der
+ * non-modale Organisator-Editor kommt in I7e.
  *
  * @var \App\Models\Event $event
- * @var array<int, array{
+ * @var list<array{
  *     task: \App\Models\EventTask,
  *     status: ?\App\Models\TaskStatus,
  *     helpers: int,
@@ -25,33 +27,4 @@ use App\Helpers\ViewHelper;
 </h1>
 <p class="text-muted mb-4">Aufgaben nach Datum (Read-Only)</p>
 
-<?php if (empty($flatList)): ?>
-    <div class="alert alert-info">Dieses Event hat noch keine Aufgaben.</div>
-<?php else: ?>
-    <ul class="list-group">
-        <?php foreach ($flatList as $item):
-            $task = $item['task'];
-        ?>
-            <li class="list-group-item d-flex flex-column">
-                <div class="d-flex align-items-center gap-2">
-                    <?php if ($task->hasFixedSlot() && $task->getStartAt() !== null): ?>
-                        <span class="badge bg-light text-dark border">
-                            <?= ViewHelper::e($task->getStartAt()) ?>
-                        </span>
-                    <?php else: ?>
-                        <span class="badge bg-secondary">Ohne feste Zeit</span>
-                    <?php endif; ?>
-                    <strong><?= ViewHelper::e($task->getTitle()) ?></strong>
-                </div>
-                <?php if (!empty($item['ancestor_path'])): ?>
-                    <small class="text-muted mt-1">
-                        <?php foreach ($item['ancestor_path'] as $i => $ancestorTitle): ?>
-                            <?php if ($i > 0): ?> &gt; <?php endif; ?>
-                            <?= ViewHelper::e($ancestorTitle) ?>
-                        <?php endforeach; ?>
-                    </small>
-                <?php endif; ?>
-            </li>
-        <?php endforeach; ?>
-    </ul>
-<?php endif; ?>
+<?php include __DIR__ . '/../../events/_task_list_by_date.php'; ?>
