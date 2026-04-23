@@ -181,6 +181,33 @@ $this->flash($request, 'info', 'Hinweis: ...');
 </div>
 ```
 
+### Fullscreen + scrollbar auf Mobile — Flex-Hoehen-Falle
+
+Wenn ein Modal auf schmalen Viewports Fullscreen gehen soll (typisch
+fuer groessere Formulare) und gleichzeitig scrollbar sein muss, ist
+die Kombination:
+
+```html
+<div class="modal-dialog modal-lg modal-fullscreen-md-down modal-dialog-scrollable">
+```
+
+Bootstrap 5.3 hat dabei eine Flex-Hoehen-Kollision unter Chromium-
+Mobile-Emulation und echten iOS/Android-Browsern: das `.modal-body`
+schrumpft **ohne** `min-height: 0` nicht unter seinen Content-
+Anspruch, ueberfliesst den sticky Footer und deckt den Save-Button
+visuell ab. Playwright-Symptom: `subtree intercepts pointer events`
+beim Click auf den Footer-Button.
+
+Loesung: in `src/public/css/app.css` ist bereits ein generischer
+Fix vorhanden (gesucht mit `grep "I7b5"`). Wer die Klassen-
+Kombination neu einfuehrt, muss nichts tun — der Selector greift.
+**NIE** den Fix-Block entfernen, auch nicht als Aufraeumen
+uninspiziert, ohne die Mobile-Regression zu pruefen.
+
+**Begruendung:** der Bug ist subtil und nur auf Mobile sichtbar.
+Desktop wirkt wie vorher; ein spaeteres Entfernen wuerde erst
+Monate nach dem Merge in der Mobile-Praxis auffallen.
+
 ---
 
 ## AJAX mit Fetch API
