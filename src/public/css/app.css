@@ -511,6 +511,27 @@ main {
     background-color: var(--bs-white);
 }
 
+/* I7b3-Farbkodierung gewinnt gegen .task-list-item-Default-Border.
+ * Ohne diese spezifischeren Selektoren uebermalt die nachfolgend
+ * deklarierte .task-list-item-Regel die .task-status-*-Regeln aus
+ * dem I7b3-Block — beide haben Spezifitaet (0,1,0), der spaetere
+ * gewinnt. Die kombinierten Selektoren haben (0,2,0) und schlagen
+ * den Default unabhaengig von der Datei-Reihenfolge. */
+.task-list-item.task-status-empty {
+    border-left: 4px solid var(--bs-danger);
+    background-color: var(--bs-danger-bg-subtle);
+}
+
+.task-list-item.task-status-partial {
+    border-left: 4px solid var(--bs-warning);
+    background-color: var(--bs-warning-bg-subtle);
+}
+
+.task-list-item.task-status-full {
+    border-left: 4px solid var(--bs-success);
+    background-color: var(--bs-success-bg-subtle);
+}
+
 .task-list-item-header {
     display: flex;
     align-items: center;

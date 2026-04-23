@@ -258,4 +258,32 @@ final class TaskListByDatePartialInvariantsTest extends TestCase
             . 'konvertieren, um H:i zu rendern.'
         );
     }
+
+    // =========================================================================
+    // CSS-Invariante: I7b3-Status-Kodierung hat Vorrang vor I7b4-Default
+    // =========================================================================
+
+    public function test_css_status_classes_override_task_list_item_default_border(): void
+    {
+        $css = (string) file_get_contents(
+            __DIR__ . '/../../../src/app/../public/css/app.css'
+        );
+
+        // Die Kombinations-Selektoren muessen existieren, damit die
+        // I7b3-Farbkodierung auf der neuen Liste-View nicht vom
+        // Default-Border (3px grau) der .task-list-item-Regel uebermalt
+        // wird. G3-Finding aus Phase 3; Regressions-Schutz.
+        foreach (['empty', 'partial', 'full'] as $status) {
+            self::assertMatchesRegularExpression(
+                '/\.task-list-item\.task-status-' . $status . '\b/',
+                $css,
+                'app.css braucht kombinierten Selektor '
+                . '.task-list-item.task-status-' . $status . ', damit die '
+                . 'I7b3-Statusfarbe den I7b4-Default-Border sicher gewinnt. '
+                . 'Ohne diese hoehere Spezifitaet uebermalt '
+                . '.task-list-item (deklariert NACH .task-status-*) die '
+                . 'Farb-Border visuell.'
+            );
+        }
+    }
 }
