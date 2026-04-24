@@ -1,7 +1,7 @@
 # VAES Benutzerhandbuch
 
 **Vereins-Arbeitsstunden-Erfassungssystem (VAES)**
-Version 1.4.0
+Version 1.4.7
 Stand: April 2026
 
 ---
@@ -71,6 +71,8 @@ Stand: April 2026
     - 12.2 [Kategorien verwalten](#122-kategorien-verwalten)
     - 12.3 [Soll-Stunden verwalten](#123-soll-stunden-verwalten)
     - 12.4 [Event-Verwaltung](#124-event-verwaltung)
+      - [Aufgabenbaum-Editor (optional aktivierbar)](#aufgabenbaum-editor-optional-aktivierbar)
+      - [Editor-Ansicht (non-modaler Editor)](#editor-ansicht-non-modaler-editor)
     - 12.5 [Event-Vorlagen](#125-event-vorlagen)
     - 12.6 [Systemeinstellungen](#126-systemeinstellungen)
     - 12.7 [Audit-Trail](#127-audit-trail)
@@ -116,6 +118,12 @@ Die Anwendung ist fuer moderne Webbrowser optimiert und kann auf Desktop-Compute
 - Explizite Absicherung gegen parallele Bearbeitung in mehreren Browser-Tabs
 - Verbesserte Security-Header (CSP, HSTS, Permissions-Policy)
 - Rate-Limiting fuer Passwort-Reset
+
+**Neu in Version 1.4.7:**
+- Editor-Ansicht (non-modaler Editor) fuer Event-Aufgabenbaum mit Sidebar-Uebersicht (siehe Abschnitt 12.4).
+- Expand/Collapse-All und Per-Node-Chevron im Baum-Editor.
+- Sidebar-Scroll-Highlight mit Auto-Expand eingeklappter Gruppen.
+- Mobile-Offcanvas-Sidebar unter 992 px Breite.
 
 ---
 
@@ -1329,6 +1337,51 @@ Bei Aufgaben-Knoten zeigen die Badges die Werte des Knotens selbst, nicht aggreg
 ##### Barrierefreiheit / ohne JavaScript
 
 Drag & Drop und der Bearbeiten-Dialog benoetigen JavaScript. Ist JavaScript deaktiviert, erscheint ein Hinweis -- in diesem Fall bitte die bisherige flache Aufgabenverwaltung auf der Event-Detailseite nutzen.
+
+#### Editor-Ansicht (non-modaler Editor)
+
+Ab VAES 1.4.7 steht zusaetzlich eine **Editor-Ansicht** bereit. Sie bietet eine alternative, non-modale Oberflaeche fuer den Aufgabenbaum eines Events und eignet sich besonders fuer grosse Baeume und detaillierte Uebersicht. Der klassische Bearbeiten-Dialog (Modal) bleibt der Standard und ist weiterhin uneingeschraenkt verfuegbar.
+
+**Verfuegbar fuer:** Event-Administratoren und Event-Organisatoren.
+**Feature-Flag:** `events.tree_editor_enabled=1`. In der Produktion derzeit deaktiviert; die Links sind dann nicht sichtbar.
+
+##### Einstiegs-Punkte
+
+Die Editor-Ansicht erreichen Sie auf drei Wegen:
+
+1. **Event-Detailseite** (Admin oder Organisator): neben dem Button *Bearbeiten* ein zusaetzlicher Button *Editor-Ansicht*.
+2. **Bearbeiten-Dialog** (Admin, `/admin/events/{id}/edit`): oberhalb des Formulars erscheint ein Hinweis-Banner mit Button *Editor oeffnen*.
+3. **Organisator-Uebersicht** (`/organizer/events`): pro Event-Karte ein direkter Button *Editor-Ansicht*.
+
+##### Aufbau
+
+Die Editor-Ansicht ist zweigeteilt:
+
+- **Links (breiter Bereich):** Der Aufgabenbaum mit allen Gruppen und Aufgaben. Aktionen wie Anlegen, Verschieben, Bearbeiten, Konvertieren und Loeschen stehen direkt am jeweiligen Knoten zur Verfuegung (wie im Modal-Editor).
+- **Rechts (schmaler Bereich):** Eine Kontext-Sidebar mit drei Panels:
+  - **Panel 1 - Event:** Titel, Zeitraum, Ort, Status und zugewiesene Organisator(en).
+  - **Panel 2 - Belegung:** Anzahl aktiver Zusagen, Helfer-Soll (Summe der Kapazitaeten), offene Slots, Summe der Standard-Stunden und Status-Verteilung (keine Zusage / teilweise / voll).
+  - **Panel 3 - Aufgaben chronologisch:** Alle Leaf-Aufgaben nach Startzeit sortiert. Ein Klick auf eine Aufgabe scrollt den Baum an die entsprechende Stelle und hebt den Knoten kurz hervor.
+
+Auf schmalen Fenstern oder Mobilgeraeten (unter ca. 992 px Breite) wandert die Sidebar in ein aufklappbares Offcanvas rechts. Der Zugriff erfolgt ueber ein Sidebar-Icon in der Baum-Toolbar.
+
+##### Baum-Navigation
+
+In der Toolbar ueber dem Aufgabenbaum gibt es zwei Komfort-Aktionen:
+
+- **Alle ausklappen:** Oeffnet saemtliche Gruppen auf einmal.
+- **Alle einklappen:** Schliesst saemtliche Gruppen auf einmal.
+
+Jede einzelne Gruppe hat zusaetzlich einen kleinen Chevron (Pfeil nach unten) am Zeilenanfang zum gezielten Ein-/Ausklappen.
+
+Wenn Sie in der Sidebar auf eine Aufgabe klicken, die in einer eingeklappten Gruppe liegt, werden die Elterngruppen automatisch ausgeklappt, damit die Aufgabe sichtbar wird.
+
+##### Rechte und Sichtbarkeit
+
+- **Administratoren** nutzen die Editor-Ansicht fuer jedes Event.
+- **Organisatoren** sehen sie nur fuer Events, bei denen sie als Organisator eingetragen sind. Fremde Events liefern 403.
+- Alle Aenderungen werden - wie beim Modal-Editor - im Audit-Log protokolliert.
+- Ist das Feature-Flag deaktiviert (Produktion), sind saemtliche Links und Routen unsichtbar bzw. liefern 404.
 
 ### 12.5 Event-Vorlagen
 

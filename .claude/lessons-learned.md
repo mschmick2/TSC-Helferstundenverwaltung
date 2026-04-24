@@ -1078,3 +1078,136 @@ Text zeigt.
 → Siehe `src/public/css/app.css` `.task-tree-editor .task-
   node__edit-trigger`-Block als Referenz.
 
+### 2026-04-24 — Invariants-Tests und Promoted Constructor Parameters
+
+**Kontext:**
+Phase 3 Teil 1 von I7e-A (PHPUnit-Invarianten fuer
+`OrganizerEventEditController`). Der bewaehrte `methodBody()`-
+Helper aus den I7b1/I7b4-Test-Klassen greift den Method-Rumpf
+zwischen Signatur-`{` und der naechsten Method-Definition. Fuer
+einen regulaeren Method-Body funktioniert das zuverlaessig.
+
+**Problem / Ueberraschung:**
+PHP-8-Constructor-Property-Promotion schreibt die Dependencies
+in die Signatur, nicht in den Rumpf. Der eigentliche
+Constructor-Body ist danach leer (oder nur Whitespace und
+Kommentar). `methodBody($code, '__construct')` liefert einen
+leeren String — und ein `assertStringContainsString('EventRepository', $body)`
+schlaegt fehl, obwohl die Dependency korrekt injected ist. Im
+Worst Case laufen saemtliche Dep-Checks ins Leere und liefern
+still einen False-Positive.
+
+**Loesung:**
+Fuer Ctor-Dependency-Checks nicht `methodBody()` verwenden,
+sondern das Promoted-Property-Pattern gegen den gesamten
+File-Inhalt matchen:
+```php
+self::assertMatchesRegularExpression(
+    '/private\s+' . preg_quote($type, '/') . '\s+\$\w+/',
+    $code,
+    "Konstruktor muss $type als Promoted-Property injecten."
+);
+```
+Fuer normale Method-Bodies bleibt `methodBody()` korrekt.
+
+**Praevention:**
+- Neue Invariants-Tests prueffen: sobald ein Test gegen den
+  Konstruktor-Rumpf laeuft, pruefen, ob die Klasse Ctor-Promotion
+  nutzt. Falls ja, auf File-Regex umstellen.
+- Merkregel: "Promoted Parameters leben in der Signatur. Wer
+  sie testet, muss die Signatur sehen."
+
+### 2026-04-24 — IDOR bei per-Task-Service-Methoden ohne Event-Scope
+
+**Kontext:**
+G4-Security-Review von I7e-A, Dimension 3. Der `TaskTreeService`
+ist per G1-Entscheidung E1 bewusst auth-neutral; der Controller
+ist fuer die Authorization zustaendig (`isOrganizer($eventId)`).
+Die Service-Methoden `move`, `convertToGroup/Leaf`,
+`softDeleteNode`, `updateNode` akzeptieren nur eine `taskId` —
+der Event-Kontext geht dort verloren.
+
+**Problem / Ueberraschung:**
+User X ist Organisator von Event A und schickt
+`POST /organizer/events/A/tasks/{B-task-id}/tree-delete`.
+`isOrganizer(A)` greift korrekt und gibt `true`. Der Service
+ruft `taskRepo->findById($taskId)` auf — und findet die Task
+aus Event B. Loescht sie. **Kein Event-Scope-Check auf dem
+Pfad.**
+
+Die Luecke existierte seit I7b1 im Admin-Pfad, war dort aber
+auf `event_admin`-Rolle begrenzt (limitierter Angreifer-Kreis).
+I7e-A hat den Pfad unter `/organizer/events/...` ohne
+RoleMiddleware freigegeben und damit den Angriffs-Kreis auf alle
+Event-Organisatoren ausgeweitet.
+
+**Loesung (Option B, minimal-invasiv):**
+Controller-seitiger Cross-Check vor dem Service-Call, gespiegelt
+aus dem schon in Phase 1 fuer `editTaskNode` etablierten Muster:
+```php
+$task = $this->taskRepo->findById($taskId);
+if ($task === null || $task->getEventId() !== $eventId) {
+    return $response->withStatus(404);
+}
+```
+`404` statt `403` — verdeckt die Task-Existenz in einem fremden
+Event. Drei Controller gefixt (Organizer/Admin/Template mit
+`getTemplateId()`-Variante).
+
+**Alternative (Option A) als Follow-up:**
+Service-API um `int $eventId` / `int $templateId` erweitern,
+Service wirft `AuthorizationException` bei Mismatch. Sauberer,
+aber API-Break in fuenf Methoden. Fuer spaeter vorgemerkt.
+
+**Praevention:**
+- Statische Invarianten in drei Test-Dateien
+  (`test_mutating_actions_check_task_belongs_to_event` /
+  `..._template`) fangen zukuenftige mutierende Actions ab, die
+  den Scope-Check vergessen.
+- Merkregel: "Wenn der Service auf einer Domain-ID arbeitet
+  (taskId, assignmentId, ...), aber die Authorization eine
+  Parent-ID kennt (eventId, userId), muss **irgendwer** die
+  beiden verknuepfen. Im auth-neutralen Service ist das der
+  Controller."
+
+### 2026-04-24 — Scope-Hygiene bei Browser-Smoke-Nachbesserungen
+
+**Kontext:**
+I7e-A Phase 2c war urspruenglich fuer Link-Ergaenzung und
+Sidebar-Label-Bug-Fix geplant. Waehrend der Session kam nach
+einem Smoke-Test der explizite Wunsch dazu, Expand/Collapse-All-
+Buttons zu ergaenzen. Das wurde als "Phase 2c Teil 2" aufgenommen.
+
+**Problem / Ueberraschung:**
+Expand/Collapse-All ist inhaltlich ein **neues Feature**, nicht
+eine Nachbesserung an bestehenden Features. Die zugrundeliegende
+Annahme im erweiterten Prompt war zusaetzlich falsch (der
+bestehende Tree-Editor hatte kein Per-Node-Collapse, der Prompt
+nahm `<details>`/`<summary>` an). Daraus entstanden zwei
+Scope-Fragen:
+- Darf ein Feature unter dem Label "Phase 2c" wachsen?
+- Wieviel zusaetzliche Funktionalitaet (Per-Node-Chevron,
+  klassenbasierte Collapse-CSS, JS-Delegation) darf implizit
+  mitkommen, damit das Feature sinnvoll ist?
+
+**Loesung:**
+- Neue Features bekommen einen eigenen Coder-Prompt, auch wenn
+  sie klein sind. Prompt benennt die Abweichung vom Original-
+  Scope explizit.
+- Im Commit-Trailer muss die Erweiterung als solche markiert
+  sein, damit der Architect-Final-Review sie klar zuordnen
+  kann (statt sie als "noch zu Phase 2c gehoerig" durchwinken
+  zu muessen).
+- Wenn sich bei der Umsetzung Zwangs-Ergaenzungen ergeben
+  (Per-Node-Chevron war noetig, damit "Alle einklappen" keine
+  Sackgasse wird), sind auch die im Commit dokumentiert, mit
+  Begruendung.
+
+**Praevention:**
+- Unterscheidung `fix` vs. `feat` im Commit-Type-Prefix
+  diszipliniert fuehren: Nachbesserung == gleiche Features
+  sauberer gemacht; Erweiterung == neue Features.
+- Merkregel: "Wer waehrend der Session neue UI-Affordance
+  ergaenzt, eroeffnet einen neuen Scope. Auch wenn sie
+  verbunden aussieht, bekommt sie einen eigenen Commit."
+

@@ -187,6 +187,8 @@ Erlaubte Uebergaenge pro Status siehe `src/app/Services/WorkflowService.php`.
 | 1 | Session-Cookie: `Secure` + `SameSite=Strict` in Produktion pruefen | erledigt 2026-04-20 (Modul 7 I3: `config.example.php` empfiehlt `SameSite=Strict`, `Secure` bereits automatisch per HTTPS-Erkennung) |
 | 2 | Rate-Limiting fuer Passwort-Reset-Endpunkt pruefen | erledigt 2026-04-21 (Zwei-Bucket-Schutz fuer `/forgot-password`: IP sichtbar, Email silent gegen verteilte Flood-Angriffe; Migration 008 `rate_limits.email`; Config-Keys statt Hardcoded; E2E-Spec 09 als Nachweis) |
 | 3 | CSP-Header pruefen (Strato `.htaccess`) | erledigt 2026-04-21 (Safe-Improvements: `SecurityHeadersMiddleware` setzt CSP/HSTS/Permissions-Policy auch lokal; Policy um `object-src 'none'`, `base-uri`, `form-action`, `frame-ancestors`, `upgrade-insecure-requests` ergaenzt; `.htaccess` parallel gezogen; `'unsafe-inline'` bleibt bis zum Nonce-Rollout als eigene Iteration) |
+| 4 | IDOR in mutierenden Tree-Controller-Actions (fehlender Event-/Template-Scope-Check vor Service-Call) | erledigt 2026-04-24 (Modul 6 I7e-A G4 Dim 3: Controller-seitiger Cross-Check `$task->getEventId() !== $eventId` in 12 Actions auf `OrganizerEventEditController`, `EventAdminController`, `EventTemplateController`. Statische Invarianten in drei Test-Dateien gegen Drift. Commit 2a16823) |
+| 5 | Audit-Log bei fehlgeschlagenen Authorization-Zugriffen (403) | offen — Follow-up v aus I7e-A G4 Dim 7; siehe `docs/follow-ups.md` |
 
 Neue Eintraege bei G4-Findings hier ergaenzen.
 
