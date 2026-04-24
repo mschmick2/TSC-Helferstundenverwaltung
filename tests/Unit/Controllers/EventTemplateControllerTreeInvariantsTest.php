@@ -517,9 +517,8 @@ final class EventTemplateControllerTreeInvariantsTest extends TestCase
 
     public function test_mutating_actions_check_task_belongs_to_template(): void
     {
-        // Regressions-Schutz fuer G4-Fix: analog zu Event-Controllern, aber
-        // mit Template-Scope. Ohne den Check konnte ein Template-Admin Tasks
-        // in fremden Templates manipulieren.
+        // I7e-B.0.1: der IDOR-Scope-Check ist in die Trait-Methode
+        // assertTaskBelongsToTemplate extrahiert (TemplateTreeActionHelpers).
         $code = $this->read(self::CONTROLLER_PATH);
         $actionsNeedingScopeCheck = [
             'moveTaskNode',
@@ -531,23 +530,26 @@ final class EventTemplateControllerTreeInvariantsTest extends TestCase
             $body = $this->methodBody($code, $action);
             self::assertNotSame('', $body, "Action $action() fehlt.");
             self::assertMatchesRegularExpression(
-                '/\$task->getTemplateId\(\)\s*!==\s*\$templateId/',
+                '/\$this->assertTaskBelongsToTemplate\(/',
                 $body,
-                "EventTemplateController::$action() muss pruefen, dass "
-                . "\$task->getTemplateId() === \$templateId (IDOR-Schutz, G4 Dim 3)."
-            );
-            self::assertMatchesRegularExpression(
-                '/\$this->templateRepo->findTaskById\(\s*\$taskId\s*\)/',
-                $body,
-                "EventTemplateController::$action() muss templateRepo->findTaskById"
-                . "(\$taskId) aufrufen, um das Task-Objekt fuer den Scope-Check zu laden."
-            );
-            self::assertMatchesRegularExpression(
-                '/return\s+\$response->withStatus\(\s*404\s*\)/',
-                $body,
-                "EventTemplateController::$action() muss 404 zurueckgeben, wenn "
-                . "Task nicht zum Template gehoert."
+                "EventTemplateController::$action() muss assertTaskBelongsToTemplate "
+                . "aufrufen (IDOR-Schutz via TemplateTreeActionHelpers-Trait)."
             );
         }
+
+        // Die eigentliche Pruef-Logik liegt im Trait.
+        $traitPath = __DIR__ . '/../../../src/app/Controllers/Concerns/TemplateTreeActionHelpers.php';
+        $traitBody = $this->methodBody((string) file_get_contents($traitPath), 'assertTaskBelongsToTemplate');
+        self::assertMatchesRegularExpression(
+            '/\$task->getTemplateId\(\)\s*!==\s*\$templateId/',
+            $traitBody,
+            'TemplateTreeActionHelpers::assertTaskBelongsToTemplate() muss '
+            . 'getTemplateId gegen templateId vergleichen.'
+        );
+        self::assertMatchesRegularExpression(
+            '/->withStatus\(\s*404\s*\)/',
+            $traitBody,
+            'assertTaskBelongsToTemplate() muss 404 bei Miss liefern.'
+        );
     }
 }

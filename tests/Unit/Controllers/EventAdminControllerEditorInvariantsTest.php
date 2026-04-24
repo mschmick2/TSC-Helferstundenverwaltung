@@ -23,6 +23,9 @@ final class EventAdminControllerEditorInvariantsTest extends TestCase
 {
     private const CONTROLLER_PATH =
         __DIR__ . '/../../../src/app/Controllers/EventAdminController.php';
+    /** I7e-B.0.1: Helper wurden in Traits extrahiert. */
+    private const TRAIT_EVENT_TREE_ACTION_HELPERS =
+        __DIR__ . '/../../../src/app/Controllers/Concerns/EventTreeActionHelpers.php';
 
     private function read(string $path): string
     {
@@ -177,21 +180,22 @@ final class EventAdminControllerEditorInvariantsTest extends TestCase
 
     public function test_computeBelegungsSummary_exists(): void
     {
+        // I7e-B.0.1: Helper liegt im Trait EventTreeActionHelpers.
         $body = $this->methodBody(
-            $this->read(self::CONTROLLER_PATH),
+            $this->read(self::TRAIT_EVENT_TREE_ACTION_HELPERS),
             'computeBelegungsSummary'
         );
         self::assertNotSame(
             '',
             $body,
-            'Private Helper computeBelegungsSummary() fehlt (Phase 2/2c).'
+            'Helper computeBelegungsSummary() muss im EventTreeActionHelpers-Trait existieren.'
         );
     }
 
     public function test_computeBelegungsSummary_returns_zusagen_aktiv_key(): void
     {
         $body = $this->methodBody(
-            $this->read(self::CONTROLLER_PATH),
+            $this->read(self::TRAIT_EVENT_TREE_ACTION_HELPERS),
             'computeBelegungsSummary'
         );
         self::assertMatchesRegularExpression(
@@ -205,37 +209,28 @@ final class EventAdminControllerEditorInvariantsTest extends TestCase
     public function test_computeBelegungsSummary_uses_array_sum_on_assignmentCounts(): void
     {
         $body = $this->methodBody(
-            $this->read(self::CONTROLLER_PATH),
+            $this->read(self::TRAIT_EVENT_TREE_ACTION_HELPERS),
             'computeBelegungsSummary'
         );
         self::assertMatchesRegularExpression(
             '/array_sum\s*\(\s*array_map\s*\(\s*[\'"]intval[\'"]\s*,\s*\$assignmentCounts\s*\)\s*\)/',
             $body,
             'computeBelegungsSummary() muss zusagen_aktiv via array_sum(array_map'
-            . "('intval', \$assignmentCounts)) berechnen (siehe Organizer-"
-            . 'Counterpart; Duplikat-Semantik bis Trait-Extraktion).'
+            . "('intval', \$assignmentCounts)) berechnen."
         );
     }
 
-    public function test_computeBelegungsSummary_returns_same_keys_as_organizer(): void
+    public function test_trait_computeBelegungsSummary_returns_all_required_keys(): void
     {
-        // Duplikat-Semantik-Check: beide computeBelegungsSummary-Implementierungen
-        // muessen identische Rueckgabe-Keys haben, sonst bricht der View (einer
-        // der Editor-Controller liefert Keys, die die Sidebar erwartet, der
-        // andere nicht). Regression: Trait-Extraktion (Follow-up n) darf erst
-        // passieren, wenn beide Methoden wirklich identisch sind.
-        $adminBody = $this->methodBody(
-            $this->read(self::CONTROLLER_PATH),
+        // I7e-B.0.1: Nach der Trait-Extraktion gibt es nur noch EINE
+        // Implementierung (im Trait). Der vorherige Duplikat-Semantik-
+        // Check zwischen Admin und Organizer ist damit obsolet. Wir
+        // pruefen stattdessen den Trait direkt auf die erwarteten Keys.
+        $body = $this->methodBody(
+            $this->read(self::TRAIT_EVENT_TREE_ACTION_HELPERS),
             'computeBelegungsSummary'
         );
-        $organizerBody = $this->methodBody(
-            (string) file_get_contents(
-                __DIR__ . '/../../../src/app/Controllers/OrganizerEventEditController.php'
-            ),
-            'computeBelegungsSummary'
-        );
-        self::assertNotSame('', $adminBody, 'Admin-computeBelegungsSummary fehlt.');
-        self::assertNotSame('', $organizerBody, 'Organizer-computeBelegungsSummary fehlt.');
+        self::assertNotSame('', $body, 'computeBelegungsSummary fehlt im Trait.');
 
         $expectedKeys = [
             'leaf_count',
@@ -250,15 +245,8 @@ final class EventAdminControllerEditorInvariantsTest extends TestCase
         foreach ($expectedKeys as $key) {
             self::assertStringContainsString(
                 "'$key'",
-                $adminBody,
-                "Admin-computeBelegungsSummary muss Key '$key' im Return-Array "
-                . "fuehren (Duplikat-Semantik zum Organizer-Counterpart)."
-            );
-            self::assertStringContainsString(
-                "'$key'",
-                $organizerBody,
-                "Organizer-computeBelegungsSummary muss Key '$key' im Return-Array "
-                . "fuehren (Duplikat-Semantik zum Admin-Counterpart)."
+                $body,
+                "Trait-computeBelegungsSummary muss Key '$key' im Return-Array fuehren."
             );
         }
     }

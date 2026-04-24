@@ -29,6 +29,11 @@ use PHPUnit\Framework\TestCase;
 final class EventAdminControllerTreeInvariantsTest extends TestCase
 {
     private const CONTROLLER_PATH   = __DIR__ . '/../../../src/app/Controllers/EventAdminController.php';
+    /** I7e-B.0.1: Helper wurden in Traits extrahiert. */
+    private const TRAIT_TREE_ACTION_HELPERS =
+        __DIR__ . '/../../../src/app/Controllers/Concerns/TreeActionHelpers.php';
+    private const TRAIT_EVENT_TREE_ACTION_HELPERS =
+        __DIR__ . '/../../../src/app/Controllers/Concerns/EventTreeActionHelpers.php';
     private const PARTIAL_EDITOR    = __DIR__ . '/../../../src/app/Views/admin/events/_task_tree_node.php';
     private const PARTIAL_READONLY  = __DIR__ . '/../../../src/app/Views/admin/events/_task_tree_readonly.php';
     private const VIEW_EDIT         = __DIR__ . '/../../../src/app/Views/admin/events/edit.php';
@@ -204,9 +209,11 @@ final class EventAdminControllerTreeInvariantsTest extends TestCase
 
     public function test_normalizer_helper_exists_and_handles_parent_and_empty_strings(): void
     {
-        $code = $this->read(self::CONTROLLER_PATH);
+        // I7e-B.0.1: normalizeTreeFormInputs liegt im Trait
+        // EventTreeActionHelpers.
+        $code = $this->read(self::TRAIT_EVENT_TREE_ACTION_HELPERS);
         $body = $this->methodBody($code, 'normalizeTreeFormInputs');
-        self::assertNotSame('', $body, 'Helper normalizeTreeFormInputs() fehlt.');
+        self::assertNotSame('', $body, 'Helper normalizeTreeFormInputs() muss im Trait existieren.');
         // parent_task_id-Cast
         self::assertStringContainsString(
             "'parent_task_id'",
@@ -279,11 +286,11 @@ final class EventAdminControllerTreeInvariantsTest extends TestCase
             'showTaskTree() muss den Aggregator-Output ueber serializeTreeForJson() '
             . 'flachklopfen — sonst kommt EventTask-Objekt als leeres JSON zurueck.'
         );
-        // Helper muss existieren
+        // I7e-B.0.1: serializeTreeForJson liegt im Trait EventTreeActionHelpers.
         self::assertNotSame(
             '',
-            $this->methodBody($code, 'serializeTreeForJson'),
-            'Private Helper serializeTreeForJson() fehlt.'
+            $this->methodBody($this->read(self::TRAIT_EVENT_TREE_ACTION_HELPERS), 'serializeTreeForJson'),
+            'Helper serializeTreeForJson() muss im EventTreeActionHelpers-Trait existieren.'
         );
     }
 
@@ -553,10 +560,11 @@ final class EventAdminControllerTreeInvariantsTest extends TestCase
 
     public function test_serializeTreeForJson_includes_status_field(): void
     {
-        $code = $this->read(self::CONTROLLER_PATH);
+        // I7e-B.0.1: serializeTreeForJson liegt im Trait EventTreeActionHelpers.
+        $code = $this->read(self::TRAIT_EVENT_TREE_ACTION_HELPERS);
         $body = $this->methodBody($code, 'serializeTreeForJson');
 
-        self::assertNotSame('', $body, 'serializeTreeForJson() fehlt.');
+        self::assertNotSame('', $body, 'serializeTreeForJson() muss im Trait existieren.');
         self::assertMatchesRegularExpression(
             "/'status'\\s*=>/",
             $body,
@@ -748,9 +756,10 @@ final class EventAdminControllerTreeInvariantsTest extends TestCase
 
     public function test_mutating_actions_check_task_belongs_to_event(): void
     {
-        // Regressions-Schutz fuer den G4-ROT-Fix (siehe Organizer-Counterpart).
-        // Der Admin-Controller war durch event_admin-Rolle begrenzt, hatte
-        // aber dasselbe Service-Delegation-Muster und darum dieselbe Luecke.
+        // I7e-B.0.1: der IDOR-Scope-Check ist in die Trait-Methode
+        // assertTaskBelongsToEvent extrahiert. Der Action-Body muss sie
+        // aufrufen; die eigentliche Pruef-Logik (getEventId, withStatus 404)
+        // liegt im Trait und wird dort durch den Organizer-Test abgedeckt.
         $code = $this->read(self::CONTROLLER_PATH);
         $actionsNeedingScopeCheck = [
             'moveTaskNode',
@@ -762,22 +771,10 @@ final class EventAdminControllerTreeInvariantsTest extends TestCase
             $body = $this->methodBody($code, $action);
             self::assertNotSame('', $body, "Action $action() fehlt.");
             self::assertMatchesRegularExpression(
-                '/\$task->getEventId\(\)\s*!==\s*\$eventId/',
+                '/\$this->assertTaskBelongsToEvent\(/',
                 $body,
-                "EventAdminController::$action() muss pruefen, dass "
-                . "\$task->getEventId() === \$eventId (IDOR-Schutz, G4 Dim 3)."
-            );
-            self::assertMatchesRegularExpression(
-                '/\$this->taskRepo->findById\(\s*\$taskId\s*\)/',
-                $body,
-                "EventAdminController::$action() muss taskRepo->findById(\$taskId) "
-                . "aufrufen, um das Task-Objekt fuer den Scope-Check zu laden."
-            );
-            self::assertMatchesRegularExpression(
-                '/return\s+\$response->withStatus\(\s*404\s*\)/',
-                $body,
-                "EventAdminController::$action() muss 404 zurueckgeben, wenn "
-                . "Task nicht zum Event gehoert."
+                "EventAdminController::$action() muss assertTaskBelongsToEvent "
+                . "aufrufen (IDOR-Schutz via EventTreeActionHelpers-Trait)."
             );
         }
     }

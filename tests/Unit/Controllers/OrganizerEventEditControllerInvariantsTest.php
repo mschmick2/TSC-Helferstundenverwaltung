@@ -32,6 +32,13 @@ final class OrganizerEventEditControllerInvariantsTest extends TestCase
     private const CONTROLLER_PATH =
         __DIR__ . '/../../../src/app/Controllers/OrganizerEventEditController.php';
 
+    /** I7e-B.0.1: Helper wurden in Traits extrahiert. Existenz-Checks
+     *  pruefen jetzt gegen diese Dateien statt gegen den Controller-File. */
+    private const TRAIT_TREE_ACTION_HELPERS =
+        __DIR__ . '/../../../src/app/Controllers/Concerns/TreeActionHelpers.php';
+    private const TRAIT_EVENT_TREE_ACTION_HELPERS =
+        __DIR__ . '/../../../src/app/Controllers/Concerns/EventTreeActionHelpers.php';
+
     /** 8 Tree-Actions, die seit Phase 1 existieren. */
     private const TREE_ACTIONS = [
         'showTaskTree',
@@ -277,21 +284,22 @@ final class OrganizerEventEditControllerInvariantsTest extends TestCase
 
     public function test_computeBelegungsSummary_exists(): void
     {
+        // I7e-B.0.1: Helper liegt im Trait EventTreeActionHelpers.
         $body = $this->methodBody(
-            $this->read(self::CONTROLLER_PATH),
+            $this->read(self::TRAIT_EVENT_TREE_ACTION_HELPERS),
             'computeBelegungsSummary'
         );
         self::assertNotSame(
             '',
             $body,
-            'Private Helper computeBelegungsSummary() fehlt (Phase 2/2c).'
+            'Helper computeBelegungsSummary() muss im EventTreeActionHelpers-Trait existieren.'
         );
     }
 
     public function test_computeBelegungsSummary_returns_zusagen_aktiv_key(): void
     {
         $body = $this->methodBody(
-            $this->read(self::CONTROLLER_PATH),
+            $this->read(self::TRAIT_EVENT_TREE_ACTION_HELPERS),
             'computeBelegungsSummary'
         );
         self::assertMatchesRegularExpression(
@@ -299,38 +307,35 @@ final class OrganizerEventEditControllerInvariantsTest extends TestCase
             $body,
             'computeBelegungsSummary() muss einen zusagen_aktiv-Schluessel im '
             . 'Rueckgabe-Array liefern (Phase-2c-Bug-Fix: die Sidebar-Zeile '
-            . '"Aktive Zusagen" hatte vorher faelschlich helpers_total angezeigt, '
-            . 'was die Capacity-Target-Summe ist, nicht die echten Zusagen).'
+            . '"Aktive Zusagen" hatte vorher faelschlich helpers_total angezeigt).'
         );
     }
 
     public function test_computeBelegungsSummary_uses_array_sum_on_assignmentCounts(): void
     {
         $body = $this->methodBody(
-            $this->read(self::CONTROLLER_PATH),
+            $this->read(self::TRAIT_EVENT_TREE_ACTION_HELPERS),
             'computeBelegungsSummary'
         );
         self::assertMatchesRegularExpression(
             '/array_sum\s*\(\s*array_map\s*\(\s*[\'"]intval[\'"]\s*,\s*\$assignmentCounts\s*\)\s*\)/',
             $body,
             'computeBelegungsSummary() muss zusagen_aktiv via array_sum(array_map'
-            . "('intval', \$assignmentCounts)) berechnen — das ist die tatsaechliche "
-            . 'Zusage-Anzahl aus countActiveByEvent, unabhaengig von Capacity-Modus.'
+            . "('intval', \$assignmentCounts)) berechnen."
         );
     }
 
     public function test_computeBelegungsSummary_keeps_helpers_total_for_soll(): void
     {
         $body = $this->methodBody(
-            $this->read(self::CONTROLLER_PATH),
+            $this->read(self::TRAIT_EVENT_TREE_ACTION_HELPERS),
             'computeBelegungsSummary'
         );
         self::assertMatchesRegularExpression(
             "/'helpers_total'\\s*=>/",
             $body,
-            'computeBelegungsSummary() muss weiterhin helpers_total liefern — '
-            . 'das ist die Helfer-Soll-Summe (Capacity-Targets), die in der '
-            . 'Sidebar als neue "Helfer-Soll"-Zeile gerendert wird.'
+            'computeBelegungsSummary() muss weiterhin helpers_total liefern '
+            . '(Helfer-Soll-Summe aus capacity_target-Werten).'
         );
     }
 
@@ -440,35 +445,35 @@ final class OrganizerEventEditControllerInvariantsTest extends TestCase
 
     public function test_success_response_redirects_to_organizer_editor(): void
     {
+        // I7e-B.0.1: treeSuccessResponse liegt jetzt im Trait und ist
+        // kontext-neutral. Der Redirect-Path wird an der Aufruf-Stelle
+        // gesetzt — dort pruefen wir, dass /organizer/events/{id}/editor
+        // geliefert wird, NICHT /admin/events.
         $code = $this->read(self::CONTROLLER_PATH);
-        $body = $this->methodBody($code, 'treeSuccessResponse');
-        self::assertNotSame('', $body, 'Helper treeSuccessResponse() fehlt.');
         self::assertStringContainsString(
-            "'/organizer/events/'",
-            $body,
-            "treeSuccessResponse() muss zum Organizer-Editor redirecten "
-            . "(/organizer/events/{id}/editor). Ein versehentlicher Redirect "
-            . "zu /admin/events/... wuerde den Organizer auf eine Admin-Route "
-            . "schicken, wo er 403 bekommt."
+            "treeSuccessResponse(\$request, \$response, '/organizer/events/' . \$eventId . '/editor',",
+            $code,
+            "OrganizerEventEditController muss treeSuccessResponse mit "
+            . "/organizer/events/{id}/editor als Redirect-Path aufrufen. "
+            . "Ein versehentlicher Aufruf mit /admin/events/... wuerde den "
+            . "Organizer auf eine Admin-Route schicken, wo er 403 bekommt."
         );
-        self::assertStringContainsString(
-            '/editor',
-            $body,
-            'treeSuccessResponse() muss auf die Editor-Route zuruecklenken '
-            . '(nicht auf /organizer/events allein).'
+        self::assertStringNotContainsString(
+            "treeSuccessResponse(\$request, \$response, '/admin/",
+            $code,
+            "OrganizerEventEditController darf NICHT mit /admin-Pfad redirecten."
         );
     }
 
     public function test_error_response_redirects_to_organizer_editor(): void
     {
+        // Analog zu treeSuccessResponse, siehe dort.
         $code = $this->read(self::CONTROLLER_PATH);
-        $body = $this->methodBody($code, 'treeErrorResponse');
-        self::assertNotSame('', $body, 'Helper treeErrorResponse() fehlt.');
         self::assertStringContainsString(
-            "'/organizer/events/'",
-            $body,
-            "treeErrorResponse() muss zum Organizer-Editor redirecten, nicht "
-            . "zu /admin-Routen (siehe treeSuccessResponse-Begruendung)."
+            "treeErrorResponse(\$request, \$response, '/organizer/events/' . \$eventId . '/editor',",
+            $code,
+            "OrganizerEventEditController muss treeErrorResponse mit "
+            . "/organizer/events/{id}/editor aufrufen, nicht mit /admin-Pfad."
         );
     }
 
@@ -486,10 +491,11 @@ final class OrganizerEventEditControllerInvariantsTest extends TestCase
             'showTaskTree() muss den Aggregator-Output ueber serializeTreeForJson() '
             . 'flachklopfen — sonst kommt EventTask-Objekt als leeres JSON zurueck.'
         );
+        // I7e-B.0.1: serializeTreeForJson liegt im Trait EventTreeActionHelpers.
         self::assertNotSame(
             '',
-            $this->methodBody($code, 'serializeTreeForJson'),
-            'Private Helper serializeTreeForJson() fehlt.'
+            $this->methodBody($this->read(self::TRAIT_EVENT_TREE_ACTION_HELPERS), 'serializeTreeForJson'),
+            'Helper serializeTreeForJson() muss im EventTreeActionHelpers-Trait existieren.'
         );
     }
 
@@ -566,12 +572,10 @@ final class OrganizerEventEditControllerInvariantsTest extends TestCase
 
     public function test_mutating_actions_check_task_belongs_to_event(): void
     {
-        // Regressions-Schutz fuer den G4-ROT-Fix: jede mutierende Tree-Action
-        // muss pruefen, dass die uebergebene Task-ID auch zum Event aus der
-        // Route gehoert. Ohne diesen Cross-Check konnte ein Organisator von
-        // Event A Tasks in Event B manipulieren, indem er die Task-ID von B
-        // in die POST-Route von A steckte. Muster: mirror von editTaskNode
-        // (Phase 1).
+        // I7e-B.0.1: der IDOR-Scope-Check ist in die Trait-Methode
+        // assertTaskBelongsToEvent extrahiert. Der Action-Body muss sie
+        // aufrufen; die eigentliche Pruef-Logik liegt im Trait und wird
+        // dort durch eine eigene Invariante abgedeckt.
         $code = $this->read(self::CONTROLLER_PATH);
         $actionsNeedingScopeCheck = [
             'moveTaskNode',
@@ -583,36 +587,43 @@ final class OrganizerEventEditControllerInvariantsTest extends TestCase
             $body = $this->methodBody($code, $action);
             self::assertNotSame('', $body, "Action $action() fehlt.");
             self::assertMatchesRegularExpression(
-                '/\$task->getEventId\(\)\s*!==\s*\$eventId/',
+                '/\$this->assertTaskBelongsToEvent\(/',
                 $body,
-                "OrganizerEventEditController::$action() muss pruefen, dass "
-                . "\$task->getEventId() === \$eventId (IDOR-Schutz, G4 Dim 3)."
-            );
-            self::assertMatchesRegularExpression(
-                '/\$this->taskRepo->findById\(\s*\$taskId\s*\)/',
-                $body,
-                "OrganizerEventEditController::$action() muss taskRepo->findById(\$taskId) "
-                . "aufrufen, um das Task-Objekt fuer den Scope-Check zu laden."
-            );
-            self::assertMatchesRegularExpression(
-                '/return\s+\$response->withStatus\(\s*404\s*\)/',
-                $body,
-                "OrganizerEventEditController::$action() muss 404 zurueckgeben, "
-                . "wenn Task nicht zum Event gehoert (kein 403 — Existenz der "
-                . "Task-ID in einem fremden Event soll nicht geraten werden)."
+                "OrganizerEventEditController::$action() muss assertTaskBelongsToEvent "
+                . "aufrufen (IDOR-Schutz via EventTreeActionHelpers-Trait, G4 Dim 3)."
             );
         }
+
+        // Die eigentliche Scope-Logik inkl. 404-Response wird im Trait
+        // gepruefft.
+        $traitBody = $this->methodBody(
+            $this->read(self::TRAIT_EVENT_TREE_ACTION_HELPERS),
+            'assertTaskBelongsToEvent'
+        );
+        self::assertMatchesRegularExpression(
+            '/\$task->getEventId\(\)\s*!==\s*\$eventId/',
+            $traitBody,
+            'EventTreeActionHelpers::assertTaskBelongsToEvent() muss den '
+            . 'Event-Scope-Vergleich durchfuehren.'
+        );
+        self::assertMatchesRegularExpression(
+            '/->withStatus\(\s*404\s*\)/',
+            $traitBody,
+            'assertTaskBelongsToEvent() muss bei Miss 404 liefern (nicht 403 — '
+            . 'Task-Existenz im fremden Event soll nicht geraten werden).'
+        );
     }
 
     public function test_scope_check_follows_isOrganizer_precedes_service_call(): void
     {
+        // I7e-B.0.1: Scope-Check-Marker ist jetzt der Trait-Aufruf.
         $code = $this->read(self::CONTROLLER_PATH);
         $actions = ['moveTaskNode', 'convertTaskNode', 'deleteTaskNode', 'updateTaskNode'];
         foreach ($actions as $action) {
             $body = $this->methodBody($code, $action);
 
             $posIsOrg     = strpos($body, 'isOrganizer(');
-            $posScopeCheck = strpos($body, '$task->getEventId()');
+            $posScopeCheck = strpos($body, 'assertTaskBelongsToEvent(');
             $posService   = strpos($body, '$this->treeService->');
 
             self::assertNotFalse($posIsOrg, "$action: isOrganizer-Check fehlt.");

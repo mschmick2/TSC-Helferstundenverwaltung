@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Controllers;
 
+use App\Controllers\Concerns\EventTreeActionHelpers;
+use App\Controllers\Concerns\TreeActionHelpers;
 use App\Exceptions\BusinessRuleException;
 use App\Exceptions\ValidationException;
 use App\Helpers\ViewHelper;
@@ -54,6 +56,9 @@ use Psr\Http\Message\ServerRequestInterface as Request;
  */
 class OrganizerEventEditController extends BaseController
 {
+    use TreeActionHelpers;
+    use EventTreeActionHelpers;
+
     public function __construct(
         private EventRepository $eventRepo,
         private EventTaskRepository $taskRepo,
@@ -178,9 +183,9 @@ class OrganizerEventEditController extends BaseController
         try {
             $newId = $this->treeService->createNode($eventId, $data, $actorId);
         } catch (ValidationException $e) {
-            return $this->treeErrorResponse($request, $response, $eventId, 422, $e->getErrors());
+            return $this->treeErrorResponse($request, $response, '/organizer/events/' . $eventId . '/editor', 422, $e->getErrors());
         } catch (BusinessRuleException $e) {
-            return $this->treeErrorResponse($request, $response, $eventId, 409, [$e->getMessage()]);
+            return $this->treeErrorResponse($request, $response, '/organizer/events/' . $eventId . '/editor', 409, [$e->getMessage()]);
         }
 
         if ($this->wantsJson($request)) {
@@ -209,12 +214,10 @@ class OrganizerEventEditController extends BaseController
         }
         $actorId = (int) $user->getId();
 
-        // IDOR-Schutz (G4 Dim 3): Task muss zum Event aus der Route gehoeren.
-        // Gleiches Muster wie editTaskNode. TaskTreeService::move akzeptiert
-        // nur eine taskId ohne Event-Scope, darum Cross-Check hier.
-        $task = $this->taskRepo->findById($taskId);
-        if ($task === null || $task->getEventId() !== $eventId) {
-            return $response->withStatus(404);
+        // IDOR-Schutz (G4 Dim 3, I7e-B.0.1: via Trait-Helper).
+        $scopeCheck = $this->assertTaskBelongsToEvent($taskId, $eventId, $response);
+        if ($scopeCheck !== null) {
+            return $scopeCheck;
         }
 
         $data = (array) $request->getParsedBody();
@@ -228,12 +231,12 @@ class OrganizerEventEditController extends BaseController
         try {
             $this->treeService->move($taskId, $newParentId, $newSortOrder, $actorId);
         } catch (ValidationException $e) {
-            return $this->treeErrorResponse($request, $response, $eventId, 422, $e->getErrors());
+            return $this->treeErrorResponse($request, $response, '/organizer/events/' . $eventId . '/editor', 422, $e->getErrors());
         } catch (BusinessRuleException $e) {
-            return $this->treeErrorResponse($request, $response, $eventId, 409, [$e->getMessage()]);
+            return $this->treeErrorResponse($request, $response, '/organizer/events/' . $eventId . '/editor', 409, [$e->getMessage()]);
         }
 
-        return $this->treeSuccessResponse($request, $response, $eventId, 'Aufgabe verschoben.');
+        return $this->treeSuccessResponse($request, $response, '/organizer/events/' . $eventId . '/editor', 'Aufgabe verschoben.');
     }
 
     /**
@@ -264,12 +267,12 @@ class OrganizerEventEditController extends BaseController
         try {
             $this->treeService->reorderSiblings($eventId, $parentId, $orderedIds, $actorId);
         } catch (ValidationException $e) {
-            return $this->treeErrorResponse($request, $response, $eventId, 422, $e->getErrors());
+            return $this->treeErrorResponse($request, $response, '/organizer/events/' . $eventId . '/editor', 422, $e->getErrors());
         } catch (BusinessRuleException $e) {
-            return $this->treeErrorResponse($request, $response, $eventId, 409, [$e->getMessage()]);
+            return $this->treeErrorResponse($request, $response, '/organizer/events/' . $eventId . '/editor', 409, [$e->getMessage()]);
         }
 
-        return $this->treeSuccessResponse($request, $response, $eventId, 'Reihenfolge gespeichert.');
+        return $this->treeSuccessResponse($request, $response, '/organizer/events/' . $eventId . '/editor', 'Reihenfolge gespeichert.');
     }
 
     /**
@@ -292,10 +295,10 @@ class OrganizerEventEditController extends BaseController
         }
         $actorId = (int) $user->getId();
 
-        // IDOR-Schutz (G4 Dim 3): siehe moveTaskNode.
-        $task = $this->taskRepo->findById($taskId);
-        if ($task === null || $task->getEventId() !== $eventId) {
-            return $response->withStatus(404);
+        // IDOR-Schutz (G4 Dim 3, I7e-B.0.1: via Trait-Helper).
+        $scopeCheck = $this->assertTaskBelongsToEvent($taskId, $eventId, $response);
+        if ($scopeCheck !== null) {
+            return $scopeCheck;
         }
 
         $data   = $this->normalizeTreeFormInputs((array) $request->getParsedBody());
@@ -308,15 +311,15 @@ class OrganizerEventEditController extends BaseController
                 default => throw new ValidationException(['target' => 'Unbekannter Convert-Zielwert (erwartet: group|leaf).']),
             };
         } catch (ValidationException $e) {
-            return $this->treeErrorResponse($request, $response, $eventId, 422, $e->getErrors());
+            return $this->treeErrorResponse($request, $response, '/organizer/events/' . $eventId . '/editor', 422, $e->getErrors());
         } catch (BusinessRuleException $e) {
-            return $this->treeErrorResponse($request, $response, $eventId, 409, [$e->getMessage()]);
+            return $this->treeErrorResponse($request, $response, '/organizer/events/' . $eventId . '/editor', 409, [$e->getMessage()]);
         }
 
         return $this->treeSuccessResponse(
             $request,
             $response,
-            $eventId,
+            '/organizer/events/' . $eventId . '/editor',
             $target === 'group' ? 'Knoten in Gruppe konvertiert.' : 'Knoten in Aufgabe konvertiert.'
         );
     }
@@ -340,21 +343,21 @@ class OrganizerEventEditController extends BaseController
         }
         $actorId = (int) $user->getId();
 
-        // IDOR-Schutz (G4 Dim 3): siehe moveTaskNode.
-        $task = $this->taskRepo->findById($taskId);
-        if ($task === null || $task->getEventId() !== $eventId) {
-            return $response->withStatus(404);
+        // IDOR-Schutz (G4 Dim 3, I7e-B.0.1: via Trait-Helper).
+        $scopeCheck = $this->assertTaskBelongsToEvent($taskId, $eventId, $response);
+        if ($scopeCheck !== null) {
+            return $scopeCheck;
         }
 
         try {
             $this->treeService->softDeleteNode($taskId, $actorId);
         } catch (ValidationException $e) {
-            return $this->treeErrorResponse($request, $response, $eventId, 422, $e->getErrors());
+            return $this->treeErrorResponse($request, $response, '/organizer/events/' . $eventId . '/editor', 422, $e->getErrors());
         } catch (BusinessRuleException $e) {
-            return $this->treeErrorResponse($request, $response, $eventId, 409, [$e->getMessage()]);
+            return $this->treeErrorResponse($request, $response, '/organizer/events/' . $eventId . '/editor', 409, [$e->getMessage()]);
         }
 
-        return $this->treeSuccessResponse($request, $response, $eventId, 'Aufgabe geloescht.');
+        return $this->treeSuccessResponse($request, $response, '/organizer/events/' . $eventId . '/editor', 'Aufgabe geloescht.');
     }
 
     /**
@@ -427,10 +430,10 @@ class OrganizerEventEditController extends BaseController
         }
         $actorId = (int) $user->getId();
 
-        // IDOR-Schutz (G4 Dim 3): siehe moveTaskNode.
-        $task = $this->taskRepo->findById($taskId);
-        if ($task === null || $task->getEventId() !== $eventId) {
-            return $response->withStatus(404);
+        // IDOR-Schutz (G4 Dim 3, I7e-B.0.1: via Trait-Helper).
+        $scopeCheck = $this->assertTaskBelongsToEvent($taskId, $eventId, $response);
+        if ($scopeCheck !== null) {
+            return $scopeCheck;
         }
 
         $data = $this->normalizeTreeFormInputs((array) $request->getParsedBody());
@@ -438,255 +441,19 @@ class OrganizerEventEditController extends BaseController
         try {
             $this->treeService->updateNode($taskId, $data, $actorId);
         } catch (ValidationException $e) {
-            return $this->treeErrorResponse($request, $response, $eventId, 422, $e->getErrors());
+            return $this->treeErrorResponse($request, $response, '/organizer/events/' . $eventId . '/editor', 422, $e->getErrors());
         } catch (BusinessRuleException $e) {
-            return $this->treeErrorResponse($request, $response, $eventId, 409, [$e->getMessage()]);
+            return $this->treeErrorResponse($request, $response, '/organizer/events/' . $eventId . '/editor', 409, [$e->getMessage()]);
         }
 
-        return $this->treeSuccessResponse($request, $response, $eventId, 'Aufgabe aktualisiert.');
+        return $this->treeSuccessResponse($request, $response, '/organizer/events/' . $eventId . '/editor', 'Aufgabe aktualisiert.');
     }
 
     // =========================================================================
-    // Duplikat-Helfer (aus EventAdminController; Follow-up n: Trait-Extraktion)
-    //
-    // Bewusste temporaere Doppelung, bis drei Controller laufen. Die einzigen
-    // fachlichen Abweichungen sind die Redirect-Ziele in treeSuccessResponse/
-    // treeErrorResponse ('/organizer/events/{id}/editor' statt
-    // '/admin/events/{id}').
+    // Tree-Action-Helpers liegen in App\Controllers\Concerns\TreeActionHelpers
+    // und App\Controllers\Concerns\EventTreeActionHelpers (I7e-B.0.1). Das
+    // Redirect-Ziel '/organizer/events/{id}/editor' wird im Aufruf selbst
+    // gesetzt; der Trait ist kontext-neutral.
     // =========================================================================
 
-    /**
-     * Duplikat aus EventAdminController, Trait-Extraktion in Follow-up n.
-     * HTTP-Form-Inputs in Service-taugliche Typen ueberfuehren — siehe
-     * EventAdminController::normalizeTreeFormInputs fuer die ausfuehrliche
-     * Begruendung der "" → null-Normalisierung.
-     */
-    private function normalizeTreeFormInputs(array $data): array
-    {
-        if (array_key_exists('parent_task_id', $data)) {
-            $pid = $data['parent_task_id'];
-            $data['parent_task_id'] = ($pid === null || $pid === '' || $pid === '0' || $pid === 0)
-                ? null
-                : (int) $pid;
-        }
-        foreach (['start_at', 'end_at', 'category_id', 'capacity_target'] as $field) {
-            if (array_key_exists($field, $data) && $data[$field] === '') {
-                $data[$field] = null;
-            }
-        }
-        return $data;
-    }
-
-    /**
-     * Duplikat aus EventAdminController, Trait-Extraktion in Follow-up n.
-     */
-    private function treeEditorEnabled(): bool
-    {
-        $value = $this->settingsService->getString('events.tree_editor_enabled', '0');
-        return $value === '1' || $value === 'true';
-    }
-
-    /**
-     * Duplikat aus EventAdminController, Trait-Extraktion in Follow-up n.
-     *
-     * @param array<int, array{task:\App\Models\EventTask, children:array, helpers_subtree:int, hours_subtree:float, leaves_subtree:int, open_slots_subtree:int|null}> $tree
-     * @return array<int, array<string, mixed>>
-     */
-    private function serializeTreeForJson(array $tree): array
-    {
-        $out = [];
-        foreach ($tree as $node) {
-            $task = $node['task'];
-            $out[] = [
-                'id'                 => (int) $task->getId(),
-                'event_id'           => $task->getEventId(),
-                'parent_task_id'     => $task->getParentTaskId(),
-                'is_group'           => $task->isGroup() ? 1 : 0,
-                'category_id'        => $task->getCategoryId(),
-                'title'              => $task->getTitle(),
-                'description'        => $task->getDescription(),
-                'task_type'          => $task->getTaskType(),
-                'slot_mode'          => $task->getSlotMode(),
-                'start_at'           => $task->getStartAt(),
-                'end_at'             => $task->getEndAt(),
-                'capacity_mode'      => $task->getCapacityMode(),
-                'capacity_target'    => $task->getCapacityTarget(),
-                'hours_default'      => $task->getHoursDefault(),
-                'sort_order'         => $task->getSortOrder(),
-                'helpers_subtree'    => $node['helpers_subtree'],
-                'hours_subtree'      => $node['hours_subtree'],
-                'leaves_subtree'     => $node['leaves_subtree'],
-                'open_slots_subtree' => $node['open_slots_subtree'],
-                'status'             => $node['status']?->value,
-                'children'           => $this->serializeTreeForJson($node['children']),
-            ];
-        }
-        return $out;
-    }
-
-    /**
-     * Duplikat aus EventAdminController, Trait-Extraktion in Follow-up n.
-     */
-    private function wantsJson(Request $request): bool
-    {
-        return str_contains($request->getHeaderLine('Accept'), 'application/json');
-    }
-
-    /**
-     * Duplikat aus EventAdminController mit Redirect-Abweichung: das Success-
-     * Target zeigt auf /organizer/events/{id}/editor statt /admin/events/{id},
-     * damit der User nach einer Tree-Operation im Editor-Kontext bleibt.
-     * Trait-Extraktion in Follow-up n.
-     */
-    private function treeSuccessResponse(
-        Request $request,
-        Response $response,
-        int $eventId,
-        string $flashMessage
-    ): Response {
-        if ($this->wantsJson($request)) {
-            return $this->json($response, ['status' => 'ok']);
-        }
-        ViewHelper::flash('success', $flashMessage);
-        return $this->redirect($response, '/organizer/events/' . $eventId . '/editor');
-    }
-
-    /**
-     * Duplikat aus EventAdminController mit Redirect-Abweichung (siehe
-     * treeSuccessResponse). Trait-Extraktion in Follow-up n.
-     */
-    private function treeErrorResponse(
-        Request $request,
-        Response $response,
-        int $eventId,
-        int $status,
-        array $errors
-    ): Response {
-        if ($this->wantsJson($request)) {
-            return $this->json($response, ['status' => 'error', 'errors' => $errors], $status);
-        }
-        ViewHelper::flash('danger', implode(' ', array_map('strval', $errors)));
-        return $this->redirect($response, '/organizer/events/' . $eventId . '/editor');
-    }
-
-    // =========================================================================
-    // Sidebar-Helpers (I7e-A Phase 2). Bewusste Duplikate in
-    // EventAdminController fuer die Symmetrie der beiden showEditor-Aktionen;
-    // Trait-Extraktion bleibt an Follow-up n gekoppelt.
-    // =========================================================================
-
-    /**
-     * Sortiert die flache Aufgabenliste nach Startzeit. Tasks ohne
-     * Startzeit wandern ans Ende. PHP 8+ garantiert Stabilitaet von usort,
-     * daher bleibt die Depth-First-Reihenfolge aus dem Aggregator als
-     * Sekundaer-Sort erhalten.
-     *
-     * @param list<array{task:EventTask, status:?TaskStatus, helpers:int, open_slots:?int, ancestor_path:list<string>}> $flatList
-     */
-    private function sortFlatListByStart(array &$flatList): void
-    {
-        usort($flatList, static function (array $a, array $b): int {
-            /** @var EventTask $ta */
-            $ta = $a['task'];
-            /** @var EventTask $tb */
-            $tb = $b['task'];
-            $sa = $ta->getStartAt();
-            $sb = $tb->getStartAt();
-            if ($sa === null || $sa === '') {
-                return $sb === null || $sb === '' ? 0 : 1;
-            }
-            if ($sb === null || $sb === '') {
-                return -1;
-            }
-            return strcmp($sa, $sb);
-        });
-    }
-
-    /**
-     * Aggregiert die Belegungs-Zahlen fuer die Sidebar aus Tree + Flatlist.
-     *
-     * Achtung zur Semantik (I7e-A Phase 2c, nachgebessert aus Smoke):
-     *   - `helpers_total` = Summe der capacity_target-Werte. Das ist die
-     *     SOLL-Zahl (Helfer-Soll), nicht die tatsaechlichen Zusagen. Der
-     *     Name `helpers` stammt aus dem TaskTreeAggregator, dessen
-     *     `helpers_subtree` fuer Leaves `capacity_target ?? 0` liefert.
-     *   - `zusagen_aktiv` = tatsaechliche aktive Zusagen, gesammelt
-     *     ueber `$assignmentCounts` (Map task_id -> count aktive Zusagen
-     *     aus EventTaskAssignmentRepository::countActiveByEvent).
-     *
-     * @param array $tree     Root-Nodes aus TaskTreeAggregator::buildTree
-     * @param list<array{task:EventTask, status:?TaskStatus, helpers:int, open_slots:?int, ancestor_path:list<string>}> $flatList
-     * @param array<int,int> $assignmentCounts  task_id -> Anzahl aktive Zusagen
-     * @return array{
-     *     leaf_count:int,
-     *     group_count:int,
-     *     helpers_total:int,
-     *     zusagen_aktiv:int,
-     *     open_slots:int,
-     *     open_slots_known:bool,
-     *     hours_default_total:float,
-     *     status_counts:array{empty:int, partial:int, full:int}
-     * }
-     */
-    private function computeBelegungsSummary(array $tree, array $flatList, array $assignmentCounts = []): array
-    {
-        $helpersTotal     = 0;
-        $openSlotsTotal   = 0;
-        $openSlotsKnown   = true;
-        $hoursTotal       = 0.0;
-        $statusCounts     = ['empty' => 0, 'partial' => 0, 'full' => 0];
-
-        foreach ($flatList as $entry) {
-            $helpersTotal += (int) $entry['helpers'];
-            $hoursTotal   += (float) $entry['task']->getHoursDefault();
-
-            if ($entry['open_slots'] === null) {
-                $openSlotsKnown = false;
-            } else {
-                $openSlotsTotal += (int) $entry['open_slots'];
-            }
-
-            if ($entry['status'] instanceof TaskStatus) {
-                $statusCounts[$entry['status']->value]++;
-            }
-        }
-
-        // countActiveByEvent liefert pro Event genau den map task_id->count
-        // der aktiven Zusagen. array_sum ist damit exakt die Anzahl der
-        // tatsaechlichen Zusagen ueber alle Leaves (inkl. unbegrenzte Tasks).
-        $zusagenAktiv = array_sum(array_map('intval', $assignmentCounts));
-
-        $groupCount = 0;
-        $this->walkTreeForSummary($tree, $groupCount);
-
-        return [
-            'leaf_count'          => count($flatList),
-            'group_count'         => $groupCount,
-            'helpers_total'       => $helpersTotal,
-            'zusagen_aktiv'       => $zusagenAktiv,
-            'open_slots'          => $openSlotsTotal,
-            'open_slots_known'    => $openSlotsKnown,
-            'hours_default_total' => $hoursTotal,
-            'status_counts'       => $statusCounts,
-        ];
-    }
-
-    /**
-     * Rekursiver Walker fuer Gruppen-Count. Leaves zaehlt bereits die
-     * flache Liste; hier interessiert nur, wie viele Gruppen-Knoten
-     * ueberhaupt existieren (fuer Sidebar-Panel 2).
-     *
-     * @param array $nodes Tree-Nodes aus TaskTreeAggregator::buildTree
-     */
-    private function walkTreeForSummary(array $nodes, int &$groupCount): void
-    {
-        foreach ($nodes as $node) {
-            /** @var EventTask $task */
-            $task = $node['task'];
-            if ($task->isGroup()) {
-                $groupCount++;
-                $this->walkTreeForSummary((array) ($node['children'] ?? []), $groupCount);
-            }
-        }
-    }
 }

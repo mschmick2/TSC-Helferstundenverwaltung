@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Controllers;
 
+use App\Controllers\Concerns\TemplateTreeActionHelpers;
+use App\Controllers\Concerns\TreeActionHelpers;
 use App\Exceptions\BusinessRuleException;
 use App\Exceptions\ValidationException;
 use App\Helpers\ViewHelper;
@@ -25,6 +27,9 @@ use Psr\Http\Message\ServerRequestInterface as Request;
  */
 class EventTemplateController extends BaseController
 {
+    use TreeActionHelpers;
+    use TemplateTreeActionHelpers;
+
     public function __construct(
         private EventTemplateRepository $templateRepo,
         private CategoryRepository $categoryRepo,
@@ -409,9 +414,9 @@ class EventTemplateController extends BaseController
         try {
             $newId = $this->treeService->createNode($templateId, $data, $actorId);
         } catch (ValidationException $e) {
-            return $this->treeErrorResponse($request, $response, $templateId, 422, $e->getErrors());
+            return $this->treeErrorResponse($request, $response, '/admin/event-templates/' . $templateId . '/edit', 422, $e->getErrors());
         } catch (BusinessRuleException $e) {
-            return $this->treeErrorResponse($request, $response, $templateId, 409, [$e->getMessage()]);
+            return $this->treeErrorResponse($request, $response, '/admin/event-templates/' . $templateId . '/edit', 409, [$e->getMessage()]);
         }
 
         if ($this->wantsJson($request)) {
@@ -442,15 +447,15 @@ class EventTemplateController extends BaseController
         try {
             $this->treeService->reorderSiblings($templateId, $parentId, $orderedIds, $actorId);
         } catch (ValidationException $e) {
-            return $this->treeErrorResponse($request, $response, $templateId, 422, $e->getErrors());
+            return $this->treeErrorResponse($request, $response, '/admin/event-templates/' . $templateId . '/edit', 422, $e->getErrors());
         } catch (BusinessRuleException $e) {
-            return $this->treeErrorResponse($request, $response, $templateId, 409, [$e->getMessage()]);
+            return $this->treeErrorResponse($request, $response, '/admin/event-templates/' . $templateId . '/edit', 409, [$e->getMessage()]);
         }
 
         return $this->treeSuccessResponse(
             $request,
             $response,
-            $templateId,
+            '/admin/event-templates/' . $templateId . '/edit',
             'Reihenfolge gespeichert.'
         );
     }
@@ -468,12 +473,10 @@ class EventTemplateController extends BaseController
             return $response->withStatus(404);
         }
 
-        // IDOR-Schutz (G4 Dim 3): Task muss zum Template aus der Route gehoeren.
-        // Gleiches Muster wie editTaskNode. TemplateTaskTreeService::move
-        // akzeptiert nur eine taskId ohne Template-Scope.
-        $task = $this->templateRepo->findTaskById($taskId);
-        if ($task === null || $task->getTemplateId() !== $templateId) {
-            return $response->withStatus(404);
+        // IDOR-Schutz (G4 Dim 3, I7e-B.0.1: via Trait-Helper).
+        $scopeCheck = $this->assertTaskBelongsToTemplate($taskId, $templateId, $response);
+        if ($scopeCheck !== null) {
+            return $scopeCheck;
         }
 
         $user = $request->getAttribute('user');
@@ -486,12 +489,12 @@ class EventTemplateController extends BaseController
         try {
             $this->treeService->move($taskId, $newParentId, $newSortOrder, $actorId);
         } catch (ValidationException $e) {
-            return $this->treeErrorResponse($request, $response, $templateId, 422, $e->getErrors());
+            return $this->treeErrorResponse($request, $response, '/admin/event-templates/' . $templateId . '/edit', 422, $e->getErrors());
         } catch (BusinessRuleException $e) {
-            return $this->treeErrorResponse($request, $response, $templateId, 409, [$e->getMessage()]);
+            return $this->treeErrorResponse($request, $response, '/admin/event-templates/' . $templateId . '/edit', 409, [$e->getMessage()]);
         }
 
-        return $this->treeSuccessResponse($request, $response, $templateId, 'Aufgabe verschoben.');
+        return $this->treeSuccessResponse($request, $response, '/admin/event-templates/' . $templateId . '/edit', 'Aufgabe verschoben.');
     }
 
     /**
@@ -508,10 +511,10 @@ class EventTemplateController extends BaseController
             return $response->withStatus(404);
         }
 
-        // IDOR-Schutz (G4 Dim 3): siehe moveTaskNode.
-        $task = $this->templateRepo->findTaskById($taskId);
-        if ($task === null || $task->getTemplateId() !== $templateId) {
-            return $response->withStatus(404);
+        // IDOR-Schutz (G4 Dim 3, I7e-B.0.1: via Trait-Helper).
+        $scopeCheck = $this->assertTaskBelongsToTemplate($taskId, $templateId, $response);
+        if ($scopeCheck !== null) {
+            return $scopeCheck;
         }
 
         $user = $request->getAttribute('user');
@@ -529,18 +532,18 @@ class EventTemplateController extends BaseController
                 return $this->treeErrorResponse(
                     $request,
                     $response,
-                    $templateId,
+                    '/admin/event-templates/' . $templateId . '/edit',
                     422,
                     ['Ungueltiges Convert-Ziel: target muss "group" oder "leaf" sein.']
                 );
             }
         } catch (ValidationException $e) {
-            return $this->treeErrorResponse($request, $response, $templateId, 422, $e->getErrors());
+            return $this->treeErrorResponse($request, $response, '/admin/event-templates/' . $templateId . '/edit', 422, $e->getErrors());
         } catch (BusinessRuleException $e) {
-            return $this->treeErrorResponse($request, $response, $templateId, 409, [$e->getMessage()]);
+            return $this->treeErrorResponse($request, $response, '/admin/event-templates/' . $templateId . '/edit', 409, [$e->getMessage()]);
         }
 
-        return $this->treeSuccessResponse($request, $response, $templateId, 'Knoten konvertiert.');
+        return $this->treeSuccessResponse($request, $response, '/admin/event-templates/' . $templateId . '/edit', 'Knoten konvertiert.');
     }
 
     /**
@@ -556,10 +559,10 @@ class EventTemplateController extends BaseController
             return $response->withStatus(404);
         }
 
-        // IDOR-Schutz (G4 Dim 3): siehe moveTaskNode.
-        $task = $this->templateRepo->findTaskById($taskId);
-        if ($task === null || $task->getTemplateId() !== $templateId) {
-            return $response->withStatus(404);
+        // IDOR-Schutz (G4 Dim 3, I7e-B.0.1: via Trait-Helper).
+        $scopeCheck = $this->assertTaskBelongsToTemplate($taskId, $templateId, $response);
+        if ($scopeCheck !== null) {
+            return $scopeCheck;
         }
 
         $user = $request->getAttribute('user');
@@ -568,10 +571,10 @@ class EventTemplateController extends BaseController
         try {
             $this->treeService->deleteNode($taskId, $actorId);
         } catch (BusinessRuleException $e) {
-            return $this->treeErrorResponse($request, $response, $templateId, 409, [$e->getMessage()]);
+            return $this->treeErrorResponse($request, $response, '/admin/event-templates/' . $templateId . '/edit', 409, [$e->getMessage()]);
         }
 
-        return $this->treeSuccessResponse($request, $response, $templateId, 'Aufgabe geloescht.');
+        return $this->treeSuccessResponse($request, $response, '/admin/event-templates/' . $templateId . '/edit', 'Aufgabe geloescht.');
     }
 
     /**
@@ -629,10 +632,10 @@ class EventTemplateController extends BaseController
             return $response->withStatus(404);
         }
 
-        // IDOR-Schutz (G4 Dim 3): siehe moveTaskNode.
-        $task = $this->templateRepo->findTaskById($taskId);
-        if ($task === null || $task->getTemplateId() !== $templateId) {
-            return $response->withStatus(404);
+        // IDOR-Schutz (G4 Dim 3, I7e-B.0.1: via Trait-Helper).
+        $scopeCheck = $this->assertTaskBelongsToTemplate($taskId, $templateId, $response);
+        if ($scopeCheck !== null) {
+            return $scopeCheck;
         }
 
         $user = $request->getAttribute('user');
@@ -642,12 +645,12 @@ class EventTemplateController extends BaseController
         try {
             $this->treeService->updateNode($taskId, $data, $actorId);
         } catch (ValidationException $e) {
-            return $this->treeErrorResponse($request, $response, $templateId, 422, $e->getErrors());
+            return $this->treeErrorResponse($request, $response, '/admin/event-templates/' . $templateId . '/edit', 422, $e->getErrors());
         } catch (BusinessRuleException $e) {
-            return $this->treeErrorResponse($request, $response, $templateId, 409, [$e->getMessage()]);
+            return $this->treeErrorResponse($request, $response, '/admin/event-templates/' . $templateId . '/edit', 409, [$e->getMessage()]);
         }
 
-        return $this->treeSuccessResponse($request, $response, $templateId, 'Aufgabe aktualisiert.');
+        return $this->treeSuccessResponse($request, $response, '/admin/event-templates/' . $templateId . '/edit', 'Aufgabe aktualisiert.');
     }
 
     // =========================================================================
@@ -689,15 +692,6 @@ class EventTemplateController extends BaseController
             return null;
         }
         return (int) $value;
-    }
-
-    private function treeEditorEnabled(): bool
-    {
-        if ($this->settingsService === null) {
-            return false;
-        }
-        $value = $this->settingsService->getString('events.tree_editor_enabled', '0');
-        return $value === '1' || $value === 'true';
     }
 
     /**
@@ -753,35 +747,4 @@ class EventTemplateController extends BaseController
         return $out;
     }
 
-    private function wantsJson(Request $request): bool
-    {
-        return str_contains($request->getHeaderLine('Accept'), 'application/json');
-    }
-
-    private function treeSuccessResponse(
-        Request $request,
-        Response $response,
-        int $templateId,
-        string $flashMessage
-    ): Response {
-        if ($this->wantsJson($request)) {
-            return $this->json($response, ['status' => 'ok']);
-        }
-        ViewHelper::flash('success', $flashMessage);
-        return $this->redirect($response, '/admin/event-templates/' . $templateId . '/edit');
-    }
-
-    private function treeErrorResponse(
-        Request $request,
-        Response $response,
-        int $templateId,
-        int $status,
-        array $errors
-    ): Response {
-        if ($this->wantsJson($request)) {
-            return $this->json($response, ['status' => 'error', 'errors' => $errors], $status);
-        }
-        ViewHelper::flash('danger', implode(' ', array_map('strval', $errors)));
-        return $this->redirect($response, '/admin/event-templates/' . $templateId . '/edit');
-    }
 }
