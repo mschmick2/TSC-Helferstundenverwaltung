@@ -99,6 +99,29 @@ class SettingsService
     }
 
     /**
+     * Ist der Aufgabenbaum-Editor freigeschaltet (Modul 6 I7a/I7b/I7e-A/I7e-B)?
+     * Entspricht dem inline-Check aus TreeActionHelpers::treeEditorEnabled()
+     * in kanonischer Service-Form.
+     */
+    public function treeEditorEnabled(): bool
+    {
+        return $this->getBool('events.tree_editor_enabled', false);
+    }
+
+    /**
+     * Ist das Edit-Session-Tracking freigeschaltet (Modul 6 I7e-C)?
+     *
+     * Hart gekoppelt an treeEditorEnabled() (Architect-C2 aus I7e-C G1):
+     * ohne aktiven Editor ist die Session-Anzeige sinnlos. Das vermeidet
+     * die verwirrende Kombination "Sessions aktiv, Editor aus".
+     */
+    public function editSessionsEnabled(): bool
+    {
+        return $this->treeEditorEnabled()
+            && $this->getBool('events.edit_sessions_enabled', false);
+    }
+
+    /**
      * Standard-Sollstunden pro Jahr
      */
     public function getDefaultTargetHours(): int

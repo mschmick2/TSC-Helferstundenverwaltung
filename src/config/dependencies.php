@@ -167,6 +167,10 @@ return [
         return new EventTaskAssignmentRepository($c->get(PDO::class));
     },
 
+    \App\Repositories\EditSessionRepository::class => function (ContainerInterface $c): \App\Repositories\EditSessionRepository {
+        return new \App\Repositories\EditSessionRepository($c->get(PDO::class));
+    },
+
     EventTemplateRepository::class => function (ContainerInterface $c): EventTemplateRepository {
         return new EventTemplateRepository($c->get(PDO::class));
     },
@@ -235,6 +239,14 @@ return [
 
     \App\Services\TaskTreeAggregator::class => function (): \App\Services\TaskTreeAggregator {
         return new \App\Services\TaskTreeAggregator();
+    },
+
+    // --- Modul 6 I7e-C: Edit-Session-Tracking -------------------------------
+    \App\Services\EditSessionService::class => function (ContainerInterface $c): \App\Services\EditSessionService {
+        return new \App\Services\EditSessionService(
+            $c->get(\App\Repositories\EditSessionRepository::class),
+            $c->get(SettingsService::class),
+        );
     },
 
     // --- Modul 6 I7c: Template-Aufgabenbaum ---------------------------------
