@@ -110,6 +110,14 @@ final class TaskTreeService
         }
     }
 
+    /**
+     * Knoten verschieben (neuer parent + neuer sort_order).
+     *
+     * Optimistic-Lock: wenn $expectedVersion !== null und die aktuelle
+     * DB-Version abweicht, wirft die Methode OptimisticLockException.
+     * Bei $expectedVersion = null wird der Lock uebersprungen
+     * (last-write-wins). Authorisierung bleibt in den Controller-Guards.
+     */
     public function move(int $taskId, ?int $newParentId, int $newSortOrder, int $actorId, ?int $expectedVersion = null): void
     {
         $this->assertEnabled();
@@ -235,6 +243,14 @@ final class TaskTreeService
         }
     }
 
+    /**
+     * Leaf in eine Gruppe konvertieren.
+     *
+     * Optimistic-Lock: wenn $expectedVersion !== null und die aktuelle
+     * DB-Version abweicht, wirft die Methode OptimisticLockException.
+     * Bei $expectedVersion = null wird der Lock uebersprungen
+     * (last-write-wins). Authorisierung bleibt in den Controller-Guards.
+     */
     public function convertToGroup(int $taskId, int $actorId, ?int $expectedVersion = null): void
     {
         $this->assertEnabled();
@@ -303,6 +319,14 @@ final class TaskTreeService
         }
     }
 
+    /**
+     * Gruppe zurueck in eine Leaf-Aufgabe konvertieren.
+     *
+     * Optimistic-Lock: wenn $expectedVersion !== null und die aktuelle
+     * DB-Version abweicht, wirft die Methode OptimisticLockException.
+     * Bei $expectedVersion = null wird der Lock uebersprungen
+     * (last-write-wins). Authorisierung bleibt in den Controller-Guards.
+     */
     public function convertToLeaf(int $taskId, array $leafData, int $actorId, ?int $expectedVersion = null): void
     {
         $this->assertEnabled();
@@ -384,6 +408,11 @@ final class TaskTreeService
      * Kaskadierender Soft-Delete ist NICHT vorgesehen und wird, falls jemals
      * gewuenscht, in einem eigenen Inkrement mit explizitem Bestaetigungs-
      * Flow nachgereicht.
+     *
+     * Optimistic-Lock: wenn $expectedVersion !== null und die aktuelle
+     * DB-Version abweicht, wirft die Methode OptimisticLockException.
+     * Bei $expectedVersion = null wird der Lock uebersprungen
+     * (last-write-wins). Authorisierung bleibt in den Controller-Guards.
      */
     public function softDeleteNode(int $taskId, int $actorId, ?int $expectedVersion = null): void
     {
@@ -464,6 +493,11 @@ final class TaskTreeService
      * Audit-Eintrag enthaelt nur die tatsaechlich geaenderten Felder (Feld-Diff).
      * Sind keine Felder veraendert, wird weder DB-Write noch Audit-Eintrag
      * ausgeloest.
+     *
+     * Optimistic-Lock: wenn $expectedVersion !== null und die aktuelle
+     * DB-Version abweicht, wirft die Methode OptimisticLockException.
+     * Bei $expectedVersion = null wird der Lock uebersprungen
+     * (last-write-wins). Authorisierung bleibt in den Controller-Guards.
      */
     public function updateNode(int $taskId, array $data, int $actorId, ?int $expectedVersion = null): void
     {

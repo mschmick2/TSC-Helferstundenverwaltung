@@ -81,57 +81,15 @@ Aus dem Sanity-Gate und dem G4-Security-Review von I7e-B.1 ergaben
 sich fuenf neue Eintraege. Der Architect empfiehlt in G8 drei
 Buendelungen:
 
-- **Doku-Buendel** (Follow-ups o + p): kombinierter `docs(repo)`-
-  Commit, ca. 30 Min.
+- ~~**Doku-Buendel** (Follow-ups o + p)~~ -- abgeschlossen als
+  Commit `docs(locking): I7e-B Follow-up-Buendel 1` (Docblock von
+  `EventTaskRepository::update` und der fuenf mutierenden
+  `TaskTreeService`-Methoden aktualisiert).
 - **Test-Breite-Buendel** (Follow-ups q + r): kombinierter
   `test(locks)`-Commit, ca. 1 Stunde.
 - **Systemisch** (Follow-up s): gehoert zu einem breiter angelegten
   Security-Inkrement zusammen mit Follow-up v, keine eigene Mini-
   Iteration.
-
-### Follow-up o — Docblock-Update EventTaskRepository::update()
-
-- **Quelle:** Sanity-Gate I7e-B (G3-Reviewer-Befund).
-- **Status:** offen, kosmetisch.
-
-**Beschreibung:**
-Der Docblock von `EventTaskRepository::update()` (aktuell Zeilen
-286-292) traegt noch den Satz "Eine Version-Pruefung (Optimistic
-Lock) gibt es derzeit nicht ... Parameter ist fuer spaetere
-Aktivierung reserviert." Das stammt aus Modul 7 I3 und ist seit
-I7e-B.1 Phase 1 falsch -- der Parameter ist aktiv.
-
-**Naechster Schritt:**
-Docblock an den aktuellen Stand angleichen: "Bei gesetztem
-`$expectedVersion` wird das UPDATE per `AND version = :version`
-auf die erwartete Version gefiltert. Bei Mismatch liefert die
-Methode `false` zurueck; der Service uebersetzt das in eine
-`OptimisticLockException`."
-
-**Groessenordnung:** Einzeiler, ca. 5 Min. Sollte mit Follow-up
-p gebuendelt werden.
-
-### Follow-up p — Docblock-Erweiterung Lock-Semantik
-
-- **Quelle:** G4 Security-Review I7e-B (Dimension 9).
-- **Status:** offen, Doku.
-
-**Beschreibung:**
-Im G4-Review aufgefallen: Der Parameter `?int $expectedVersion = null`
-ist **optional** -- ein fehlender Wert deaktiviert den Lock (last-
-write-wins). Das ist by-design, damit Legacy-Aufrufer ohne Lock
-weiterfunktionieren, aber in keinem Docblock explizit erwaehnt.
-Ein kuenftiger Endpunkt-Autor koennte annehmen, der Lock sei
-automatisch aktiv, sobald die Signatur ihn enthaelt.
-
-**Naechster Schritt:**
-In den Docblocks von `TaskTreeService` (5 mutierende Methoden)
-und `EventTaskRepository` (5 mutierende Methoden) den Satz
-ergaenzen: "Ein fehlender `$expectedVersion` bedeutet last-write-
-wins; Authorisierung bleibt in den Controller-Guards."
-
-**Groessenordnung:** ca. 20 Min. Gemeinsam mit Follow-up o als
-einen `docs(repo)`-Commit.
 
 ### Follow-up q — Organizer-Multi-Context-Test in Spec 16
 

@@ -284,11 +284,25 @@ class EventTaskRepository
     }
 
     /**
-     * Task aktualisieren. version-Spalte wird immer inkrementiert, damit Aussen-
-     * stehende (Event-Admin-UI) eine verlaessliche Versionsnummer erhalten.
-     * Eine Version-Pruefung (Optimistic Lock) gibt es derzeit nicht, weil Tasks
-     * nur ueber die Event-Detail-Seite editiert werden und dort der Event-Schutz
-     * schon greift. Parameter $expectedVersion ist fuer spaetere Aktivierung reserviert.
+     * Task aktualisieren. Die version-Spalte wird immer inkrementiert, damit
+     * externe Konsumenten (Event-Admin-UI, Tree-Editor) eine verlaessliche
+     * Versionsnummer erhalten.
+     *
+     * Optimistic-Lock-Verhalten (seit Modul 6 I7e-B.1 Phase 1):
+     *   - Wenn $expectedVersion gesetzt ist, haengt die Methode
+     *     `AND version = :version` an den WHERE-Ausdruck. Bei Version-
+     *     Mismatch betrifft das UPDATE keine Zeile; die Methode gibt `false`
+     *     zurueck. Der aufrufende Service (TaskTreeService) uebersetzt das
+     *     `false` in eine OptimisticLockException.
+     *   - Wenn $expectedVersion null bleibt (Default), wird der Lock-Check
+     *     uebersprungen (last-write-wins). Das ist bewusst: Aufrufer ohne
+     *     Version-Tracking sollen weiterhin funktionieren. Authorisierung
+     *     ist Aufgabe der Controller-Guards (Feature-Flag, isOrganizer,
+     *     assertTaskBelongsToEvent), nicht des Locks.
+     *
+     * @return bool true bei erfolgreichem Update, false wenn die Zeile
+     *              nicht existiert, soft-geloescht ist ODER die erwartete
+     *              Version nicht passt.
      */
     public function update(int $id, array $data, ?int $expectedVersion = null): bool
     {
