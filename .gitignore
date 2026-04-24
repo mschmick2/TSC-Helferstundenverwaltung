@@ -103,6 +103,11 @@ vaes_backup_*
 /tests/e2e/.playwright-cache/
 /tests/e2e/package-lock.json
 
+# Playwright-Test-Artefakte im Root (zusätzlich zu /tests/e2e/test-results/)
+/test-results-*.json
+/test-results-*/
+/playwright-report/
+
 # E2E-Config mit DB-Zugang (Vorlage bleibt: config.e2e.example.php)
 /src/config/config.e2e.php
 
