@@ -208,6 +208,20 @@
         if (sessionId === null) {
             return;
         }
+        // Follow-up z: Bei programmatischem Reload (z.B. aus
+        // event-task-tree.js::handleLockConflict nach Optimistic-Lock-
+        // Konflikt) wird die Edit-Session NICHT geschlossen. Der
+        // aufrufende Code setzt sessionStorage['vaes_programmatic_
+        // reload'] = '1' direkt vor window.location.reload(). Hier
+        // NUR lesen, NICHT entfernen — beforeunload und pagehide feuern
+        // beide, beide Handler muessen das Flag sehen und ueberspringen.
+        // Das Flag wird erst in boot() der neu geladenen Seite geraeumt
+        // (self-cleanup nach Reload). Nach dem Reload findet
+        // resumeOrStartSession die Session noch offen, Probe-Heartbeat
+        // liefert 200, C1-Invariante haelt.
+        if (sessionStorage.getItem('vaes_programmatic_reload') === '1') {
+            return;
+        }
         // Konsistent zu entry-lock.js: URL-encoded form body mit
         // csrf_token-Field. Der Server akzeptiert das ueber
         // CsrfMiddleware (form-data-Pfad), und navigator.sendBeacon
@@ -351,6 +365,16 @@
             // Keine Editor-Seite mit Session-Anker.
             return;
         }
+
+        // Follow-up z: wenn die vorige Seite einen programmatischen
+        // Reload ausgeloest hat (z.B. nach Lock-Konflikt), hat der
+        // close-Handler das Flag gelesen und den sendBeacon uebersprungen.
+        // Jetzt -- nach dem Reload -- ist das Flag obsolet und wird
+        // hier geraeumt, damit ein nachfolgender echter User-Close den
+        // Standard-Pfad nimmt. Cleanup im boot() statt im Close-Handler,
+        // weil beforeunload UND pagehide beide feuern und beide das Flag
+        // brauchen.
+        sessionStorage.removeItem('vaes_programmatic_reload');
 
         eventId = parseInt(indicatorContainer.dataset.eventId || '0', 10);
         if (!Number.isFinite(eventId) || eventId <= 0) {

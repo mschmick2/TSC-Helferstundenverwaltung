@@ -135,7 +135,14 @@ gebuendelte Mini-Iteration nach dem Tag.
   unter "Verfuegbarkeit").
 - ~~**Follow-up t**~~ -- erledigt in Commit `test(e2e): I7e-C
   Nach-Tag Test-Breite` als Spec 17 Test 5. Dabei ist eine
-  Design-Luecke zu Architect-C1 aufgefallen (Follow-up z).
+  Design-Luecke zu Architect-C1 aufgefallen (Follow-up z,
+  inzwischen ebenfalls erledigt).
+- ~~**Follow-up z**~~ -- erledigt in Commit `fix(edit-sessions):
+  Follow-up z - beforeunload respektiert programmatischen
+  Reload (C1)`. sessionStorage-Flag-Pattern zwischen
+  event-task-tree.js und edit-session.js; Spec 17 Test 5
+  strenger gefasst (`toBe(sessionIdBefore)`); zwei statische
+  Invariants als Drift-Schutz ergaenzt.
 
 ### ~~Follow-up t -- Lock-Reload-E2E-Test in Spec 17~~ (erledigt)
 
@@ -145,46 +152,20 @@ funktional" laeuft. Deckt die User-sichtbare Invariante
 strikte C1-Intent-Invariante (gleiche Session-ID ueberlebt den
 Reload) ist nicht erreichbar -- siehe Follow-up z.
 
-### Follow-up z -- Design-Fix fuer Architect-C1 (beforeunload-Close vs. Reload)
+### ~~Follow-up z -- Design-Fix fuer Architect-C1~~ (erledigt)
 
-- **Quelle:** FU-G6-1 Umsetzung (Test-Befund, 2026-04-24).
-- **Status:** offen, Design-Luecke.
-
-**Beschreibung:**
-Architect-C1 aus I7e-C G1 postuliert: "sessionStorage ueberlebt
-Lock-Reload, gleiche Session-ID bleibt". In der Implementierung
-greift jedoch der `beforeunload`-Handler in `edit-session.js`
-auch bei programmatischen Reloads und schickt per
-`navigator.sendBeacon` einen Close-Request. Nach dem Reload
-findet `resumeOrStartSession` die Session geschlossen (404)
-und legt eine neue mit neuer ID an.
-
-User-sichtbar **intakt**: der Server dedupliziert per `user_id`
-(`EditSessionView::toJsonReadyArray`), andere Editoren sehen
-weiterhin "EVENT_ADMIN bearbeitet..." ohne Luecke im Polling-
-Feed. Die Praesenz-Invariante haelt.
-
-C1-Intent-Invariante **nicht erfuellt**: neue DB-Zeile, neue ID,
-minimaler Server-Overhead (ein zusaetzlicher INSERT + DELETE-
-Rotation ueber `cleanupStale`).
-
-**Naechster Schritt:**
-Design-Fix in `edit-session.js`. Optionen:
-- (A) Ein Modul-Flag `programmaticReload = true` wird von
-  `handleLockConflict` vor `window.location.reload()` gesetzt;
-  `closeSessionBestEffort` prueft das Flag und ueberspringt den
-  sendBeacon-Aufruf.
-- (B) `handleLockConflict` ruft explizit einen "soft-reload"-Modus
-  auf, der den beforeunload-Handler vorher abmeldet.
-
-Option (A) ist minimal-invasiv, eine Flag-Variable + ein
-`if`-Check. Kann in einer <30-Min-Mini-Iteration umgesetzt werden.
-
-Nach Umsetzung: Spec 17 Test 5 strenger fassen
-(`sessionIdAfter === sessionIdBefore`) und als Gegenbeweis
-ausbauen.
-
-**Groessenordnung:** ca. 30 Min inkl. Test-Erweiterung.
+Erledigt in Commit `fix(edit-sessions): Follow-up z - beforeunload
+respektiert programmatischen Reload (C1)`. Umgesetzt wurde
+Variante A3 (sessionStorage-Flag statt Modul-Variable): sowohl
+`event-task-tree.js::handleLockConflict` als auch
+`edit-session.js::closeSessionBestEffort` nutzen
+`sessionStorage['vaes_programmatic_reload']` als Koordinations-
+Signal. Das Flag wird von `handleLockConflict` gesetzt und von
+`closeSessionBestEffort` beim ersten Lesen konsumiert (self-
+cleanup). Spec 17 Test 5 ist jetzt auf die strenge C1-Invariante
+`toBe(sessionIdBefore)` umgestellt, zwei statische Invariants
+schuetzen gegen Drift (in `EditSessionJsInvariantsTest` und
+`OptimisticLockInvariantsGapTest`).
 
 ### Follow-up u -- Repository-Integration-Tests fuer EditSessionRepository
 

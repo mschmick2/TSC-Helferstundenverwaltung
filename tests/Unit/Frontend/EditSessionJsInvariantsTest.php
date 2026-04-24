@@ -284,4 +284,40 @@ final class EditSessionJsInvariantsTest extends TestCase
             'formatDuration muss "X Minuten" als Plural liefern.'
         );
     }
+
+    // =========================================================================
+    // Follow-up z: programmatic-reload-Flag in closeSessionBestEffort
+    // =========================================================================
+
+    public function test_close_handler_checks_programmatic_reload_flag(): void
+    {
+        $js = $this->read();
+
+        // closeSessionBestEffort muss das Flag vaes_programmatic_reload
+        // pruefen und bei gesetztem Flag den sendBeacon-Close
+        // ueberspringen. Sonst wird die Session beim Lock-Reload
+        // geschlossen und Architect-C1 unterlaufen.
+        self::assertMatchesRegularExpression(
+            "/sessionStorage\.getItem\(\s*'vaes_programmatic_reload'\s*\)/",
+            $js,
+            'edit-session.js::closeSessionBestEffort muss das Flag '
+            . 'vaes_programmatic_reload aus sessionStorage lesen, damit '
+            . 'programmatische Reloads (z.B. aus event-task-tree.js::'
+            . 'handleLockConflict) den sendBeacon-Close ueberspringen.'
+        );
+
+        // Self-cleanup: das Flag muss irgendwo entfernt werden, damit
+        // ein folgender echter User-Close nicht auch uebersprungen
+        // wird. Wichtig: NICHT im close-Handler selbst (sonst konsumiert
+        // der erste von beforeunload/pagehide das Flag und der zweite
+        // macht trotzdem sendBeacon), sondern in boot() nach dem Reload.
+        self::assertMatchesRegularExpression(
+            "/sessionStorage\.removeItem\(\s*'vaes_programmatic_reload'\s*\)/",
+            $js,
+            'edit-session.js muss das Flag vaes_programmatic_reload '
+            . 'beim boot nach dem Reload entfernen (Post-Reload-Cleanup). '
+            . 'Sonst wuerde auch ein nachfolgender echter User-Close den '
+            . 'Standard-Pfad verpassen.'
+        );
+    }
 }

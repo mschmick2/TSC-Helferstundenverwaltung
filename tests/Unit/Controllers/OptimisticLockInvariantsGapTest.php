@@ -281,6 +281,42 @@ final class OptimisticLockInvariantsGapTest extends TestCase
         );
     }
 
+    public function test_handle_lock_conflict_sets_programmatic_reload_flag(): void
+    {
+        // Follow-up z (2026-04-24): handleLockConflict muss vor dem
+        // window.location.reload() das sessionStorage-Flag
+        // vaes_programmatic_reload = '1' setzen, damit edit-session.js
+        // im beforeunload-Handler den sendBeacon-Close ueberspringt und
+        // Architect-C1 end-zu-end gilt.
+        $js = $this->read(self::JS_KERN);
+        if (!preg_match('/function\s+handleLockConflict\s*\([^)]*\)\s*\{(.*?)\n\s{0,4}\}/s', $js, $m)) {
+            self::fail('handleLockConflict konnte nicht geparst werden.');
+        }
+        $body = $m[1];
+        self::assertMatchesRegularExpression(
+            "/sessionStorage\.setItem\(\s*'vaes_programmatic_reload'\s*,\s*'1'\s*\)/",
+            $body,
+            'handleLockConflict muss sessionStorage.setItem('
+            . "'vaes_programmatic_reload', '1') aufrufen, bevor es "
+            . 'window.location.reload() ausfuehrt. Ohne das Flag '
+            . 'schliesst edit-session.js die Edit-Session via sendBeacon '
+            . 'und Architect-C1 haelt nicht end-zu-end.'
+        );
+        // Die setItem-Zeile MUSS vor dem reload() stehen, sonst
+        // wird das Flag erst nach dem Navigate-Ausloesen gesetzt und
+        // der beforeunload-Handler sieht es nicht.
+        $posSet = strpos($body, "setItem('vaes_programmatic_reload'");
+        $posReload = strpos($body, 'window.location.reload(');
+        self::assertNotFalse($posSet, 'Flag-Setzung fehlt.');
+        self::assertNotFalse($posReload, 'reload()-Aufruf fehlt.');
+        self::assertLessThan(
+            $posReload,
+            $posSet,
+            'Das Flag vaes_programmatic_reload muss VOR '
+            . 'window.location.reload() gesetzt werden, nicht danach.'
+        );
+    }
+
     // =========================================================================
     // Bereich E — Model-Getter
     // =========================================================================

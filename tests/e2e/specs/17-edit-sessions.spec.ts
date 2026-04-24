@@ -290,34 +290,29 @@ test.describe('Edit-Session-Hinweis (I7e-C.1)', () => {
   });
 
   // =========================================================================
-  // Test 5 — Edit-Session bleibt nach Lock-Reload funktional (FU-G6-1)
+  // Test 5 — Architect-C1 end-zu-end: Session-ID ueberlebt Lock-Reload (FU-G6-1)
   //
-  // Testet die User-sichtbare Invariante nach einem Optimistic-Lock-
-  // Konflikt aus I7e-B: die Edit-Session-Funktion laeuft danach weiter,
-  // der Nutzer wird fuer andere Editoren weiterhin als "aktiv" angezeigt,
-  // keine dauerhafte Luecke im Polling-Feed.
+  // Beweist Architect-C1 aus I7e-C G1: nach einem Optimistic-Lock-
+  // Konflikt aus I7e-B reloadet event-task-tree.js die Seite
+  // (handleLockConflict), und edit-session.js findet seine Session-ID
+  // im sessionStorage wieder -- Probe-Heartbeat ergibt 200, keine neue
+  // Session-Zeile.
   //
-  // **Befund waehrend der Implementierung (siehe Commit-Trailer):**
-  // Architect-C1 aus I7e-C G1 ("sessionStorage ueberlebt Lock-Reload,
-  // gleiche Session-ID") ist durch den beforeunload-Handler in edit-
-  // session.js unterlaufen -- jeder Reload triggert sendBeacon-Close
-  // auf die alte Session. Der Probe-Heartbeat nach dem Reload findet
-  // sie geschlossen (404), sessionStorage wird geleert, und eine neue
-  // Session mit neuer ID wird gestartet. Aus Nutzer-Sicht bleibt die
-  // Praesenz aber lueckenlos, weil der Server per user_id dedupliziert
-  // (EditSessionView::toJsonReadyArray) -- andere User sehen unveraendert
-  // "EVENT_ADMIN bearbeitet dieses Event".
+  // **Historie (siehe Follow-up z im Register):**
+  // In der ersten Test-Fassung (FU-G6-1 Mini-Iteration) schlug die
+  // strenge Assertion fehl, weil der beforeunload-Handler in
+  // edit-session.js auch bei programmatischen Reloads einen sendBeacon-
+  // Close absetzte. Der Probe-Heartbeat nach dem Reload fand die
+  // Session geschlossen (404), sessionStorage wurde geleert, eine neue
+  // Session mit neuer ID wurde gestartet. Die user-sichtbare
+  // Praesenz-Invariante hielt (Server dedupliziert per user_id), aber
+  // die strenge C1-Intent-Invariante nicht.
   //
-  // Dieser Test verifiziert die TATSAECHLICH erfuellte Invariante:
-  //   - Vor Lock-Konflikt: gueltige Session-ID im sessionStorage.
-  //   - Nach Lock-Reload: wieder gueltige Session-ID im sessionStorage
-  //     (ID kann wegen beforeunload-Close eine neue sein).
-  //
-  // Die strikte "gleiche ID ueberlebt"-Invariante (Architect-C1-Intent)
-  // ist nur durch eine Production-Code-Aenderung in edit-session.js
-  // zu erreichen (z.B. "skip beforeunload-close when programmatic
-  // reload is pending"). Das ist Scope eines eigenen Design-Fix-
-  // Inkrements.
+  // Follow-up-z-Fix: event-task-tree.js setzt vor
+  // window.location.reload() das Flag sessionStorage[
+  // 'vaes_programmatic_reload'] = '1'. edit-session.js prueft dieses
+  // Flag in closeSessionBestEffort und ueberspringt den sendBeacon-
+  // Close bei gesetztem Flag. Nach dem Fix greift C1 end-zu-end.
   //
   // Strategie:
   //   1. ADMIN (E2E Admin) und EVENT_ADMIN (E2E Eventadmin) oeffnen
@@ -325,16 +320,15 @@ test.describe('Edit-Session-Hinweis (I7e-C.1)', () => {
   //      Modal-Editor als auch den Edit-Sessions-Indicator.
   //   2. Beide oeffnen den Edit-Modal fuer denselben Task.
   //   3. ADMIN speichert erfolgreich. event-task-tree.js ruft danach
-  //      window.location.reload() (Standard-Erfolgs-Pfad) auf.
+  //      window.location.reload() (Standard-Erfolgs-Pfad, OHNE Flag).
   //   4. EVENT_ADMIN haelt die alte Modal-Version, speichert -> 409 +
-  //      Warn-Toast. handleLockConflict ruft nach 1.5 s
-  //      window.location.reload() (Konflikt-Pfad) auf.
-  //   5. ASSERTION: EVENT_ADMINs sessionStorage.vaes_edit_session_id ist
-  //      nach dem Reload wieder gueltig gesetzt (Edit-Session-Tracking
-  //      nach Lock-Reload funktional).
+  //      Warn-Toast. handleLockConflict setzt das Flag und ruft nach
+  //      1.5 s window.location.reload() auf.
+  //   5. KERN-ASSERTION: EVENT_ADMINs sessionStorage.vaes_edit_session_id
+  //      ist nach dem Reload IDENTISCH zu vorher.
   // =========================================================================
 
-  test('Lock-Reload aus I7e-B: Edit-Session bleibt funktional (FU-G6-1)', async ({ browser }) => {
+  test('Lock-Reload aus I7e-B: Session-ID bleibt identisch (FU-G6-1)', async ({ browser }) => {
     test.setTimeout(60_000);
 
     const a = await loginNewContext(browser, ADMIN);
@@ -396,32 +390,44 @@ test.describe('Edit-Session-Hinweis (I7e-C.1)', () => {
 
       // Auf den Post-Reload-Zustand warten: edit-session.js bootet
       // erneut, der Indicator-Container ist wieder im DOM, edit-
-      // session.js liest sessionStorage UND -- weil beforeunload die
-      // alte Session per sendBeacon geschlossen hat -- startet beim
-      // Probe-Heartbeat-Miss eine neue Session.
+      // session.js liest sessionStorage. Dank Follow-up-z-Fix wurde
+      // die alte Session NICHT via sendBeacon geschlossen, der
+      // Probe-Heartbeat findet sie weiter offen und behaelt die ID.
       await expect(treeB.nodeByTitle(titleAfterA)).toBeVisible({ timeout: 15_000 });
       await expect(b.page.locator('#edit-sessions-indicator')).toBeAttached();
 
       // Kurz warten, damit resumeOrStartSession den Post-Reload-Flow
-      // abgeschlossen hat (Probe-Heartbeat + ggf. Neu-Start).
+      // abgeschlossen hat (Probe-Heartbeat bestaetigt gueltige Session).
       await b.page.waitForTimeout(800);
 
-      // ASSERTION: Edit-Session-Tracking ist nach dem Reload wieder
-      // funktional -- sessionStorage enthaelt eine gueltige Session-ID
-      // (kann die alte sein oder eine neue, je nach Timing der
-      // beforeunload-Close-Lieferung).
+      // KERN-ASSERTION (C1 end-zu-end): Session-ID bleibt IDENTISCH.
       const sessionIdAfter = await b.page.evaluate(
         () => sessionStorage.getItem('vaes_edit_session_id')
       );
       expect(
         sessionIdAfter,
         'sessionStorage.vaes_edit_session_id muss nach dem Lock-Reload '
-          + 'wieder gesetzt sein -- Edit-Session-Tracking funktioniert.'
-      ).toBeTruthy();
+          + 'identisch zur ID vor dem Konflikt sein -- das beweist '
+          + 'Architect-C1 end-zu-end: sessionStorage-Persistenz + '
+          + 'Server-Session ueberleben den Lock-Reload. Fix aus '
+          + 'Follow-up z: event-task-tree.js setzt vor dem Reload ein '
+          + 'sessionStorage-Flag, das edit-session.js im beforeunload-'
+          + 'Handler liest und den sendBeacon-Close ueberspringt.'
+      ).toBe(sessionIdBefore);
+
+      // Zusatz-Pruefung: das Flag wurde nach dem Reload konsumiert
+      // (self-cleanup in closeSessionBestEffort), damit ein echter
+      // User-Close nicht versehentlich auch uebersprungen wird.
+      const flagAfter = await b.page.evaluate(
+        () => sessionStorage.getItem('vaes_programmatic_reload')
+      );
       expect(
-        Number(sessionIdAfter),
-        'Post-Reload-Session-ID muss eine gueltige positive Zahl sein.'
-      ).toBeGreaterThan(0);
+        flagAfter,
+        'vaes_programmatic_reload muss nach der Flag-Konsumption '
+          + '(beim ersten closeSessionBestEffort-Aufruf beim Reload) '
+          + 'wieder null sein, damit ein echter User-Close anschliessend '
+          + 'den Standard-sendBeacon-Pfad nimmt.'
+      ).toBeNull();
     } finally {
       await a.context.close();
       await b.context.close();

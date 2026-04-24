@@ -779,8 +779,16 @@
             bootstrap.Modal.getInstance(modalEl)?.hide();
         }
         // Kurze Verzoegerung, damit der Toast sichtbar wird, bevor
-        // der Reload die Seite ersetzt.
-        window.setTimeout(() => { window.location.reload(); }, 1500);
+        // der Reload die Seite ersetzt. Das Flag 'vaes_programmatic_reload'
+        // signalisiert edit-session.js, dass der Reload programmatisch
+        // ist und die Edit-Session NICHT ueber sendBeacon geschlossen
+        // werden soll — Architect-C1 aus I7e-C soll end-zu-end halten
+        // (sessionStorage-Persistenz + Server-Session ueberleben den
+        // Reload). Siehe Follow-up z im Register.
+        window.setTimeout(() => {
+            sessionStorage.setItem('vaes_programmatic_reload', '1');
+            window.location.reload();
+        }, 1500);
     }
 
     // =====================================================================
