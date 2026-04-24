@@ -286,6 +286,36 @@ $app->group('/admin', function (RouteCollectorProxy $group) {
 })->add(new RoleMiddleware(['administrator']))->add(AuthMiddleware::class);
 ```
 
+### Controller-Traits (Controllers/Concerns/)
+
+Die Tree-Controller (`OrganizerEventEditController`, `EventAdminController`,
+`EventTemplateController`) teilen sich Helper-Methoden ueber drei Traits im
+Namespace `App\Controllers\Concerns`. Die Extraktion erfolgte in I7e-B.0.1
+(2026-04-24), um Duplikat-Schuld aus drei Tree-Controllern aufzuloesen (vor
+der Extraktion waren ca. acht Helper-Methoden plus der IDOR-Scope-Check in
+jedem Controller dupliziert).
+
+- **`TreeActionHelpers`** -- allgemeine, kontext-neutrale Helpers fuer alle
+  drei Controller. Umfasst Feature-Flag-Pruefung (`treeEditorEnabled`),
+  Request-Format-Detection (`wantsJson`), Success-/Error-Response-Rendering
+  (`treeSuccessResponse`, `treeErrorResponse`) und Lock-Konflikt-Handling
+  (`lockConflictResponse`, aus I7e-B.1 Phase 2).
+- **`EventTreeActionHelpers`** -- event-spezifische Helpers, nur fuer
+  Admin- und Organizer-Controller. Umfasst `normalizeTreeFormInputs`,
+  `serializeTreeForJson`, Chronologie-Sortierung (`sortFlatListByStart`),
+  Belegungs-Summary (`computeBelegungsSummary`, `walkTreeForSummary`) und
+  IDOR-Scope-Check (`assertTaskBelongsToEvent`, aus I7e-A G4-Fix).
+- **`TemplateTreeActionHelpers`** -- Template-Pendant zu
+  `EventTreeActionHelpers`. Enthaelt derzeit nur
+  `assertTaskBelongsToTemplate`; Feldnamen und Aggregator-Signaturen
+  weichen von der Event-Variante ab und werden getrennt gehalten.
+
+**Konventions-Invariants** (`tests/Unit/Controllers/TreeControllerConventionsTest`)
+erzwingen die Property-Benennung (`$taskRepo`, `$templateRepo`,
+`$settingsService`), ueber die die Traits auf den Controller-Zustand
+zugreifen. Neue Tree-Controller muessen das Property-Namensschema
+einhalten, sonst schlaegt der Convention-Test an.
+
 ---
 
 ## Service-Schicht

@@ -1211,3 +1211,124 @@ Scope-Fragen:
   ergaenzt, eroeffnet einen neuen Scope. Auch wenn sie
   verbunden aussieht, bekommt sie einen eigenen Commit."
 
+### 2026-04-24 — Multi-Line-replace_all bei Trait-Extraktion
+
+**Kontext:**
+I7e-B.0.1 extrahierte acht Helper-Methoden plus den IDOR-Scope-
+Check aus drei Tree-Controllern in Traits. Ein Teil der Umstellung
+verlangte, dass bestehende Aufrufer-Zeilen auf die neue Trait-
+Signatur umgezogen wurden (`int $eventId` → `string $redirectPath`).
+Fuer den grossen Teil der Aufrufe hat `Edit(replace_all=true)` auf
+das Pattern `$this->treeSuccessResponse($request, $response, $eventId,`
+sauber gegriffen.
+
+**Problem / Ueberraschung:**
+In drei Actions (je `convertTaskNode`, plus `reorderTasks` und
+einer Inline-Error-Response im Template-Controller) war der Aufruf
+ueber mehrere Zeilen verteilt -- das replace-Pattern passt dann
+nicht, weil der Zeilenumbruch zwischen den Argumenten liegt.
+Die Stellen blieben stehen mit der **alten** Signatur, der
+Composer-Autoloader meldete nichts (Syntax ist korrekt), und
+PHPUnit blieb gruen, weil kein Unit-Test genau diesen Pfad
+trifft. Erst ein Browser-Smoke in Phase-1-Vorbereitung zeigte
+500-Fehler beim Klick auf "In Gruppe konvertieren".
+
+**Loesung:**
+Nach replace_all-Operationen auf mehrzeiligen Patterns immer
+einen Grep auf die **alte** Signatur als Kontroll-Lauf machen:
+`grep -rn "treeSuccessResponse(\$request, \$response, \$eventId"
+src/app/Controllers/` muss danach leer sein. Zusaetzlich bei
+Trait-Extraktionen: kurzer Browser-Smoke-Durchlauf aller Actions,
+die den umgestellten Helper nutzen, vor dem Commit.
+
+**Praevention:**
+- Multi-Line-Pattern-Ersetzungen IMMER mit Grep-Gegenprobe auf
+  alte Signatur absichern.
+- PHPUnit faengt `ArgumentCountError` / `TypeError` nur dann ab,
+  wenn der betroffene Code-Pfad im Test tatsaechlich durchlaufen
+  wird. Bei Controller-Actions ist das selten.
+- Nach Trait-Extraktion: `composer dump-autoload -o` plus kurzer
+  Dev-Server-Smoke in 2-3 der geaenderten Actions.
+
+### 2026-04-24 — Repo-bool + Service-Exception als VAES-Lock-Pattern
+
+**Kontext:**
+Modul 7 I3 (events-Tabelle) hatte Optimistic Locking mit einem
+bool-Rueckgabewert aus `EventRepository::update` eingefuehrt --
+der Controller dort pruefte `if (!$ok) { 409 }` selbst. In Modul
+6 I7e-B musste der gleiche Mechanismus auf `event_tasks`
+implementiert werden, aber dort sitzt ein Service
+(`TaskTreeService`) zwischen Controller und Repository. Der
+Service wirft bereits typisierte Exceptions fuer andere
+Fehlerklassen (`ValidationException`, `BusinessRuleException`).
+
+**Problem / Ueberraschung:**
+Ein `bool`-Rueckgabewert vom Service an den Controller waere
+inkonsistent zum Service-Exception-Stil. Andererseits wuerde
+ein Exception-Wurf aus dem Repository das Modul-7-Muster
+brechen und fuer bestehende Aufrufer (die den Code-Pfad nur
+als "Update hat geklappt / nicht" kennen) ein Upgrade-Risiko
+bedeuten.
+
+**Loesung (Architect-Entscheidung I7e-B G1-B2b):**
+Asymmetrisches Pattern:
+- **Repository** gibt weiterhin `bool` zurueck. Konsistent zu
+  Modul 7 I3. Kein Wissen ueber "Konflikt vs. Row-Missing" --
+  der Repo-Aufruf sieht nur `rowCount`.
+- **Service** faengt `$ok === false` ab und wirft bei
+  nicht-null `$expectedVersion` eine `OptimisticLockException`.
+  Konsistent zum Service-Exception-Stil.
+- **Controller** faengt die Exception und rendert 409 via
+  `lockConflictResponse` (Trait-Helper).
+
+**Regel als VAES-Konvention:**
+Bei zukuenftigen Lock-Erweiterungen (Template-Lock,
+assignments-Lock):
+- Repository immer `bool`.
+- Wenn Service dazwischen liegt: Service wirft Exception.
+- Wenn kein Service dazwischen liegt (direkter Controller/Repo-
+  Pfad wie Modul 7 I3): Controller entscheidet selbst ueber 409
+  anhand `bool`.
+
+### 2026-04-24 — errorCode-Feld als 409-Discriminator im Tree-Editor
+
+**Kontext:**
+Mit Einfuehrung des Optimistic Locks auf event_tasks (I7e-B.1
+Phase 2) haben die mutierenden Tree-Actions zwei semantisch
+verschiedene 409-Rueckgaben:
+- `BusinessRuleException` (z.B. "Task hat noch aktive Zusagen,
+  Loeschung nicht moeglich"). UX: Fehlermeldung zeigen, Nutzer
+  soll Aenderung ueberdenken.
+- `OptimisticLockException` (Version-Mismatch nach paralleler
+  Bearbeitung). UX: Warn-Toast plus automatischer Reload, weil
+  der Nutzer mit einem veralteten Stand arbeitet.
+
+Beide Faelle teilen HTTP-Status 409.
+
+**Problem / Ueberraschung:**
+Der erste Wurf des JS-Handlers pruefte `result.status === 409`
+und konnte nicht unterscheiden. Folge: bei BusinessRule-Konflikt
+reloadete die Seite ebenfalls (unerwuenscht), oder bei
+Optimistic-Lock-Konflikt blieb der Nutzer im veralteten Modal
+(ebenfalls unerwuenscht).
+
+**Loesung:**
+JSON-Response-Shape um ein **semantisches** Feld `error`
+erweitert. `lockConflictResponse` setzt
+`error: 'optimistic_lock_conflict'`; andere 409-Faelle setzen
+es nicht. Der `postJson`-Wrapper im JS exponiert das Feld als
+`result.errorCode`. Die vier Mutation-Handler (Save, Move,
+Convert, Delete) pruefen `result.errorCode === 'optimistic_lock_conflict'`
+vor dem Reload -- andere 409-Faelle fallen durch zu
+`showFormErrors` bzw. Error-Toast.
+
+**Regel:**
+- HTTP-Status allein fuer Machine-to-Machine-Reaktion (Cache,
+  Proxy, Retry-Logik).
+- Fuer UX-Differenzierung **innerhalb** desselben Status-Codes
+  einen semantischen Discriminator im Body platzieren.
+- VAES-Konvention: `error`-Feld als Kategorie-Key, `message` als
+  menschenlesbarer Text. Client-JS liest `error` als
+  `errorCode`, um den Namenskonflikt mit dem Bestand-Feld
+  `errors` (Validation-Fehler-Liste) zu vermeiden.
+

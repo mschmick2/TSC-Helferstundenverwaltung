@@ -1,7 +1,7 @@
 # VAES Benutzerhandbuch
 
 **Vereins-Arbeitsstunden-Erfassungssystem (VAES)**
-Version 1.4.7
+Version 1.4.8
 Stand: April 2026
 
 ---
@@ -73,6 +73,7 @@ Stand: April 2026
     - 12.4 [Event-Verwaltung](#124-event-verwaltung)
       - [Aufgabenbaum-Editor (optional aktivierbar)](#aufgabenbaum-editor-optional-aktivierbar)
       - [Editor-Ansicht (non-modaler Editor)](#editor-ansicht-non-modaler-editor)
+      - [Gleichzeitige Bearbeitung](#gleichzeitige-bearbeitung)
     - 12.5 [Event-Vorlagen](#125-event-vorlagen)
     - 12.6 [Systemeinstellungen](#126-systemeinstellungen)
     - 12.7 [Audit-Trail](#127-audit-trail)
@@ -124,6 +125,9 @@ Die Anwendung ist fuer moderne Webbrowser optimiert und kann auf Desktop-Compute
 - Expand/Collapse-All und Per-Node-Chevron im Baum-Editor.
 - Sidebar-Scroll-Highlight mit Auto-Expand eingeklappter Gruppen.
 - Mobile-Offcanvas-Sidebar unter 992 px Breite.
+
+**Neu in Version 1.4.8:**
+- Schutz vor ungewolltem Ueberschreiben bei gleichzeitiger Bearbeitung derselben Aufgabe im Event-Aufgabenbaum (siehe Abschnitt 12.4, "Gleichzeitige Bearbeitung").
 
 ---
 
@@ -1382,6 +1386,29 @@ Wenn Sie in der Sidebar auf eine Aufgabe klicken, die in einer eingeklappten Gru
 - **Organisatoren** sehen sie nur fuer Events, bei denen sie als Organisator eingetragen sind. Fremde Events liefern 403.
 - Alle Aenderungen werden - wie beim Modal-Editor - im Audit-Log protokolliert.
 - Ist das Feature-Flag deaktiviert (Produktion), sind saemtliche Links und Routen unsichtbar bzw. liefern 404.
+
+#### Gleichzeitige Bearbeitung
+
+Es kann vorkommen, dass zwei Organisatoren oder Administratoren gleichzeitig dieselbe Aufgabe bearbeiten wollen. Das System erkennt solche Situationen und schuetzt davor, dass Aenderungen unbemerkt ueberschrieben werden.
+
+**Was passiert in einem solchen Fall:**
+
+Wenn Sie eine Aufgabe speichern, die zwischenzeitlich von jemand anderem geaendert wurde, erscheint oben rechts eine gelbe Hinweisbox mit dem Text: "Die Aufgabe wurde zwischenzeitlich von jemand anderem geaendert. Bitte laden Sie die Ansicht neu und versuchen Sie es erneut."
+
+Nach kurzer Zeit laedt die Ansicht automatisch neu. Ihre eingegebenen Aenderungen sind dabei nicht mehr vorhanden -- bitte geben Sie sie erneut ein, falls Sie sie weiterhin anwenden moechten.
+
+**Wann tritt das auf:**
+
+- Beim Speichern einer Aufgaben-Bearbeitung.
+- Beim Verschieben einer Aufgabe (Ziehen und Ablegen).
+- Beim Umwandeln einer Aufgabe von Einzelaufgabe zu Gruppe oder umgekehrt.
+- Beim Loeschen einer Aufgabe.
+
+Das Hinzufuegen neuer Aufgaben und das Umsortieren innerhalb einer Gruppe loesen diesen Schutz nicht aus -- dort ist der Mechanismus nicht noetig.
+
+**Verfuegbarkeit:**
+
+Der Schutz gilt fuer Event-Aufgaben. Fuer Vorlagen (Event-Templates) ist er derzeit nicht aktiv und wird in einem spaeteren Inkrement nachgereicht.
 
 ### 12.5 Event-Vorlagen
 
