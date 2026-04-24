@@ -621,6 +621,22 @@ main {
     margin: 0;
 }
 
+/* =============================================================
+   Edit-Session-Hinweis (Modul 6 I7e-C.1 Phase 3)
+   Dezenter Alert oberhalb des Aufgabenbaum-Editors. Bootstrap-5
+   hat kein .alert-sm — wir definieren eine kompakte Variante,
+   damit der Hinweis nicht zu prominent wirkt (Architect-R8: nur
+   Information, keine Interaktion).
+============================================================= */
+.alert-sm {
+    padding: 0.375rem 0.75rem;
+    font-size: 0.875rem;
+}
+
+.edit-sessions-indicator {
+    /* Container ist immer im DOM — auch leer. JS fuellt ihn dynamisch. */
+}
+
 /* Kompakter Zeilen-Abstand in der chronologischen Aufgabenliste.
    Die li erben Bootstrap-Padding vom list-group-item — der innere
    Button (data-sidebar-scroll-target) uebernimmt das Padding, damit

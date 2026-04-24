@@ -280,4 +280,5 @@ if ($treeEditorEnabled):
 
 <script src="<?= ViewHelper::url('/js/vendor/sortablejs/Sortable.min.js') ?>"></script>
 <script src="<?= ViewHelper::url('/js/event-task-tree.js') ?>"></script>
+<script src="<?= ViewHelper::url('/js/edit-session.js') ?>"></script>
 <?php endif; // $treeEditorEnabled ?>

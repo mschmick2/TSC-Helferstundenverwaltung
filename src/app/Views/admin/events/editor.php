@@ -174,3 +174,4 @@ $categoriesJson = json_encode(
 
 <script src="<?= ViewHelper::url('/js/vendor/sortablejs/Sortable.min.js') ?>"></script>
 <script src="<?= ViewHelper::url('/js/event-task-tree.js') ?>"></script>
+<script src="<?= ViewHelper::url('/js/edit-session.js') ?>"></script>
