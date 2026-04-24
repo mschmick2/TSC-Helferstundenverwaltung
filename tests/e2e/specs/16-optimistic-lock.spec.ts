@@ -292,4 +292,78 @@ test.describe('Optimistic Lock auf event_tasks (I7e-B.1)', () => {
       await b.context.close();
     }
   });
+
+  // =========================================================================
+  // Test 4 — Organizer-Pfad (Follow-up q aus Sanity-Gate)
+  //
+  // Die ersten drei Tests fuhren ueber /admin/events/{id}/edit — Lock-
+  // Verkabelung im EventAdminController. Dieser Test dupliziert das
+  // Update-Konflikt-Szenario ueber /organizer/events/{id}/editor, damit
+  // der OrganizerEventEditController-Pfad end-zu-end abgedeckt ist.
+  //
+  // Zwei EVENT_ADMIN-Kontexte reichen: EVENT_ADMIN ist durch den Setup-
+  // Test als Organisator des Events eingetragen, und die Lock-Semantik
+  // ist user-unabhaengig (Konflikt entsteht durch zwei parallele
+  // Sessions, nicht durch zwei verschiedene User). Der Organizer-
+  // Controller prueft isOrganizer, und beide Kontexte bestehen diese
+  // Pruefung.
+  // =========================================================================
+
+  test('Organizer-Route: zwei Kontexte editieren denselben Task, zweiter bekommt 409 + Warn-Toast', async ({ browser }) => {
+    const a = await loginNewContext(browser, EVENT_ADMIN);
+    const b = await loginNewContext(browser, EVENT_ADMIN);
+
+    try {
+      const treeA = new AdminEventTreePage(a.page);
+      const treeB = new AdminEventTreePage(b.page);
+
+      // Direkt auf den Organizer-Editor. DOM (Tree-Widget, Edit-Modal)
+      // ist mit dem Admin-Editor identisch, nur die data-endpoint-*-
+      // URLs zeigen auf /organizer/events/... — AdminEventTreePage-
+      // Selektoren greifen damit unveraendert.
+      await a.page.goto(`/organizer/events/${eventId}/editor`);
+      await b.page.goto(`/organizer/events/${eventId}/editor`);
+      await expect(a.page.locator('#task-tree-editor')).toBeVisible();
+      await expect(b.page.locator('#task-tree-editor')).toBeVisible();
+
+      // Aktueller Titel von Task A nach Test 3.
+      const titleACurrent = `${taskATitle}-VerUp`;
+      await expect(treeA.nodeByTitle(titleACurrent)).toBeVisible();
+      await expect(treeB.nodeByTitle(titleACurrent)).toBeVisible();
+
+      // Beide oeffnen den Edit-Modal fuer denselben Task. Die JS-Seite
+      // fetcht task.version=n in beide Modals.
+      await treeA.openEditModal(titleACurrent);
+      await treeB.openEditModal(titleACurrent);
+
+      // A aendert den Titel und speichert. Request geht ueber
+      // /organizer/events/{id}/tasks/{taskId} -- also durch den
+      // OrganizerEventEditController::updateTaskNode.
+      const titleA = `${taskATitle}-OrgA`;
+      await a.page.locator('#task-edit-modal input[name="title"]').fill(titleA);
+      await a.page.locator('#task-edit-modal-save').click();
+      await expect(treeA.nodeByTitle(titleA)).toBeVisible({ timeout: 15_000 });
+
+      // B aendert mit veralteter Version und versucht zu speichern.
+      const titleB = `${taskATitle}-OrgB`;
+      await b.page.locator('#task-edit-modal input[name="title"]').fill(titleB);
+      await b.page.locator('#task-edit-modal-save').click();
+
+      // Warn-Toast wie in Test 1, aber ausgeloest vom Organizer-
+      // Controller-Pfad.
+      const warnToast = b.page.locator(
+        '.toast.text-bg-warning',
+        { hasText: /zwischenzeitlich.*geaendert/i }
+      );
+      await expect(warnToast).toBeVisible({ timeout: 5000 });
+
+      // Nach handleLockConflict reloadet B die Seite. Im Tree steht
+      // A's neuer Titel, B's Versuch ist nicht persistiert.
+      await expect(treeB.nodeByTitle(titleA)).toBeVisible({ timeout: 15_000 });
+      await expect(treeB.nodeByTitle(titleB)).toHaveCount(0);
+    } finally {
+      await a.context.close();
+      await b.context.close();
+    }
+  });
 });

@@ -317,4 +317,55 @@ final class OptimisticLockInvariantsGapTest extends TestCase
             . 'redirectet werden.'
         );
     }
+
+    // =========================================================================
+    // Bereich G — Reihenfolge Feature-Flag vs. Version-Parsing (FU-G6-2)
+    //
+    // Der Feature-Flag-Check (treeEditorEnabled) muss in jeder der vier
+    // Lock-Actions beider Event-Controller VOR dem Parsen des
+    // version-Felds aus dem Request-Body stehen. Bedeutung:
+    //   - Bei Flag=0 wird die Action mit 404 beendet, bevor irgendein
+    //     Request-Parsing passiert. Das ist der Produktions-Schutz auf
+    //     Strato (events.tree_editor_enabled=0).
+    //   - Drift-Schutz: ein kuenftiges Refactoring darf die Reihenfolge
+    //     nicht unbemerkt drehen.
+    //
+    // Der G4-Security-Review hat diese Reihenfolge als nicht-sicherheits-
+    // relevant klassifiziert (Dimension 8), weil der Lock keine
+    // Authorisierung ist. Der Test ist ein Konsistenz-Guard gegen
+    // Refactoring-Drift, kein Security-Guard.
+    // =========================================================================
+
+    public function test_feature_flag_check_precedes_expected_version_parsing(): void
+    {
+        foreach ([self::ADMIN_CONTROLLER, self::ORGANIZER_CONTROLLER] as $path) {
+            $code = $this->read($path);
+            foreach (self::LOCK_ACTIONS as $action) {
+                $body = $this->methodBody($code, $action);
+                self::assertNotSame('', $body, basename($path) . "::$action fehlt.");
+
+                $flagPos    = strpos($body, 'treeEditorEnabled');
+                $versionPos = strpos($body, "\$data['version']");
+
+                self::assertNotFalse(
+                    $flagPos,
+                    basename($path) . "::$action muss treeEditorEnabled() "
+                    . 'aufrufen (Feature-Flag-Guard).'
+                );
+                self::assertNotFalse(
+                    $versionPos,
+                    basename($path) . "::$action muss \$data['version'] "
+                    . 'aus dem Request-Body lesen (Lock-Token).'
+                );
+                self::assertLessThan(
+                    $versionPos,
+                    $flagPos,
+                    basename($path) . "::$action: treeEditorEnabled()-Check "
+                    . "muss VOR dem Parsen von \$data['version'] stehen. "
+                    . 'Drift-Schutz -- bei Flag=0 soll die Action mit 404 '
+                    . 'enden, bevor irgendein Request-Parsing laeuft.'
+                );
+            }
+        }
+    }
 }

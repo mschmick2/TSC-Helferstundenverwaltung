@@ -85,54 +85,14 @@ Buendelungen:
   Commit `docs(locking): I7e-B Follow-up-Buendel 1` (Docblock von
   `EventTaskRepository::update` und der fuenf mutierenden
   `TaskTreeService`-Methoden aktualisiert).
-- **Test-Breite-Buendel** (Follow-ups q + r): kombinierter
-  `test(locks)`-Commit, ca. 1 Stunde.
+- ~~**Test-Breite-Buendel** (Follow-ups q + r)~~ -- abgeschlossen
+  als Commit `test(locking): I7e-B Follow-up-Buendel 2` (Spec 16
+  um Organizer-Multi-Context-Test erweitert; neuer statischer
+  Invariants-Test fuer Feature-Flag-Reihenfolge in
+  `OptimisticLockInvariantsGapTest`).
 - **Systemisch** (Follow-up s): gehoert zu einem breiter angelegten
   Security-Inkrement zusammen mit Follow-up v, keine eigene Mini-
   Iteration.
-
-### Follow-up q — Organizer-Multi-Context-Test in Spec 16
-
-- **Quelle:** Sanity-Gate I7e-B (G6-Tester-Befund).
-- **Status:** offen, Test-Breite.
-
-**Beschreibung:**
-Alle drei Konflikt-Szenarien in `tests/e2e/specs/16-optimistic-lock.spec.ts`
-nutzen `EVENT_ADMIN` als Login. Der `OrganizerEventEditController`-
-Lock-Pfad ist damit **nur statisch** abgesichert (via
-`OptimisticLockControllerWiringTest`). Ein End-zu-End-Beweis, dass
-der Organizer-Pfad den gleichen Lock nutzt, fehlt.
-
-**Naechster Schritt:**
-Einen vierten Test in Spec 16 ergaenzen: Analog zu Test 1 (Update-
-Konflikt), aber mit `EVENT_ORGANIZER` statt `EVENT_ADMIN`. Einmalig
-bestaetigt, dass die Lock-Verkabelung im Organizer-Pfad identisch
-funktioniert.
-
-**Groessenordnung:** ca. 30 Min. Gemeinsam mit Follow-up r als
-`test(locks)`-Commit.
-
-### Follow-up r — Statische Flag-Reihenfolge-Invariante
-
-- **Quelle:** Sanity-Gate I7e-B (G6-Tester-Befund), explizit als
-  nicht-sicherheitsrelevant im G4-Review (Dimension 8) bestaetigt.
-- **Status:** offen, Drift-Schutz.
-
-**Beschreibung:**
-Die 4 Lock-Actions in `OrganizerEventEditController` und
-`EventAdminController` pruefen `treeEditorEnabled()` vor dem
-`$expectedVersion`-Parsing. Das ist manuell verifiziert, aber nicht
-per Invariante festgehalten. Bei kuenftigem Refactoring koennte
-die Reihenfolge unbemerkt gedreht werden.
-
-**Naechster Schritt:**
-Erweiterung von `OptimisticLockInvariantsGapTest` um einen Test,
-der pro Action prueft, dass die Position von `treeEditorEnabled()`
-im Method-Body kleiner ist als die Position von `$expectedVersion = isset`.
-Regex-Assertion, ca. 10 Zeilen.
-
-**Groessenordnung:** ca. 30 Min. Gemeinsam mit Follow-up q als
-`test(locks)`-Commit.
 
 ### Follow-up s — Rate-Limit auf mutierende Tree-Actions
 
