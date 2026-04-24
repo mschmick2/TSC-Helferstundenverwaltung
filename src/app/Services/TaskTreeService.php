@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Exceptions\BusinessRuleException;
+use App\Exceptions\OptimisticLockException;
 use App\Exceptions\ValidationException;
 use App\Models\EventTask;
 use App\Repositories\EventTaskRepository;
@@ -109,7 +110,7 @@ final class TaskTreeService
         }
     }
 
-    public function move(int $taskId, ?int $newParentId, int $newSortOrder, int $actorId): void
+    public function move(int $taskId, ?int $newParentId, int $newSortOrder, int $actorId, ?int $expectedVersion = null): void
     {
         $this->assertEnabled();
 
@@ -150,7 +151,10 @@ final class TaskTreeService
 
         $this->pdo->beginTransaction();
         try {
-            $this->taskRepo->move($taskId, $newParentId, $newSortOrder);
+            $ok = $this->taskRepo->move($taskId, $newParentId, $newSortOrder, $expectedVersion);
+            if (!$ok && $expectedVersion !== null) {
+                throw new OptimisticLockException($taskId, $expectedVersion);
+            }
 
             $this->auditService->log(
                 action: 'update',
@@ -231,7 +235,7 @@ final class TaskTreeService
         }
     }
 
-    public function convertToGroup(int $taskId, int $actorId): void
+    public function convertToGroup(int $taskId, int $actorId, ?int $expectedVersion = null): void
     {
         $this->assertEnabled();
 
@@ -272,7 +276,10 @@ final class TaskTreeService
 
         $this->pdo->beginTransaction();
         try {
-            $this->taskRepo->convertToGroup($taskId);
+            $ok = $this->taskRepo->convertToGroup($taskId, $expectedVersion);
+            if (!$ok && $expectedVersion !== null) {
+                throw new OptimisticLockException($taskId, $expectedVersion);
+            }
 
             $this->auditService->log(
                 action: 'update',
@@ -296,7 +303,7 @@ final class TaskTreeService
         }
     }
 
-    public function convertToLeaf(int $taskId, array $leafData, int $actorId): void
+    public function convertToLeaf(int $taskId, array $leafData, int $actorId, ?int $expectedVersion = null): void
     {
         $this->assertEnabled();
 
@@ -342,7 +349,10 @@ final class TaskTreeService
 
         $this->pdo->beginTransaction();
         try {
-            $this->taskRepo->convertToLeaf($taskId, $convertData);
+            $ok = $this->taskRepo->convertToLeaf($taskId, $convertData, $expectedVersion);
+            if (!$ok && $expectedVersion !== null) {
+                throw new OptimisticLockException($taskId, $expectedVersion);
+            }
 
             $this->auditService->log(
                 action: 'update',
@@ -375,7 +385,7 @@ final class TaskTreeService
      * gewuenscht, in einem eigenen Inkrement mit explizitem Bestaetigungs-
      * Flow nachgereicht.
      */
-    public function softDeleteNode(int $taskId, int $actorId): void
+    public function softDeleteNode(int $taskId, int $actorId, ?int $expectedVersion = null): void
     {
         $this->assertEnabled();
 
@@ -417,7 +427,10 @@ final class TaskTreeService
             // werden, ob Kinder mit ihrem Parent reaktiviert werden oder nicht. Aktuell
             // (I7a) ohne Restore-Feature unkritisch. Siehe lessons-learned.md
             // Eintrag 2026-04-22 — Soft-Delete vs FK RESTRICT bei Self-References.
-            $this->taskRepo->softDelete($taskId, $actorId);
+            $ok = $this->taskRepo->softDelete($taskId, $actorId, $expectedVersion);
+            if (!$ok && $expectedVersion !== null) {
+                throw new OptimisticLockException($taskId, $expectedVersion);
+            }
 
             $this->auditService->log(
                 action: 'delete',
@@ -452,7 +465,7 @@ final class TaskTreeService
      * Sind keine Felder veraendert, wird weder DB-Write noch Audit-Eintrag
      * ausgeloest.
      */
-    public function updateNode(int $taskId, array $data, int $actorId): void
+    public function updateNode(int $taskId, array $data, int $actorId, ?int $expectedVersion = null): void
     {
         $this->assertEnabled();
 
@@ -502,7 +515,10 @@ final class TaskTreeService
 
         $this->pdo->beginTransaction();
         try {
-            $this->taskRepo->update($taskId, $payload);
+            $ok = $this->taskRepo->update($taskId, $payload, $expectedVersion);
+            if (!$ok && $expectedVersion !== null) {
+                throw new OptimisticLockException($taskId, $expectedVersion);
+            }
 
             $this->auditService->log(
                 action: 'update',

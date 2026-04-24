@@ -334,21 +334,31 @@ class EventTaskRepository
     /**
      * Knoten umhaengen (neuer parent + neuer sort_order in einem Atomar-Update).
      * Validierung (Tiefe, Zyklus, Group-Shape) liegt im Service.
+     *
+     * $expectedVersion (I7e-B.1 Phase 1): wenn gesetzt, wird
+     * `AND version = :version` an den WHERE-Ausdruck gehaengt — bei
+     * Version-Mismatch liefert das UPDATE `rowCount = 0`, die Methode
+     * gibt `false` zurueck. Der Service uebersetzt das in eine
+     * `OptimisticLockException`.
      */
-    public function move(int $taskId, ?int $newParentId, int $newSortOrder): bool
+    public function move(int $taskId, ?int $newParentId, int $newSortOrder, ?int $expectedVersion = null): bool
     {
-        $stmt = $this->pdo->prepare(
-            "UPDATE event_tasks
-             SET parent_task_id = :pid,
-                 sort_order = :ord,
-                 version = version + 1
-             WHERE id = :id AND deleted_at IS NULL"
-        );
-        $stmt->execute([
+        $sql = "UPDATE event_tasks
+                 SET parent_task_id = :pid,
+                     sort_order = :ord,
+                     version = version + 1
+                 WHERE id = :id AND deleted_at IS NULL";
+        $params = [
             'pid' => $newParentId,
             'ord' => $newSortOrder,
             'id'  => $taskId,
-        ]);
+        ];
+        if ($expectedVersion !== null) {
+            $sql .= " AND version = :version";
+            $params['version'] = $expectedVersion;
+        }
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute($params);
         return $stmt->rowCount() > 0;
     }
 
@@ -386,23 +396,29 @@ class EventTaskRepository
      * Knoten in eine Gruppe konvertieren (oder zurueck zu Leaf). Setzt die
      * Shape-Felder atomar, damit die Group-Shape-Constraint nicht zwischen-
      * zeitlich verletzt wird.
+     *
+     * $expectedVersion (I7e-B.1 Phase 1): siehe move().
      */
-    public function convertToGroup(int $taskId): bool
+    public function convertToGroup(int $taskId, ?int $expectedVersion = null): bool
     {
-        $stmt = $this->pdo->prepare(
-            "UPDATE event_tasks
-             SET is_group = 1,
-                 slot_mode = NULL,
-                 start_at = NULL,
-                 end_at = NULL,
-                 capacity_mode = 'unbegrenzt',
-                 capacity_target = NULL,
-                 hours_default = 0,
-                 task_type = 'aufgabe',
-                 version = version + 1
-             WHERE id = :id AND deleted_at IS NULL"
-        );
-        $stmt->execute(['id' => $taskId]);
+        $sql = "UPDATE event_tasks
+                 SET is_group = 1,
+                     slot_mode = NULL,
+                     start_at = NULL,
+                     end_at = NULL,
+                     capacity_mode = 'unbegrenzt',
+                     capacity_target = NULL,
+                     hours_default = 0,
+                     task_type = 'aufgabe',
+                     version = version + 1
+                 WHERE id = :id AND deleted_at IS NULL";
+        $params = ['id' => $taskId];
+        if ($expectedVersion !== null) {
+            $sql .= " AND version = :version";
+            $params['version'] = $expectedVersion;
+        }
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute($params);
         return $stmt->rowCount() > 0;
     }
 
@@ -410,23 +426,23 @@ class EventTaskRepository
      * Gruppe zurueck in Leaf konvertieren. Erwartet Shape-Defaults vom Service
      * (slot_mode, capacity_mode, hours_default usw.), damit die Konvertierung
      * konsistent zu den Validierungen ist.
+     *
+     * $expectedVersion (I7e-B.1 Phase 1): siehe move().
      */
-    public function convertToLeaf(int $taskId, array $leafData): bool
+    public function convertToLeaf(int $taskId, array $leafData, ?int $expectedVersion = null): bool
     {
-        $stmt = $this->pdo->prepare(
-            "UPDATE event_tasks
-             SET is_group = 0,
-                 task_type = :task_type,
-                 slot_mode = :slot_mode,
-                 start_at = :start_at,
-                 end_at = :end_at,
-                 capacity_mode = :capacity_mode,
-                 capacity_target = :capacity_target,
-                 hours_default = :hours_default,
-                 version = version + 1
-             WHERE id = :id AND deleted_at IS NULL"
-        );
-        $stmt->execute([
+        $sql = "UPDATE event_tasks
+                 SET is_group = 0,
+                     task_type = :task_type,
+                     slot_mode = :slot_mode,
+                     start_at = :start_at,
+                     end_at = :end_at,
+                     capacity_mode = :capacity_mode,
+                     capacity_target = :capacity_target,
+                     hours_default = :hours_default,
+                     version = version + 1
+                 WHERE id = :id AND deleted_at IS NULL";
+        $params = [
             'task_type'       => $leafData['task_type'] ?? EventTask::TYPE_AUFGABE,
             'slot_mode'       => $leafData['slot_mode'] ?? EventTask::SLOT_FIX,
             'start_at'        => $leafData['start_at'] ?? null,
@@ -435,17 +451,31 @@ class EventTaskRepository
             'capacity_target' => $leafData['capacity_target'] ?? null,
             'hours_default'   => $leafData['hours_default'] ?? 0.0,
             'id'              => $taskId,
-        ]);
+        ];
+        if ($expectedVersion !== null) {
+            $sql .= " AND version = :version";
+            $params['version'] = $expectedVersion;
+        }
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute($params);
         return $stmt->rowCount() > 0;
     }
 
-    public function softDelete(int $id, int $deletedBy): bool
+    /**
+     * Soft-Delete (setzt deleted_at + deleted_by). $expectedVersion
+     * analog zu den uebrigen mutierenden Methoden (I7e-B.1 Phase 1).
+     */
+    public function softDelete(int $id, int $deletedBy, ?int $expectedVersion = null): bool
     {
-        $stmt = $this->pdo->prepare(
-            "UPDATE event_tasks SET deleted_at = NOW(), deleted_by = :user, version = version + 1
-             WHERE id = :id AND deleted_at IS NULL"
-        );
-        $stmt->execute(['user' => $deletedBy, 'id' => $id]);
+        $sql = "UPDATE event_tasks SET deleted_at = NOW(), deleted_by = :user, version = version + 1
+                 WHERE id = :id AND deleted_at IS NULL";
+        $params = ['user' => $deletedBy, 'id' => $id];
+        if ($expectedVersion !== null) {
+            $sql .= " AND version = :version";
+            $params['version'] = $expectedVersion;
+        }
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute($params);
         return $stmt->rowCount() > 0;
     }
 
