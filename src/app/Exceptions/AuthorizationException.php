@@ -27,7 +27,30 @@ class AuthorizationException extends \RuntimeException
     private array $metadata;
 
     /**
-     * @param array<string, mixed> $metadata
+     * @param string               $message  Fehler-Text fuer Logs und die
+     *                                       Dev-Umgebung. Wird an die
+     *                                       Flash/JSON-Response weitergereicht.
+     * @param string               $reason   Machine-Code fuer die Audit-
+     *                                       Auswertung. Default:
+     *                                       `missing_role`. Aktuell ebenfalls
+     *                                       genutzt: `csrf_invalid`,
+     *                                       `rate_limited`,
+     *                                       `ownership_violation`,
+     *                                       `resource_not_found`.
+     * @param array<string, mixed> $metadata Zusatz-Kontext fuer den Audit-
+     *                                       Eintrag.
+     *
+     * **Wichtig -- keine PII in `$metadata` aufnehmen.** Der Slim-ErrorHandler
+     * (siehe `src/public/index.php` I8 Phase 1) gibt das Array unveraendert
+     * an `AuditService::logAccessDenied` weiter, wo es als JSON in
+     * `audit_log.metadata` landet -- ohne Filterung oder Whitelist. Die
+     * Retention betraegt 10 Jahre (Audit-Log-Regel).
+     *
+     * Erlaubt sind maschinen-lesbare Codes und interne IDs (z.B.
+     * `event_id`, `task_id`, `bucket`, `required_roles`, `limit`,
+     * `window_seconds`). Verboten sind E-Mail-Adressen, Namen,
+     * IP-Adressen (die werden separat via Request-Kontext geloggt),
+     * Request-Body-Inhalte, User-Eingaben und freitext-Begruendungen.
      */
     public function __construct(
         string $message = '',

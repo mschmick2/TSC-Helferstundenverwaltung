@@ -228,6 +228,27 @@ fuehrt.
 
 ---
 
+## Offene Follow-ups nach I8 Sanity-Gate (Modul 6, 2026-04-24)
+
+Aus dem Sanity-Check-Gate zu den I8-Phasen 1+2 (Commits `a2f4695`
+und `d085676`) ergaben sich acht Follow-ups (FU-1 bis FU-8). Die
+komplette Sammlung wird mit dem I8-G9-Dokumentar-Commit ins Register
+uebernommen. Bereits vorab erledigt ist FU-3, weil der Scope
+(Docblock-Konvention + Invariant-Test) klein genug fuer einen
+Micro-Commit war:
+
+- ~~**FU-3** (G5 DSGVO)~~ -- erledigt. Metadata-PII-Konvention fuer
+  `AuthorizationException`-Werfer im `__construct`-Docblock
+  kodifiziert (keine E-Mail-Adressen, Namen, IP-Adressen,
+  Request-Body-Inhalte in `$metadata`, weil der Slim-ErrorHandler
+  das Array ungefiltert ins `audit_log` weiterreicht).
+  Statischer Invariant-Test `AuthorizationExceptionDocblockTest`
+  schuetzt vor einem spaeteren Ausduennen des Hinweises.
+  Siehe Commit `docs(exceptions): FU-3 - Metadata-PII-Hinweis auf
+  AuthorizationException`.
+
+---
+
 ## Bearbeitungsregel
 
 Wenn ein Inkrement-Coder beim Pre-Flight einen der obigen Follow-ups
