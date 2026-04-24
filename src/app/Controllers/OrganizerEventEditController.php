@@ -69,7 +69,8 @@ class OrganizerEventEditController extends BaseController
         private TaskTreeAggregator $treeAggregator,
         private CategoryRepository $categoryRepo,
         private SettingsService $settingsService,
-        private array $settings
+        private array $settings,
+        private ?\App\Services\EditSessionService $editSessionService = null
     ) {
     }
 
@@ -108,18 +109,26 @@ class OrganizerEventEditController extends BaseController
         $organizers       = $this->organizerRepo->listForEvent($eventId);
         $taskCategories   = $this->categoryRepo->findAllActive();
 
+        // Initial-State fuer Edit-Session-Anzeige (Modul 6 I7e-C.1 Phase 2,
+        // Architect-C4). Analog zum Admin-Editor: Server-seitiger Snapshot,
+        // kein Polling-Delay beim ersten Render.
+        $initialSessions = ($this->editSessionService !== null)
+            ? $this->editSessionService->listActiveForEvent($eventId)
+            : [];
+
         return $this->render($response, 'organizer/events/editor', [
-            'title'           => 'Editor: ' . $event->getTitle(),
-            'user'            => $user,
-            'settings'        => $this->settings,
-            'event'           => $event,
-            'treeData'        => $treeData,
-            'flatList'        => $flatList,
-            'summary'         => $summary,
-            'organizers'      => $organizers,
-            'taskCategories'  => $taskCategories,
-            'csrfTokenString' => $_SESSION['csrf_token'] ?? '',
-            'breadcrumbs'     => [
+            'title'            => 'Editor: ' . $event->getTitle(),
+            'user'             => $user,
+            'settings'         => $this->settings,
+            'event'            => $event,
+            'treeData'         => $treeData,
+            'flatList'         => $flatList,
+            'summary'          => $summary,
+            'organizers'       => $organizers,
+            'taskCategories'   => $taskCategories,
+            'csrfTokenString'  => $_SESSION['csrf_token'] ?? '',
+            'initialSessions'  => $initialSessions,
+            'breadcrumbs'      => [
                 ['label' => 'Dashboard', 'url' => '/'],
                 ['label' => 'Als Organisator', 'url' => '/organizer/events'],
                 ['label' => $event->getTitle() . ' — Editor'],

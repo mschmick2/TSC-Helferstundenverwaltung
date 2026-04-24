@@ -56,7 +56,8 @@ class EventAdminController extends BaseController
         private ?TaskTreeService $treeService = null,
         private ?TaskTreeAggregator $treeAggregator = null,
         private ?EventTaskAssignmentRepository $assignmentRepo = null,
-        private ?SettingsService $settingsService = null
+        private ?SettingsService $settingsService = null,
+        private ?\App\Services\EditSessionService $editSessionService = null
     ) {
     }
 
@@ -262,6 +263,13 @@ class EventAdminController extends BaseController
             $taskCategories   = $this->categoryRepo->findAllActive();
         }
 
+        // Initial-State fuer Edit-Session-Anzeige (Modul 6 I7e-C.1 Phase 2).
+        // Auch der Modal-Editor unter /admin/events/{id}/edit nutzt den
+        // Tree-Widget-JS-Kern; damit erhaelt er den gleichen Initial-State.
+        $initialSessions = ($this->editSessionService !== null)
+            ? $this->editSessionService->listActiveForEvent($id)
+            : [];
+
         return $this->render($response, 'admin/events/edit', [
             'title' => 'Event bearbeiten',
             'user' => $user,
@@ -272,6 +280,7 @@ class EventAdminController extends BaseController
             'treeEditorEnabled' => $treeEditorEnabled,
             'treeData' => $treeData,
             'taskCategories' => $taskCategories,
+            'initialSessions' => $initialSessions,
             'breadcrumbs' => [
                 ['label' => 'Dashboard', 'url' => '/'],
                 ['label' => 'Events', 'url' => '/admin/events'],
@@ -850,18 +859,27 @@ class EventAdminController extends BaseController
         $organizers       = $this->organizerRepo->listForEvent($eventId);
         $taskCategories   = $this->categoryRepo->findAllActive();
 
+        // Initial-State fuer Edit-Session-Anzeige (Modul 6 I7e-C.1 Phase 2,
+        // Architect-C4): Server-seitig gerenderter Snapshot der aktiven
+        // Sessions, damit der erste UI-Render ohne Polling-Delay auskommt.
+        // EditSessionService liefert bei deaktiviertem Flag bereits [].
+        $initialSessions = ($this->editSessionService !== null)
+            ? $this->editSessionService->listActiveForEvent($eventId)
+            : [];
+
         return $this->render($response, 'admin/events/editor', [
-            'title'           => 'Editor: ' . $event->getTitle(),
-            'user'            => $user,
-            'settings'        => $this->settings,
-            'event'           => $event,
-            'treeData'        => $treeData,
-            'flatList'        => $flatList,
-            'summary'         => $summary,
-            'organizers'      => $organizers,
-            'taskCategories'  => $taskCategories,
-            'csrfTokenString' => $_SESSION['csrf_token'] ?? '',
-            'breadcrumbs'     => [
+            'title'            => 'Editor: ' . $event->getTitle(),
+            'user'             => $user,
+            'settings'         => $this->settings,
+            'event'            => $event,
+            'treeData'         => $treeData,
+            'flatList'         => $flatList,
+            'summary'          => $summary,
+            'organizers'       => $organizers,
+            'taskCategories'   => $taskCategories,
+            'csrfTokenString'  => $_SESSION['csrf_token'] ?? '',
+            'initialSessions'  => $initialSessions,
+            'breadcrumbs'      => [
                 ['label' => 'Dashboard', 'url' => '/'],
                 ['label' => 'Events', 'url' => '/admin/events'],
                 ['label' => $event->getTitle(), 'url' => '/admin/events/' . $eventId],

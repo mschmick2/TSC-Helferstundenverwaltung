@@ -70,4 +70,42 @@ final class EditSessionView
     {
         return $this->durationSeconds;
     }
+
+    /**
+     * Formt eine Liste von EditSessionView-DTOs in JSON-taugliche Arrays.
+     * Filtert die Session des aktuellen Viewers heraus und dedupliziert
+     * pro user_id (Multi-Tab desselben Users wird zu einem Eintrag
+     * zusammengefasst -- R2 aus I7e-C G1).
+     *
+     * Wird sowohl vom API-Controller als auch von den Editor-Views
+     * (Initial-State-Rendering, C4) verwendet.
+     *
+     * @param EditSessionView[] $views
+     * @return array<int, array<string, mixed>>
+     */
+    public static function toJsonReadyArray(array $views, int $viewerUserId): array
+    {
+        $out = [];
+        $seenUserIds = [];
+        foreach ($views as $view) {
+            $uid = $view->getUserId();
+            if ($uid === $viewerUserId) {
+                continue;
+            }
+            if (isset($seenUserIds[$uid])) {
+                continue;
+            }
+            $seenUserIds[$uid] = true;
+
+            $out[] = [
+                'id'               => $view->getSessionId(),
+                'user_id'          => $uid,
+                'display_name'     => $view->getDisplayName(),
+                'started_at'       => $view->getStartedAt(),
+                'last_seen_at'     => $view->getLastSeenAt(),
+                'duration_seconds' => $view->getDurationSeconds(),
+            ];
+        }
+        return $out;
+    }
 }

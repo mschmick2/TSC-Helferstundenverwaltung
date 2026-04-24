@@ -249,6 +249,15 @@ return [
         );
     },
 
+    \App\Controllers\EditSessionController::class => function (ContainerInterface $c): \App\Controllers\EditSessionController {
+        return new \App\Controllers\EditSessionController(
+            $c->get(\App\Services\EditSessionService::class),
+            $c->get(EventRepository::class),
+            $c->get(EventOrganizerRepository::class),
+            $c->get(SettingsService::class),
+        );
+    },
+
     // --- Modul 6 I7c: Template-Aufgabenbaum ---------------------------------
     \App\Services\TemplateTaskTreeService::class => function (ContainerInterface $c): \App\Services\TemplateTaskTreeService {
         return new \App\Services\TemplateTaskTreeService(
@@ -605,7 +614,8 @@ return [
             $c->get(\App\Services\TaskTreeService::class),
             $c->get(\App\Services\TaskTreeAggregator::class),
             $c->get(EventTaskAssignmentRepository::class),
-            $c->get(SettingsService::class)
+            $c->get(SettingsService::class),
+            $c->get(\App\Services\EditSessionService::class)
         );
     },
 
@@ -683,7 +693,8 @@ return [
             $c->get(\App\Services\TaskTreeAggregator::class),
             $c->get(CategoryRepository::class),
             $c->get(\App\Services\SettingsService::class),
-            $c->get('settings')
+            $c->get('settings'),
+            $c->get(\App\Services\EditSessionService::class)
         );
     },
 ];

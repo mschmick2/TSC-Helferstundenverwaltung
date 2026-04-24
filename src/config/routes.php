@@ -8,6 +8,7 @@ use App\Controllers\AuthController;
 use App\Controllers\CategoryController;
 use App\Controllers\CronController;
 use App\Controllers\DashboardController;
+use App\Controllers\EditSessionController;
 use App\Controllers\EventAdminController;
 use App\Controllers\EventTemplateController;
 use App\Controllers\IcalController;
@@ -71,6 +72,20 @@ return function (App $app): void {
 
         // API: Ungelesene Dialog-Nachrichten Anzahl
         $group->get('/api/unread-dialog-count', [DashboardController::class, 'unreadCount']);
+
+        // API: Edit-Session-Tracking (Modul 6 I7e-C.1 Phase 2). Permission
+        // wird pro Action event-scoped geprueft (Admin ODER Organizer via
+        // canEditEvent). Keine RoleMiddleware hier, weil die Organizer-
+        // Rolle reine Event-Mitgliedschaft ist, nicht ein globales
+        // Berechtigungs-Flag.
+        $group->post('/api/edit-sessions/start',
+            [EditSessionController::class, 'start']);
+        $group->post('/api/edit-sessions/{id:[0-9]+}/heartbeat',
+            [EditSessionController::class, 'heartbeat']);
+        $group->post('/api/edit-sessions/{id:[0-9]+}/close',
+            [EditSessionController::class, 'close']);
+        $group->get('/api/edit-sessions',
+            [EditSessionController::class, 'listForEvent']);
 
         // Logout
         $group->get('/logout', [AuthController::class, 'logout']);

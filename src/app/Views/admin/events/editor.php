@@ -58,6 +58,8 @@ $categoriesJson = json_encode(
     Editor: <?= ViewHelper::e($event->getTitle()) ?>
 </h1>
 
+<?php include __DIR__ . '/../../components/_edit_sessions_indicator.php'; ?>
+
 <div class="row g-3">
 
     <div class="col-12 col-lg-8">

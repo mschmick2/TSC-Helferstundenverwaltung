@@ -109,4 +109,23 @@ abstract class BaseController
             'Sie haben keine Berechtigung, dieses Event zu bearbeiten.'
         );
     }
+
+    /**
+     * Bool-Variante zu assertEventEditPermission. Gleiches Kriterium
+     * (Admin-Rolle ODER Organizer-Membership), aber ohne Exception.
+     * Fuer API-Endpunkte, die bei fehlender Berechtigung einen 403-Status
+     * zurueckgeben statt eine Authorization-Exception durchreichen wollen.
+     *
+     * Eingefuehrt in Modul 6 I7e-C.1 Phase 2 fuer EditSessionController.
+     */
+    protected function canEditEvent(
+        User $user,
+        int $eventId,
+        EventOrganizerRepository $organizerRepo
+    ): bool {
+        if ($user->hasRole('event_admin') || $user->hasRole('administrator')) {
+            return true;
+        }
+        return $organizerRepo->isOrganizer($eventId, $user->getId());
+    }
 }

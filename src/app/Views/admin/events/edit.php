@@ -226,6 +226,8 @@ if ($treeEditorEnabled):
 
 <hr class="my-4">
 
+<?php include __DIR__ . '/../../components/_edit_sessions_indicator.php'; ?>
+
 <section class="task-tree-editor"
          id="task-tree-editor"
          data-event-id="<?= $eventIdForTree ?>"
