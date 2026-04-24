@@ -119,4 +119,62 @@ class AuditService
             description: "Einstellung geändert: {$key}"
         );
     }
+
+    /**
+     * Authorization-Denial protokollieren (Modul 6 I8 Phase 1, Follow-up v).
+     *
+     * Semantik: ein authentifizierter User hat eine Aktion angefordert,
+     * fuer die er keine Berechtigung hat. Der Eintrag wird ueber die
+     * action-ENUM-Zeile 'access_denied' geschrieben (seit Migration 011).
+     *
+     * Bewusst try/catch-geschuetzt -- ein fehlendes Audit-Log darf die
+     * App-Verfuegbarkeit nicht blockieren (Architect-Entscheidung aus
+     * I8 G1 Q5, analog zum Security-Prinzip "Observability faellt dem
+     * Service nicht in den Ruecken"). Bei DB-Fehler wird per error_log
+     * gemeldet, die Methode kehrt trotzdem normal zurueck.
+     *
+     * Die metadata enthaelt `route`, `method`, `reason` immer, plus
+     * optionale Zusatz-Daten -- bewusst OHNE Request-Body und OHNE
+     * Query-String (DSGVO-Datenminimierung).
+     *
+     * @param string               $route    Request-Path (ohne Query-String).
+     * @param string               $method   HTTP-Method in Grossbuchstaben (GET/POST/...).
+     * @param string               $reason   Machine-Code: missing_role,
+     *                                       not_organizer, rate_limited,
+     *                                       csrf_invalid, resource_not_found.
+     * @param array<string, mixed> $metadata Optionale zusaetzliche Daten.
+     */
+    public function logAccessDenied(
+        string $route,
+        string $method,
+        string $reason,
+        array $metadata = []
+    ): void {
+        try {
+            $this->log(
+                action: 'access_denied',
+                tableName: null,
+                recordId: null,
+                oldValues: null,
+                newValues: null,
+                description: 'Authorization denied: ' . $reason,
+                entryNumber: null,
+                metadata: array_merge(
+                    [
+                        'route'  => $route,
+                        'method' => strtoupper($method),
+                        'reason' => $reason,
+                    ],
+                    $metadata
+                )
+            );
+        } catch (\Throwable $e) {
+            error_log(sprintf(
+                'AuditService::logAccessDenied failed: %s (route=%s reason=%s)',
+                $e->getMessage(),
+                $route,
+                $reason
+            ));
+        }
+    }
 }

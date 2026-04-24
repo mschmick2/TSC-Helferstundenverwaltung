@@ -71,7 +71,74 @@ $app->addRoutingMiddleware();
 
 // Error Middleware
 $displayErrors = $container->get('settings')['app']['debug'] ?? false;
-$app->addErrorMiddleware($displayErrors, true, true);
+$errorMiddleware = $app->addErrorMiddleware($displayErrors, true, true);
+
+// Modul 6 I8 Phase 1 (Follow-up v): AuthorizationException-Handler. Jede
+// unauthorisierte Controller-/Service-Aktion, die diese Exception wirft
+// (z.B. BaseController::assertEventEditPermission, WorkflowService,
+// EventAssignmentService), schreibt einen audit_log-Eintrag mit
+// action='access_denied'. Der Handler gibt danach die passende Response
+// zurueck -- HTML-Clients bekommen Redirect mit Flash, JSON-Clients
+// (Accept: application/json) bekommen eine strukturierte 403-Response.
+$errorMiddleware->setErrorHandler(
+    \App\Exceptions\AuthorizationException::class,
+    function (
+        \Psr\Http\Message\ServerRequestInterface $request,
+        \Throwable $exception
+    ) use ($container) {
+        /** @var \App\Services\AuditService $auditService */
+        $auditService = $container->get(\App\Services\AuditService::class);
+        /** @var \App\Exceptions\AuthorizationException $exception */
+        $auditService->logAccessDenied(
+            route: $request->getUri()->getPath(),
+            method: $request->getMethod(),
+            reason: $exception->getReason(),
+            metadata: $exception->getMetadata()
+        );
+
+        $wantsJson = str_contains(
+            $request->getHeaderLine('Accept'),
+            'application/json'
+        );
+
+        $response = new \Slim\Psr7\Response();
+
+        if ($wantsJson) {
+            $response->getBody()->write(json_encode(
+                [
+                    'error'   => 'access_denied',
+                    'reason'  => $exception->getReason(),
+                    'message' => $exception->getMessage()
+                        ?: 'Sie haben keine Berechtigung fuer diese Aktion.',
+                ],
+                JSON_UNESCAPED_UNICODE
+            ));
+            return $response
+                ->withHeader('Content-Type', 'application/json')
+                ->withStatus(403);
+        }
+
+        // HTML-Client: Flash + Redirect zur Startseite (wie bisher in
+        // RoleMiddleware). Das bleibt der Bestand-UX treu -- der Nutzer
+        // sieht eine freundliche Meldung und landet auf einer Seite,
+        // die er bedienen darf.
+        $message = $exception->getMessage()
+            ?: 'Sie haben keine Berechtigung fuer diese Aktion.';
+        \App\Helpers\ViewHelper::flash('danger', $message);
+        $basePath = \App\Helpers\ViewHelper::getBasePath();
+        return $response
+            ->withHeader('Location', $basePath . '/')
+            ->withStatus(302);
+    }
+);
+
+// Modul 6 I8 Phase 1: RoleMiddleware wird in routes.php per
+// `new RoleMiddleware([...])` mit Rollen-Parametern instanziiert, daher
+// nicht ueber den Container. Der AuditService wird einmalig im Bootstrap
+// statisch gesetzt (Details im RoleMiddleware-Docblock).
+\App\Middleware\RoleMiddleware::setAuditService(
+    $container->get(\App\Services\AuditService::class)
+);
 
 // Security-Header-Middleware: als letztes hinzufuegen -> laeuft als ERSTES und
 // setzt CSP/HSTS/Permissions-Policy auf JEDE Response, auch auf Error- und

@@ -482,8 +482,10 @@ return [
         );
     },
 
-    CsrfMiddleware::class => function (): CsrfMiddleware {
-        return new CsrfMiddleware();
+    CsrfMiddleware::class => function (ContainerInterface $c): CsrfMiddleware {
+        // Modul 6 I8 Phase 1: AuditService-Injection fuer CSRF-Failure-
+        // Logging (action='access_denied', reason='csrf_invalid').
+        return new CsrfMiddleware($c->get(AuditService::class));
     },
 
     OpportunisticSchedulerMiddleware::class => function (ContainerInterface $c): OpportunisticSchedulerMiddleware {

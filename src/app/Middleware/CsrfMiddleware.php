@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Middleware;
 
 use App\Helpers\SecurityHelper;
+use App\Services\AuditService;
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
 use Psr\Http\Server\MiddlewareInterface;
@@ -12,10 +13,21 @@ use Psr\Http\Server\RequestHandlerInterface as Handler;
 use Slim\Psr7\Response as SlimResponse;
 
 /**
- * CSRF-Schutz-Middleware
+ * CSRF-Schutz-Middleware.
+ *
+ * Modul 6 I8 Phase 1: bei CSRF-Failure (ungueltiges Token) wird ein
+ * audit_log-Eintrag mit action='access_denied' und reason='csrf_invalid'
+ * geschrieben, bevor die 403-Response rausgeht. Der AuditService ist
+ * nullable-konstruierbar -- fuer Test-Kontexte ohne Container-Setup
+ * bleibt der alte CSRF-Verhalten erhalten.
  */
 class CsrfMiddleware implements MiddlewareInterface
 {
+    public function __construct(
+        private readonly ?AuditService $auditService = null,
+    ) {
+    }
+
     public function process(Request $request, Handler $handler): Response
     {
         // CSRF-Token generieren (für GET-Requests / Formulare)
@@ -37,6 +49,20 @@ class CsrfMiddleware implements MiddlewareInterface
         }
 
         if (!SecurityHelper::validateCsrfToken($token)) {
+            // I8 Phase 1 / Follow-up v: CSRF-Failure als Authorization-
+            // Denial auditieren. Audit ist try/catch-geschuetzt (in
+            // logAccessDenied), faellt also nicht auf die Nase wenn die
+            // DB gerade nicht erreichbar ist. Bei nicht-authentifizierten
+            // Requests (z.B. abgelaufene Session) schreibt der Eintrag
+            // user_id=NULL -- dokumentiert in AuditService-Docblock.
+            if ($this->auditService !== null) {
+                $this->auditService->logAccessDenied(
+                    route: $request->getUri()->getPath(),
+                    method: $request->getMethod(),
+                    reason: 'csrf_invalid'
+                );
+            }
+
             $basePath = \App\Helpers\ViewHelper::getBasePath();
             $response = new SlimResponse();
             $html = '<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8">'
