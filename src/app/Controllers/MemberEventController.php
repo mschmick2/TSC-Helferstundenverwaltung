@@ -218,7 +218,14 @@ class MemberEventController extends BaseController
         try {
             $this->assignmentService->withdrawSelf($id, (int) $user->getId());
             ViewHelper::flash('success', 'Zusage zurueckgezogen.');
-        } catch (AuthorizationException | BusinessRuleException $e) {
+        } catch (AuthorizationException $e) {
+            return $this->handleAuthorizationDenial(
+                $e,
+                $request,
+                $response,
+                '/my-events'
+            );
+        } catch (BusinessRuleException $e) {
             ViewHelper::flash('danger', $e->getMessage());
         }
 
@@ -247,7 +254,14 @@ class MemberEventController extends BaseController
                 $reason
             );
             ViewHelper::flash('success', 'Storno-Anfrage gestellt. Organisator wird benachrichtigt.');
-        } catch (AuthorizationException | BusinessRuleException $e) {
+        } catch (AuthorizationException $e) {
+            return $this->handleAuthorizationDenial(
+                $e,
+                $request,
+                $response,
+                '/my-events'
+            );
+        } catch (BusinessRuleException $e) {
             ViewHelper::flash('danger', $e->getMessage());
         }
 

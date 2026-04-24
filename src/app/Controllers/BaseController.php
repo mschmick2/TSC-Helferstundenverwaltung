@@ -7,6 +7,7 @@ namespace App\Controllers;
 use App\Exceptions\AuthorizationException;
 use App\Models\User;
 use App\Repositories\EventOrganizerRepository;
+use App\Services\AuditService;
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
 use Slim\Routing\RouteContext;
@@ -16,6 +17,24 @@ use Slim\Routing\RouteContext;
  */
 abstract class BaseController
 {
+    private static ?AuditService $auditService = null;
+
+    /**
+     * Bootstrap-Setter fuer den AuditService, einmalig in index.php nach
+     * Container-Aufbau gerufen. Analog zu RoleMiddleware::setAuditService
+     * (Modul 6 I8 Phase 1).
+     *
+     * Hintergrund: BaseController ist abstract und seine 15+ Subclasses
+     * haben eigene Konstruktoren ohne parent::__construct(). Ein statischer
+     * Setter vermeidet eine invasive Konstruktor-Kaskade und haelt die
+     * Audit-Anbindung fuer den handleAuthorizationDenial-Helper aus I8
+     * G4-ROT-Fix (FU-I8-G4-0) kompakt.
+     */
+    public static function setAuditService(AuditService $auditService): void
+    {
+        self::$auditService = $auditService;
+    }
+
     /**
      * Route-Argumente aus dem Request extrahieren
      */
@@ -127,5 +146,50 @@ abstract class BaseController
             return true;
         }
         return $organizerRepo->isOrganizer($eventId, $user->getId());
+    }
+
+    /**
+     * Zentrale Behandlung einer AuthorizationException aus Controller-
+     * Logik: zuerst logAccessDenied mit Kontext aus Request und Exception,
+     * dann Flash + Redirect zum uebergebenen Ziel.
+     *
+     * Hintergrund (Modul 6 I8 G4-ROT-Fix, FU-I8-G4-0): viele Controller-
+     * Methoden fangen AuthorizationException selbst ab und bubbeln sie
+     * nicht zum Slim-ErrorHandler. Ohne diesen Helper wuerde fuer diese
+     * Pfade keine `access_denied`-Audit-Zeile geschrieben -- I8 Phase 1
+     * haette seinen Haupt-Zweck (Follow-up v aus CLAUDE.md §8 Nr. 5)
+     * verfehlt. Der Helper gleicht das Audit-Verhalten fuer alle
+     * Catch-Stellen an, ohne das Bestands-UX (kontextueller Redirect
+     * + Flash) zu aendern.
+     *
+     * Der AuditService wird ueber den statischen Bootstrap-Setter
+     * bereitgestellt; wird er nie gesetzt (z.B. im Unit-Test ohne
+     * Container-Setup), laeuft der Helper stumm weiter -- Flash und
+     * Redirect funktionieren weiterhin.
+     *
+     * @param AuthorizationException $e              Exception aus Service/Helper.
+     * @param Request                $request        Aktueller Request (Route/Method/URI).
+     * @param Response               $response       PSR-7-Response-Basis fuer den Redirect.
+     * @param string                 $redirectTarget Wohin nach dem Redirect.
+     * @param string                 $flashType      Flash-Kategorie (danger|error|warning|info).
+     */
+    protected function handleAuthorizationDenial(
+        AuthorizationException $e,
+        Request $request,
+        Response $response,
+        string $redirectTarget,
+        string $flashType = 'danger'
+    ): Response {
+        if (self::$auditService !== null) {
+            self::$auditService->logAccessDenied(
+                route: $request->getUri()->getPath(),
+                method: $request->getMethod(),
+                reason: $e->getReason(),
+                metadata: $e->getMetadata()
+            );
+        }
+
+        \App\Helpers\ViewHelper::flash($flashType, $e->getMessage());
+        return $this->redirect($response, $redirectTarget);
     }
 }

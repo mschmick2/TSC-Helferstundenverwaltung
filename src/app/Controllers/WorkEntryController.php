@@ -169,8 +169,7 @@ class WorkEntryController extends BaseController
             }
             return $this->redirect($response, '/entries/create');
         } catch (AuthorizationException $e) {
-            ViewHelper::flash('error', $e->getMessage());
-            return $this->redirect($response, '/entries');
+            return $this->handleAuthorizationDenial($e, $request, $response, '/entries', 'error');
         }
     }
 
@@ -565,7 +564,15 @@ class WorkEntryController extends BaseController
         try {
             $this->workflowService->submit($entry, $user);
             ViewHelper::flash('success', 'Antrag eingereicht.');
-        } catch (BusinessRuleException | AuthorizationException $e) {
+        } catch (AuthorizationException $e) {
+            return $this->handleAuthorizationDenial(
+                $e,
+                $request,
+                $response,
+                '/entries/' . $entry->getId(),
+                'error'
+            );
+        } catch (BusinessRuleException $e) {
             ViewHelper::flash('error', $e->getMessage());
         }
 
@@ -589,7 +596,15 @@ class WorkEntryController extends BaseController
         try {
             $this->workflowService->withdraw($entry, $user);
             ViewHelper::flash('success', 'Antrag zurückgezogen.');
-        } catch (BusinessRuleException | AuthorizationException $e) {
+        } catch (AuthorizationException $e) {
+            return $this->handleAuthorizationDenial(
+                $e,
+                $request,
+                $response,
+                '/entries/' . $entry->getId(),
+                'error'
+            );
+        } catch (BusinessRuleException $e) {
             ViewHelper::flash('error', $e->getMessage());
         }
 
@@ -613,7 +628,15 @@ class WorkEntryController extends BaseController
         try {
             $this->workflowService->cancel($entry, $user);
             ViewHelper::flash('success', 'Antrag storniert.');
-        } catch (BusinessRuleException | AuthorizationException $e) {
+        } catch (AuthorizationException $e) {
+            return $this->handleAuthorizationDenial(
+                $e,
+                $request,
+                $response,
+                '/entries/' . $entry->getId(),
+                'error'
+            );
+        } catch (BusinessRuleException $e) {
             ViewHelper::flash('error', $e->getMessage());
         }
 
@@ -637,7 +660,15 @@ class WorkEntryController extends BaseController
         try {
             $this->workflowService->reactivate($entry, $user);
             ViewHelper::flash('success', 'Antrag reaktiviert.');
-        } catch (BusinessRuleException | AuthorizationException $e) {
+        } catch (AuthorizationException $e) {
+            return $this->handleAuthorizationDenial(
+                $e,
+                $request,
+                $response,
+                '/entries/' . $entry->getId(),
+                'error'
+            );
+        } catch (BusinessRuleException $e) {
             ViewHelper::flash('error', $e->getMessage());
         }
 
@@ -758,7 +789,15 @@ class WorkEntryController extends BaseController
         try {
             $this->workflowService->approve($entry, $user);
             ViewHelper::flash('success', 'Antrag freigegeben.');
-        } catch (BusinessRuleException | AuthorizationException $e) {
+        } catch (AuthorizationException $e) {
+            return $this->handleAuthorizationDenial(
+                $e,
+                $request,
+                $response,
+                '/entries/' . $entry->getId(),
+                'error'
+            );
+        } catch (BusinessRuleException $e) {
             ViewHelper::flash('error', $e->getMessage());
         }
 
@@ -785,7 +824,15 @@ class WorkEntryController extends BaseController
         try {
             $this->workflowService->reject($entry, $user, $reason);
             ViewHelper::flash('success', 'Antrag abgelehnt.');
-        } catch (BusinessRuleException | AuthorizationException $e) {
+        } catch (AuthorizationException $e) {
+            return $this->handleAuthorizationDenial(
+                $e,
+                $request,
+                $response,
+                '/entries/' . $entry->getId(),
+                'error'
+            );
+        } catch (BusinessRuleException $e) {
             ViewHelper::flash('error', $e->getMessage());
         }
 
@@ -812,7 +859,15 @@ class WorkEntryController extends BaseController
         try {
             $this->workflowService->returnForRevision($entry, $user, $reason);
             ViewHelper::flash('success', 'Antrag zur Klärung zurückgegeben.');
-        } catch (BusinessRuleException | AuthorizationException $e) {
+        } catch (AuthorizationException $e) {
+            return $this->handleAuthorizationDenial(
+                $e,
+                $request,
+                $response,
+                '/entries/' . $entry->getId(),
+                'error'
+            );
+        } catch (BusinessRuleException $e) {
             ViewHelper::flash('error', $e->getMessage());
         }
 
@@ -839,7 +894,15 @@ class WorkEntryController extends BaseController
         try {
             $this->workflowService->returnToDraft($entry, $user, $reason);
             ViewHelper::flash('success', 'Antrag zur Überarbeitung an das Mitglied zurückgegeben.');
-        } catch (BusinessRuleException | AuthorizationException $e) {
+        } catch (AuthorizationException $e) {
+            return $this->handleAuthorizationDenial(
+                $e,
+                $request,
+                $response,
+                '/review',
+                'error'
+            );
+        } catch (BusinessRuleException $e) {
             ViewHelper::flash('error', $e->getMessage());
         }
 
@@ -867,7 +930,15 @@ class WorkEntryController extends BaseController
         try {
             $this->workflowService->correct($entry, $user, $newHours, $reason);
             ViewHelper::flash('success', 'Korrektur durchgeführt.');
-        } catch (BusinessRuleException | AuthorizationException $e) {
+        } catch (AuthorizationException $e) {
+            return $this->handleAuthorizationDenial(
+                $e,
+                $request,
+                $response,
+                '/entries/' . $entry->getId(),
+                'error'
+            );
+        } catch (BusinessRuleException $e) {
             ViewHelper::flash('error', $e->getMessage());
         }
 

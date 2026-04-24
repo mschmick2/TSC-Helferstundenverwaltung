@@ -140,6 +140,14 @@ $errorMiddleware->setErrorHandler(
     $container->get(\App\Services\AuditService::class)
 );
 
+// Modul 6 I8 G4-ROT-Fix (FU-I8-G4-0): viele Controller-Methoden catchen
+// AuthorizationException selbst. BaseController::handleAuthorizationDenial
+// schliesst die Audit-Luecke zentral und braucht den AuditService -- analog
+// zum RoleMiddleware-Setter wird er einmalig im Bootstrap gesetzt.
+\App\Controllers\BaseController::setAuditService(
+    $container->get(\App\Services\AuditService::class)
+);
+
 // Security-Header-Middleware: als letztes hinzufuegen -> laeuft als ERSTES und
 // setzt CSP/HSTS/Permissions-Policy auf JEDE Response, auch auf Error- und
 // Redirect-Responses. Entspricht CLAUDE.md §8 Nr. 3.

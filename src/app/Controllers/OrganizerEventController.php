@@ -154,7 +154,14 @@ class OrganizerEventController extends BaseController
         try {
             $this->assignmentService->approveTime($id, (int) $user->getId());
             ViewHelper::flash('success', 'Zeitfenster bestaetigt.');
-        } catch (AuthorizationException | BusinessRuleException $e) {
+        } catch (AuthorizationException $e) {
+            return $this->handleAuthorizationDenial(
+                $e,
+                $request,
+                $response,
+                '/organizer/events'
+            );
+        } catch (BusinessRuleException $e) {
             ViewHelper::flash('danger', $e->getMessage());
         }
 
@@ -175,7 +182,14 @@ class OrganizerEventController extends BaseController
         try {
             $this->assignmentService->rejectTime($id, (int) $user->getId(), $reason);
             ViewHelper::flash('success', 'Zeitfenster abgelehnt.');
-        } catch (AuthorizationException | BusinessRuleException $e) {
+        } catch (AuthorizationException $e) {
+            return $this->handleAuthorizationDenial(
+                $e,
+                $request,
+                $response,
+                '/organizer/events'
+            );
+        } catch (BusinessRuleException $e) {
             ViewHelper::flash('danger', $e->getMessage());
         }
 
@@ -194,7 +208,14 @@ class OrganizerEventController extends BaseController
         try {
             $this->assignmentService->approveCancellation($id, (int) $user->getId());
             ViewHelper::flash('success', 'Storno freigegeben.');
-        } catch (AuthorizationException | BusinessRuleException $e) {
+        } catch (AuthorizationException $e) {
+            return $this->handleAuthorizationDenial(
+                $e,
+                $request,
+                $response,
+                '/organizer/events'
+            );
+        } catch (BusinessRuleException $e) {
             ViewHelper::flash('danger', $e->getMessage());
         }
 
@@ -215,7 +236,14 @@ class OrganizerEventController extends BaseController
         try {
             $this->assignmentService->rejectCancellation($id, (int) $user->getId(), $reason);
             ViewHelper::flash('success', 'Storno-Anfrage abgelehnt.');
-        } catch (AuthorizationException | BusinessRuleException $e) {
+        } catch (AuthorizationException $e) {
+            return $this->handleAuthorizationDenial(
+                $e,
+                $request,
+                $response,
+                '/organizer/events'
+            );
+        } catch (BusinessRuleException $e) {
             ViewHelper::flash('danger', $e->getMessage());
         }
 

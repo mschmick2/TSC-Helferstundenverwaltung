@@ -56,8 +56,12 @@ VALUES
      'Maximale Tree-Action-Requests pro Fenster und User (Modul 6 I8). Phase 2 liest den Wert.', FALSE),
     ('security.tree_action_rate_limit_window', '60', 'integer',
      'Rate-Limit-Fenster fuer Tree-Actions in Sekunden. Default 60 s.', FALSE),
-    ('security.edit_session_heartbeat_rate_limit_max', '4', 'integer',
-     'Maximale Edit-Session-Heartbeats pro Fenster und User. Polling-Intervall ist 30 s, 4 erlaubt 100 %% Buffer.', FALSE),
+    -- Heartbeat-Default: 8/min (30-s-Polling = 2/min Normal, 4x Puffer fuer
+    -- Netzwerk-Hiccups und clientseitige Retry-Loops). Wurde nach G4-Review
+    -- I8 von 4/min auf 8/min angehoben (FU-I8-G4-3); 4x Puffer vermeidet
+    -- user-sichtbare Session-Abbrueche bei flakigem Netzwerk.
+    ('security.edit_session_heartbeat_rate_limit_max', '8', 'integer',
+     'Maximale Edit-Session-Heartbeats pro Fenster und User. Polling-Intervall ist 30 s, 8 erlaubt 4x Puffer.', FALSE),
     ('security.edit_session_heartbeat_rate_limit_window', '60', 'integer',
      'Rate-Limit-Fenster fuer Heartbeats in Sekunden. Default 60 s.', FALSE),
     ('security.edit_session_other_rate_limit_max', '10', 'integer',
