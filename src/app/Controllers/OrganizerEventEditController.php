@@ -7,6 +7,7 @@ namespace App\Controllers;
 use App\Controllers\Concerns\EventTreeActionHelpers;
 use App\Controllers\Concerns\TreeActionHelpers;
 use App\Exceptions\BusinessRuleException;
+use App\Exceptions\OptimisticLockException;
 use App\Exceptions\ValidationException;
 use App\Helpers\ViewHelper;
 use App\Models\Event;
@@ -227,13 +228,18 @@ class OrganizerEventEditController extends BaseController
             ? (int) $data['new_parent_id']
             : null;
         $newSortOrder = (int) ($data['new_sort_order'] ?? 0);
+        // I7e-B.1 Phase 2: Optimistic-Lock-Token aus Payload lesen. null
+        // wenn nicht uebergeben — dann bleibt der Lock-Check inaktiv.
+        $expectedVersion = isset($data['version']) ? (int) $data['version'] : null;
 
         try {
-            $this->treeService->move($taskId, $newParentId, $newSortOrder, $actorId);
+            $this->treeService->move($taskId, $newParentId, $newSortOrder, $actorId, $expectedVersion);
         } catch (ValidationException $e) {
             return $this->treeErrorResponse($request, $response, '/organizer/events/' . $eventId . '/editor', 422, $e->getErrors());
         } catch (BusinessRuleException $e) {
             return $this->treeErrorResponse($request, $response, '/organizer/events/' . $eventId . '/editor', 409, [$e->getMessage()]);
+        } catch (OptimisticLockException $e) {
+            return $this->lockConflictResponse($request, $response, '/organizer/events/' . $eventId . '/editor');
         }
 
         return $this->treeSuccessResponse($request, $response, '/organizer/events/' . $eventId . '/editor', 'Aufgabe verschoben.');
@@ -303,17 +309,20 @@ class OrganizerEventEditController extends BaseController
 
         $data   = $this->normalizeTreeFormInputs((array) $request->getParsedBody());
         $target = $data['target'] ?? null;
+        $expectedVersion = isset($data['version']) ? (int) $data['version'] : null;
 
         try {
             match ($target) {
-                'group' => $this->treeService->convertToGroup($taskId, $actorId),
-                'leaf'  => $this->treeService->convertToLeaf($taskId, $data, $actorId),
+                'group' => $this->treeService->convertToGroup($taskId, $actorId, $expectedVersion),
+                'leaf'  => $this->treeService->convertToLeaf($taskId, $data, $actorId, $expectedVersion),
                 default => throw new ValidationException(['target' => 'Unbekannter Convert-Zielwert (erwartet: group|leaf).']),
             };
         } catch (ValidationException $e) {
             return $this->treeErrorResponse($request, $response, '/organizer/events/' . $eventId . '/editor', 422, $e->getErrors());
         } catch (BusinessRuleException $e) {
             return $this->treeErrorResponse($request, $response, '/organizer/events/' . $eventId . '/editor', 409, [$e->getMessage()]);
+        } catch (OptimisticLockException $e) {
+            return $this->lockConflictResponse($request, $response, '/organizer/events/' . $eventId . '/editor');
         }
 
         return $this->treeSuccessResponse(
@@ -349,12 +358,17 @@ class OrganizerEventEditController extends BaseController
             return $scopeCheck;
         }
 
+        $data = (array) $request->getParsedBody();
+        $expectedVersion = isset($data['version']) ? (int) $data['version'] : null;
+
         try {
-            $this->treeService->softDeleteNode($taskId, $actorId);
+            $this->treeService->softDeleteNode($taskId, $actorId, $expectedVersion);
         } catch (ValidationException $e) {
             return $this->treeErrorResponse($request, $response, '/organizer/events/' . $eventId . '/editor', 422, $e->getErrors());
         } catch (BusinessRuleException $e) {
             return $this->treeErrorResponse($request, $response, '/organizer/events/' . $eventId . '/editor', 409, [$e->getMessage()]);
+        } catch (OptimisticLockException $e) {
+            return $this->lockConflictResponse($request, $response, '/organizer/events/' . $eventId . '/editor');
         }
 
         return $this->treeSuccessResponse($request, $response, '/organizer/events/' . $eventId . '/editor', 'Aufgabe geloescht.');
@@ -406,6 +420,10 @@ class OrganizerEventEditController extends BaseController
                 'capacity_target' => $task->getCapacityTarget(),
                 'hours_default'   => $task->getHoursDefault(),
                 'sort_order'      => $task->getSortOrder(),
+                // I7e-B.1 Phase 2: Optimistic-Lock-Token. Das Edit-
+                // Modal-JS rendert diesen Wert als Hidden-Field und
+                // schickt ihn beim Save zurueck.
+                'version'         => $task->getVersion(),
             ],
             'ancestor_path' => $ancestorPath,
         ]);
@@ -437,13 +455,16 @@ class OrganizerEventEditController extends BaseController
         }
 
         $data = $this->normalizeTreeFormInputs((array) $request->getParsedBody());
+        $expectedVersion = isset($data['version']) ? (int) $data['version'] : null;
 
         try {
-            $this->treeService->updateNode($taskId, $data, $actorId);
+            $this->treeService->updateNode($taskId, $data, $actorId, $expectedVersion);
         } catch (ValidationException $e) {
             return $this->treeErrorResponse($request, $response, '/organizer/events/' . $eventId . '/editor', 422, $e->getErrors());
         } catch (BusinessRuleException $e) {
             return $this->treeErrorResponse($request, $response, '/organizer/events/' . $eventId . '/editor', 409, [$e->getMessage()]);
+        } catch (OptimisticLockException $e) {
+            return $this->lockConflictResponse($request, $response, '/organizer/events/' . $eventId . '/editor');
         }
 
         return $this->treeSuccessResponse($request, $response, '/organizer/events/' . $eventId . '/editor', 'Aufgabe aktualisiert.');

@@ -7,6 +7,7 @@ namespace App\Controllers;
 use App\Controllers\Concerns\EventTreeActionHelpers;
 use App\Controllers\Concerns\TreeActionHelpers;
 use App\Exceptions\BusinessRuleException;
+use App\Exceptions\OptimisticLockException;
 use App\Exceptions\ValidationException;
 use App\Helpers\ViewHelper;
 use App\Models\Event;
@@ -964,13 +965,17 @@ class EventAdminController extends BaseController
             ? (int) $data['new_parent_id']
             : null;
         $newSortOrder = (int) ($data['new_sort_order'] ?? 0);
+        // I7e-B.1 Phase 2: Optimistic-Lock-Token (siehe Organizer-Gegenpart).
+        $expectedVersion = isset($data['version']) ? (int) $data['version'] : null;
 
         try {
-            $this->treeService->move($taskId, $newParentId, $newSortOrder, $actorId);
+            $this->treeService->move($taskId, $newParentId, $newSortOrder, $actorId, $expectedVersion);
         } catch (ValidationException $e) {
             return $this->treeErrorResponse($request, $response, '/admin/events/' . $eventId, 422, $e->getErrors());
         } catch (BusinessRuleException $e) {
             return $this->treeErrorResponse($request, $response, '/admin/events/' . $eventId, 409, [$e->getMessage()]);
+        } catch (OptimisticLockException $e) {
+            return $this->lockConflictResponse($request, $response, '/admin/events/' . $eventId);
         }
 
         return $this->treeSuccessResponse($request, $response, '/admin/events/' . $eventId, 'Aufgabe verschoben.');
@@ -1034,17 +1039,20 @@ class EventAdminController extends BaseController
 
         $data   = $this->normalizeTreeFormInputs((array) $request->getParsedBody());
         $target = $data['target'] ?? null;
+        $expectedVersion = isset($data['version']) ? (int) $data['version'] : null;
 
         try {
             match ($target) {
-                'group' => $this->treeService->convertToGroup($taskId, $actorId),
-                'leaf'  => $this->treeService->convertToLeaf($taskId, $data, $actorId),
+                'group' => $this->treeService->convertToGroup($taskId, $actorId, $expectedVersion),
+                'leaf'  => $this->treeService->convertToLeaf($taskId, $data, $actorId, $expectedVersion),
                 default => throw new ValidationException(['target' => 'Unbekannter Convert-Zielwert (erwartet: group|leaf).']),
             };
         } catch (ValidationException $e) {
             return $this->treeErrorResponse($request, $response, '/admin/events/' . $eventId, 422, $e->getErrors());
         } catch (BusinessRuleException $e) {
             return $this->treeErrorResponse($request, $response, '/admin/events/' . $eventId, 409, [$e->getMessage()]);
+        } catch (OptimisticLockException $e) {
+            return $this->lockConflictResponse($request, $response, '/admin/events/' . $eventId);
         }
 
         return $this->treeSuccessResponse(
@@ -1078,12 +1086,17 @@ class EventAdminController extends BaseController
             return $scopeCheck;
         }
 
+        $data = (array) $request->getParsedBody();
+        $expectedVersion = isset($data['version']) ? (int) $data['version'] : null;
+
         try {
-            $this->treeService->softDeleteNode($taskId, $actorId);
+            $this->treeService->softDeleteNode($taskId, $actorId, $expectedVersion);
         } catch (ValidationException $e) {
             return $this->treeErrorResponse($request, $response, '/admin/events/' . $eventId, 422, $e->getErrors());
         } catch (BusinessRuleException $e) {
             return $this->treeErrorResponse($request, $response, '/admin/events/' . $eventId, 409, [$e->getMessage()]);
+        } catch (OptimisticLockException $e) {
+            return $this->lockConflictResponse($request, $response, '/admin/events/' . $eventId);
         }
 
         return $this->treeSuccessResponse($request, $response, '/admin/events/' . $eventId, 'Aufgabe geloescht.');
@@ -1138,6 +1151,8 @@ class EventAdminController extends BaseController
                 'capacity_target' => $task->getCapacityTarget(),
                 'hours_default'   => $task->getHoursDefault(),
                 'sort_order'      => $task->getSortOrder(),
+                // I7e-B.1 Phase 2: Optimistic-Lock-Token (siehe Organizer).
+                'version'         => $task->getVersion(),
             ],
             'ancestor_path' => $ancestorPath,
         ]);
@@ -1168,13 +1183,16 @@ class EventAdminController extends BaseController
         }
 
         $data = $this->normalizeTreeFormInputs((array) $request->getParsedBody());
+        $expectedVersion = isset($data['version']) ? (int) $data['version'] : null;
 
         try {
-            $this->treeService->updateNode($taskId, $data, $actorId);
+            $this->treeService->updateNode($taskId, $data, $actorId, $expectedVersion);
         } catch (ValidationException $e) {
             return $this->treeErrorResponse($request, $response, '/admin/events/' . $eventId, 422, $e->getErrors());
         } catch (BusinessRuleException $e) {
             return $this->treeErrorResponse($request, $response, '/admin/events/' . $eventId, 409, [$e->getMessage()]);
+        } catch (OptimisticLockException $e) {
+            return $this->lockConflictResponse($request, $response, '/admin/events/' . $eventId);
         }
 
         return $this->treeSuccessResponse($request, $response, '/admin/events/' . $eventId, 'Aufgabe aktualisiert.');

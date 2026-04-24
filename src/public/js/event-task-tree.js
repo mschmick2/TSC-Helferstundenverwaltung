@@ -135,12 +135,22 @@
 
         if (sourceUl !== targetUl) {
             const endpoint = item.dataset.endpointMove;
+            // I7e-B.1 Phase 2: Optimistic-Lock-Token aus dem DOM lesen.
+            // Template-Pfad liefert 0 (keine DB-Spalte); Controller
+            // liefert bei 0 keinen Mismatch, weil Service-Parameter bei
+            // === 0 dennoch als int akzeptiert wird — aber das Template-
+            // Service-Gegenstueck ignoriert den Wert (Follow-up y).
             const result = await postJson(endpoint, {
                 new_parent_id: newParentId,
                 new_sort_order: newSortOrder,
+                version: readTaskVersion(item),
             });
             if (!result.ok) {
                 revert();
+                if (result.errorCode === 'optimistic_lock_conflict') {
+                    handleLockConflict(result);
+                    return;
+                }
                 showErrorToast(result.message || 'Verschieben fehlgeschlagen.');
             } else {
                 showSuccessToast('Verschoben.');
@@ -375,6 +385,19 @@
             hidden.name = 'is_group_readonly';
             hidden.value = task.is_group ? '1' : '0';
             form.appendChild(hidden);
+
+            // I7e-B.1 Phase 2: Optimistic-Lock-Token. Der Server schickt
+            // task.version im editTaskNode-JSON; das Hidden-Field landet
+            // ueber collectFormData automatisch im POST-Body. Bei Konflikt
+            // antwortet der Server mit 409 — handleFormSubmit zeigt dann
+            // einen Warn-Toast und reloadt.
+            if (typeof task.version !== 'undefined' && task.version !== null) {
+                const versionInput = document.createElement('input');
+                versionInput.type = 'hidden';
+                versionInput.name = 'version';
+                versionInput.value = String(task.version);
+                form.appendChild(versionInput);
+            }
         }
 
         appendInput(form, 'title', 'Titel *', task.title || '', 'text', 'col-md-12', true);
@@ -595,6 +618,16 @@
             return;
         }
 
+        // I7e-B.1 Phase 2: 409 mit optimistic_lock_conflict-Kennzeichen
+        // aus dem TreeActionHelpers-Helper — Toast + Reload statt
+        // Fehlerliste im Formular. Andere 409-Faelle (BusinessRule-
+        // Konflikt ohne Lock) gehen weiter in showFormErrors; sie
+        // haben keinen optimistic_lock_conflict-Marker.
+        if (result.errorCode === 'optimistic_lock_conflict') {
+            handleLockConflict(result);
+            return;
+        }
+
         if (saveBtn) {
             saveBtn.disabled = false;
             if (saveBtn.dataset.origLabel) saveBtn.textContent = saveBtn.dataset.origLabel;
@@ -674,8 +707,16 @@
             : 'Knoten wirklich in eine Aufgabe konvertieren?';
         if (!window.confirm(confirmMsg)) return;
 
-        const result = await postJson(endpoint, {target: target});
+        const nodeLi = btn.closest('.task-node');
+        const result = await postJson(endpoint, {
+            target: target,
+            version: readTaskVersion(nodeLi),
+        });
         if (!result.ok) {
+            if (result.errorCode === 'optimistic_lock_conflict') {
+                handleLockConflict(result);
+                return;
+            }
             showErrorToast(result.message || 'Konvertieren fehlgeschlagen.');
             return;
         }
@@ -691,13 +732,55 @@
             return;
         }
 
-        const result = await postJson(endpoint, {});
+        const nodeLi = btn.closest('.task-node');
+        const result = await postJson(endpoint, {
+            version: readTaskVersion(nodeLi),
+        });
         if (!result.ok) {
+            if (result.errorCode === 'optimistic_lock_conflict') {
+                handleLockConflict(result);
+                return;
+            }
             showErrorToast(result.message || 'Loeschen fehlgeschlagen.');
             return;
         }
         showSuccessToast('Geloescht.');
         window.location.reload();
+    }
+
+    // =====================================================================
+    // I7e-B.1 Phase 2 — Optimistic-Lock-Helpers
+    //
+    // readTaskVersion liest data-task-version vom <li class="task-node">.
+    // Fallback auf 0, wenn das Attribut fehlt — z.B. im Template-Kontext,
+    // wo event_template_tasks derzeit keine version-Spalte hat. Der
+    // Controller interpretiert 0 als "nicht uebergeben" auf Service-Ebene
+    // nicht (0 !== null), aber das Template-Gegenstueck ignoriert den
+    // Wert, bis Follow-up y den Lock dort aktiviert.
+    //
+    // handleLockConflict zeigt einen Warn-Toast mit der Server-Message
+    // (oder einem klaren Fallback), schliesst ein ggf. offenes Edit-Modal
+    // und reloadt die Seite, damit der Nutzer den frischen DB-Stand sieht.
+    // =====================================================================
+
+    function readTaskVersion(nodeLi) {
+        if (!nodeLi) return 0;
+        const v = parseInt(nodeLi.dataset.taskVersion || '0', 10);
+        return Number.isFinite(v) ? v : 0;
+    }
+
+    function handleLockConflict(result) {
+        const message = (result && result.message)
+            || 'Die Aufgabe wurde zwischenzeitlich von jemand anderem geaendert. '
+                + 'Die Ansicht wird neu geladen.';
+        showToast(message, 'warning');
+        const modalEl = document.getElementById('task-edit-modal');
+        if (modalEl && typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+            bootstrap.Modal.getInstance(modalEl)?.hide();
+        }
+        // Kurze Verzoegerung, damit der Toast sichtbar wird, bevor
+        // der Reload die Seite ersetzt.
+        window.setTimeout(() => { window.location.reload(); }, 1500);
     }
 
     // =====================================================================
@@ -740,7 +823,14 @@
                     ok: false,
                     status: res.status,
                     errors: data.errors || null,
-                    message: data.error || data.status || ('HTTP ' + res.status),
+                    // I7e-B.1 Phase 2: error ist ein Machine-Code
+                    // (z.B. 'optimistic_lock_conflict'); message ist
+                    // der menschenlesbare Text. Fruehere Aufrufer
+                    // nutzten `message` als Fallback-Anzeige, der
+                    // Bestand bleibt: wenn message fehlt, nehmen wir
+                    // den error-Code oder 'HTTP <status>'.
+                    errorCode: data.error || null,
+                    message: data.message || data.error || data.status || ('HTTP ' + res.status),
                 };
             }
             const data = await res.json().catch(() => ({}));

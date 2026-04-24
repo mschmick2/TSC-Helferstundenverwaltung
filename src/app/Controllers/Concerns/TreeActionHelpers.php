@@ -98,4 +98,45 @@ trait TreeActionHelpers
         \App\Helpers\ViewHelper::flash('danger', implode(' ', array_map('strval', $errors)));
         return $this->redirect($response, $redirectPath);
     }
+
+    /**
+     * 409-Conflict-Response fuer Optimistic-Lock-Konflikte (I7e-B.1 Phase 2).
+     *
+     * Je nach wantsJson:
+     *  - AJAX (Tree-Editor-JS): 409 mit JSON
+     *    `{"error":"optimistic_lock_conflict","message":"..."}`.
+     *    Tree-Editor-JS liest `result.status === 409` und
+     *    uebersetzt zu Toast + Re-Fetch.
+     *  - Form-Submit-Fallback: 409 mit Flash + Redirect zum
+     *    gleichen Editor, damit der Nutzer den frischen DB-Stand
+     *    sieht.
+     *
+     * Die Message ist bewusst knapp und klar, ohne technische
+     * Details — der Tree-Editor-Konflikt ist kein Fehler, sondern
+     * ein erwartetes Rennen, das die UI jetzt aufloest.
+     */
+    protected function lockConflictResponse(
+        Request $request,
+        Response $response,
+        string $redirectPath
+    ): Response {
+        $message = 'Die Aufgabe wurde zwischenzeitlich von jemand '
+            . 'anderem geaendert. Bitte laden Sie die Ansicht neu '
+            . 'und versuchen Sie es erneut.';
+
+        if ($this->wantsJson($request)) {
+            return $this->json(
+                $response,
+                [
+                    'status'  => 'error',
+                    'error'   => 'optimistic_lock_conflict',
+                    'message' => $message,
+                ],
+                409
+            );
+        }
+
+        \App\Helpers\ViewHelper::flash('warning', $message);
+        return $this->redirect($response, $redirectPath)->withStatus(409);
+    }
 }

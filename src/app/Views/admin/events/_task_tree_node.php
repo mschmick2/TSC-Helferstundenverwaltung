@@ -102,6 +102,15 @@ $status = $node['status'] ?? null;
 ?>
 <li class="task-node<?= $isGroup ? ' task-node--group' : ' task-node--leaf' ?><?= $status !== null ? ' ' . $status->cssClass() : '' ?>"
     data-task-id="<?= $taskId ?>"
+    data-task-version="<?php /* I7e-B.1 Phase 2: Optimistic-Lock-Token.
+        Nur im Event-Kontext relevant — Template-Tasks haben keine
+        version-Spalte (Follow-up y). Bei Template liefert das
+        Template-Task-Model keinen Version-Getter; der Coalesce-
+        Fallback `?? 0` haelt das Attribut formal-korrekt, ohne
+        Rendering-Fehler. Der Template-JS-Pfad liest das Attribut
+        aktuell nicht. */
+        echo (int) (method_exists($task, 'getVersion') ? $task->getVersion() : 0);
+    ?>"
     data-is-group="<?= $isGroup ? '1' : '0' ?>"
     <?php if ($status !== null): ?>
     aria-label="<?= ViewHelper::e($status->ariaLabel()) ?>"

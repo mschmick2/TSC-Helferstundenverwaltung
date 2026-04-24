@@ -99,6 +99,7 @@ trait EventTreeActionHelpers
                 'capacity_target'    => $task->getCapacityTarget(),
                 'hours_default'      => $task->getHoursDefault(),
                 'sort_order'         => $task->getSortOrder(),
+                'version'            => $task->getVersion(),
                 'helpers_subtree'    => $node['helpers_subtree'],
                 'hours_subtree'      => $node['hours_subtree'],
                 'leaves_subtree'     => $node['leaves_subtree'],
