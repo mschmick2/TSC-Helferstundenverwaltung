@@ -187,13 +187,44 @@ Test-DB. Sinnvoll erst, wenn andere I7e-Repos (z.B.
 **Groessenordnung:** ca. 1 Stunde, gebuendelt mit FU-t als
 Test-Buendel.
 
-### Geplantes naechstes Inkrement
+### I7e-C.2 Template-Edit-Sessions — deferred (2026-04-24)
 
-**I7e-C.2** -- Template-Edit-Sessions als analoges Pattern fuer
-Event-Templates. Eigenes G1-Runde-1 mit Entscheidungen zur
-DB-Schema-Erweiterung und HTTP-/JS-Symmetrie. Geschaetzt
-1-2 Sessions. Wartet auf bewussten Start; nicht blockierend
-fuer den I7e-C.1-Tag.
+**Status:** verworfen fuer jetzt, als Follow-up dokumentiert.
+
+**Analyse (G1-Runde-1 Architect-Plan I7e-C.2):**
+Template-Parallel-Bearbeitung ist in der aktuellen Nutzung sehr
+selten:
+- TSC Mondial hat 1-3 Event-Admins.
+- Templates sind Vorlagen fuer wiederkehrende Event-Typen, die
+  einmal aufgebaut und dann ueber Monate unveraendert abgeleitet
+  werden.
+- Keine Template-Organizer-Rolle -- nur `event_admin` und
+  `administrator` duerfen ueberhaupt bearbeiten.
+
+**Aufwandsschaetzung fuer volle Umsetzung:** 4-4,5 Sessions
+(Migration auf target_type-Generalisierung von `edit_sessions`,
+Controller-Refactor, Frontend-Partial-Generalisierung, neue
+Playwright-Spec 18, Gate-Pipeline Sanity+G4+G8+G9, Tag
+`v1.4.10-local-i7e-c2`).
+
+**Entscheidung:** Kosten-Nutzen nicht gerechtfertigt bei
+aktueller Nutzungsfrequenz. I7e-C.1 deckt den ueblichen
+Koordinations-Fall (Event-Bearbeitung) vollstaendig ab.
+
+**Re-Evaluation empfohlen, wenn:**
+- Die Event-Admin-Zahl signifikant waechst (z.B. > 5 regelmaessig
+  aktive Admins).
+- Templates haeufiger gepflegt werden (z.B. monatliche
+  Anpassungen an Saisondaten).
+- Oder andere Target-Typen (z.B. Einstellungs-Editor) eingefuehrt
+  werden und die target_type-Generalisierung der `edit_sessions`-
+  Tabelle dann ohnehin Sinn macht.
+
+**Architect-Plan-Ausarbeitung** (G1-Runde-1 inkl. K1b/K2b/K3b-
+Bestaetigungen, fuenf C-Korrekturen C6-C10, zwoelf Q-Klaerungen,
+Risiko-Matrix R1-R8 und Vier-Phasen-Plan) steht im Session-
+Verlauf vom 2026-04-24 bereit, falls Re-Evaluation zu "umsetzen"
+fuehrt.
 
 ---
 
