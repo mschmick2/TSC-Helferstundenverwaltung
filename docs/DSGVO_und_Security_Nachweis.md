@@ -40,6 +40,7 @@ Aufbewahrungsfrist sind im Projekt-Regelwerk tabellarisch gefuehrt (siehe
 | Sicherheits-Logs | `login_attempts.*`, `rate_limits.*` | 90 Tage bzw. max. zweimal groesstes Fenster |
 | Audit-Trail | `audit_log.*` | 10 Jahre, revisionssicher |
 | Event-Helferdaten | `event_task_assignments.user_id`, `event_organizers.*` | 10 Jahre (Helferstunden-Nachweis) |
+| Edit-Session-Tracking | `edit_sessions.user_id`, `event_id`, `browser_session_id`, Zeitstempel | max. 1 Stunde (Lazy-Cleanup, kein Audit-Eintrag) |
 
 Das System-Benutzerkonto (`users.mitgliedsnummer = 'SYSTEM'`) ist als
 Automationsaccount fuer auto-generierte `work_entries` vorgesehen und ist
@@ -388,11 +389,39 @@ Abschnitt „Fehlerbehandlung").
 | `users` (Austritt) | Nein | Admin ueber UI | Sofort Soft-Delete |
 | Anonymisierung nach Ablauf | Nein (Skript) | Admin, CLI | Nach 10 Jahren |
 | `audit_log` | **Nein** | — | **10 Jahre, nicht loeschbar** |
+| `edit_sessions` | Ja | `EditSessionRepository::cleanupStale()` beim Insert | sofort nach Close, max. 1 Stunde dangling |
 
 **Offener Punkt:** Eine fully-automated Cron-basierte Loeschroutine existiert
 nicht, weil die Produktionsumgebung (Strato Shared Hosting) keine Cron-Jobs
 erlaubt (siehe Abschnitt 8). Die Einhaltung der Fristen geschieht
 organisatorisch durch einen **jaehrlichen Admin-Review**.
+
+**Detail Edit-Session-Tracking** (Modul 6 I7e-C.1, eingefuehrt 2026-04-24):
+- **Zweck:** Anzeige, dass ein anderer Nutzer gerade dasselbe Event
+  bearbeitet, um Parallel-Arbeit zu koordinieren. Der eigentliche
+  Daten-Integritaets-Schutz bleibt der Optimistic Lock aus Modul 6 I7e-B
+  (`event_tasks.version`).
+- **Rechtsgrundlage:** Art. 6(1)(f) berechtigtes Interesse (Koordinations-
+  Bedarf bei gemeinsamer Vereins-Verwaltungsaufgabe).
+- **Verarbeitete Daten:** `user_id` (interne ID), `event_id` (interne ID),
+  `browser_session_id` (clientseitig generierter zufaelliger Identifier,
+  nicht PII), Zeitstempel `started_at`, `last_seen_at`, `closed_at`. Fuer
+  die UI-Anzeige wird abgeleitet `display_name = users.vorname + ' ' +
+  users.nachname` per JOIN — DSGVO-relevante Klartext-PII wird zur
+  Anzeige nur in den `EditSessionView`-Response gemappt, nicht in der
+  Tabelle persistiert.
+- **Empfaenger-Kreis:** Alle Editor-Berechtigten desselben Events
+  (Event-Administratoren mit `event_admin`/`administrator`-Rolle und
+  eingetragene Event-Organisatoren). Keine Externen, keine API-
+  Integrationen.
+- **Audit-Log:** **Keine** Eintraege fuer Session-Open/Close. Die Tabelle
+  `edit_sessions` ist selbst der kurzlebige Record (Architect-
+  Entscheidung C5 aus G1-I7e-C). Der `audit_log` bleibt fuer Business-
+  Events (Antrags-Statusaenderungen, Aufgaben-Aenderungen,
+  Konfigurations-Aenderungen).
+- **Feature-Flag:** `events.edit_sessions_enabled`, hart gekoppelt an
+  `events.tree_editor_enabled`. Auf Produktion derzeit beide auf `0` —
+  das Feature ist dort nicht aktiv.
 
 ---
 

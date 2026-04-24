@@ -507,6 +507,53 @@ class AuditService
 }
 ```
 
+### Kurzlebige Tracking-Tabellen mit Lazy-Cleanup
+
+Fuer Features, die zustand-ueberwachende Information sammeln, die
+nicht im `audit_log` abgelegt werden soll (weil sie kein Business-
+Event ist, sondern Infrastruktur), nutzt VAES das Pattern der
+"kurzlebigen Tracking-Tabelle". Eingefuehrt in Modul 6 I7e-C.1
+(Edit-Session-Hinweis) als wiederverwendbares Vorbild.
+
+Charakteristika:
+
+- **Eigene DB-Tabelle** mit FK-Kaskaden (`ON DELETE CASCADE`) auf
+  alle beteiligten Entitaeten — verschwinden die Eltern, verschwinden
+  die Tracking-Eintraege automatisch.
+- **Retention-Strategie**: Lazy-Cleanup beim Einfuegen neuer
+  Eintraege, kein Cron noetig. Strato-kompatibel. Konkretes Beispiel
+  aus `EditSessionRepository::create()`: vor jedem INSERT laeuft
+  `cleanupStale()`, das geschlossene Sessions sofort und dangling-
+  Sessions nach einer Stunde entfernt.
+- **Kein Audit-Log-Eintrag**: die Tabelle IST das Log, kurzlebig
+  und inspizierbar. Audit-Log waere zu rauschig (Hunderte
+  Session-Open/Close pro Tag).
+- **Feature-Flag** mit harter Code-Kopplung an verwandte Features
+  (Beispiel: `editSessionsEnabled() && treeEditorEnabled()`),
+  damit unsinnige Kombinationen ausgeschlossen sind.
+
+Konkretes Beispiel: `edit_sessions` (Migration 010, I7e-C.1).
+Felder `user_id`, `event_id`, `browser_session_id`, drei Zeitstempel
+plus `closed_at NULL`-Marker. `EditSessionRepository::cleanupStale`
+loescht beim naechsten Insert alle Eintraege mit
+`closed_at IS NOT NULL OR last_seen_at < NOW() - INTERVAL 3600 SECOND`.
+
+Geeignet fuer:
+
+- **Session-Tracking** (wie I7e-C: wer hat wann den Editor offen).
+- **Temporaere Locks** (kurzfristige Pessimistic-Locks ohne
+  permanente Audit-Spur).
+- **Presence-Detection** ("wer ist gerade online", falls jemals
+  gewuenscht).
+
+NICHT geeignet fuer:
+
+- **Persistente Audit-/Logging-Anforderungen**: dort gehoert das
+  `audit_log` zum Einsatz, append-only mit DB-Trigger-Schutz.
+- **Cross-Request-Locks ueber lange Zeit**: dort sind Optimistic
+  Lock (Modul 7 I3, Modul 6 I7e-B) oder Pessimistic-Locks mit
+  expliziter Lebenszeit besser.
+
 ---
 
 ## Middleware

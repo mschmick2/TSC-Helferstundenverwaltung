@@ -1,7 +1,7 @@
 # VAES Benutzerhandbuch
 
 **Vereins-Arbeitsstunden-Erfassungssystem (VAES)**
-Version 1.4.8
+Version 1.4.9
 Stand: April 2026
 
 ---
@@ -74,6 +74,7 @@ Stand: April 2026
       - [Aufgabenbaum-Editor (optional aktivierbar)](#aufgabenbaum-editor-optional-aktivierbar)
       - [Editor-Ansicht (non-modaler Editor)](#editor-ansicht-non-modaler-editor)
       - [Gleichzeitige Bearbeitung](#gleichzeitige-bearbeitung)
+      - [Hinweis auf parallele Editoren](#hinweis-auf-parallele-editoren)
     - 12.5 [Event-Vorlagen](#125-event-vorlagen)
     - 12.6 [Systemeinstellungen](#126-systemeinstellungen)
     - 12.7 [Audit-Trail](#127-audit-trail)
@@ -128,6 +129,9 @@ Die Anwendung ist fuer moderne Webbrowser optimiert und kann auf Desktop-Compute
 
 **Neu in Version 1.4.8:**
 - Schutz vor ungewolltem Ueberschreiben bei gleichzeitiger Bearbeitung derselben Aufgabe im Event-Aufgabenbaum (siehe Abschnitt 12.4, "Gleichzeitige Bearbeitung").
+
+**Neu in Version 1.4.9:**
+- Hinweis auf parallele Editoren im Event-Aufgabenbaum: Wenn ein anderer Organisator oder Administrator gleichzeitig dasselbe Event bearbeitet, sehen Sie das oben im Editor (siehe Abschnitt 12.4, "Hinweis auf parallele Editoren"). Schliesst die andere Person den Tab, verschwindet der Hinweis nach kurzer Zeit von selbst.
 
 ---
 
@@ -1409,6 +1413,43 @@ Das Hinzufuegen neuer Aufgaben und das Umsortieren innerhalb einer Gruppe loesen
 **Verfuegbarkeit:**
 
 Der Schutz gilt fuer Event-Aufgaben. Fuer Vorlagen (Event-Templates) ist er derzeit nicht aktiv und wird in einem spaeteren Inkrement nachgereicht.
+
+#### Hinweis auf parallele Editoren
+
+Wenn ein anderer Organisator oder Administrator gerade dasselbe Event bearbeitet, sehen Sie oben im Editor einen Hinweis: "Vorname Nachname bearbeitet dieses Event seit X Minuten."
+
+Der Hinweis aktualisiert sich automatisch alle 30 Sekunden. Wenn die andere Person den Tab schliesst, verschwindet der Hinweis nach kurzer Zeit (maximal zwei Minuten) von selbst.
+
+Anders als der Konflikt-Hinweis (Abschnitt "Gleichzeitige Bearbeitung") zeigt dieser Hinweis die Parallel-Bearbeitung **vor** dem Speichern -- Sie koennen also rechtzeitig entscheiden, ob Sie kurz nachfragen oder dennoch weiterarbeiten moechten. Beim Speichern greift weiterhin der Konflikt-Schutz aus dem vorigen Abschnitt.
+
+**Wo wird der Hinweis angezeigt:**
+
+- Editor-Ansicht (non-modaler Editor) -- oberhalb des Aufgabenbaums.
+- Klassischer Event-Bearbeiten-Dialog -- oberhalb des Formulars.
+
+Jede aktive Parallel-Bearbeitung erscheint als eigene Zeile. Wenn mehrere Personen gleichzeitig arbeiten, stapeln sich die Zeilen.
+
+**Verfuegbarkeit:**
+
+Dieses Feature muss von der Administration freigeschaltet werden. Es sind zwei Einstellungen noetig:
+
+- `events.tree_editor_enabled = 1`
+- `events.edit_sessions_enabled = 1`
+
+In der aktuellen Produktions-Konfiguration sind beide Einstellungen auf `0` -- das Feature ist dort nicht aktiv und der Hinweis erscheint nicht.
+
+**Hinweis fuer Administratoren beim Deploy (v1.4.9):**
+
+Bei einer Aktualisierung der Strato-Produktion mit den Aenderungen aus `v1.4.9-local-i7e-c`:
+
+1. **Zuerst** Migration 010 manuell einspielen (via phpMyAdmin oder Strato-Shell):
+   - Datei: `scripts/database/migrations/010_edit_sessions.sql`.
+   - Idempotent: wiederholte Ausfuehrung schadet nicht.
+2. **Danach** optional die beiden Feature-Flags aktivieren -- nur, wenn das Feature live gehen soll:
+   - `events.tree_editor_enabled = 1`
+   - `events.edit_sessions_enabled = 1`
+
+Ohne Migration und mit Flags `= 0` ist die Deploy-Uebernahme risikolos -- das Feature bleibt inaktiv, bestehende Funktionalitaet bleibt unveraendert.
 
 ### 12.5 Event-Vorlagen
 

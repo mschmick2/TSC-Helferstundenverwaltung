@@ -1332,3 +1332,121 @@ vor dem Reload -- andere 409-Faelle fallen durch zu
   `errorCode`, um den Namenskonflikt mit dem Bestand-Feld
   `errors` (Validation-Fehler-Liste) zu vermeiden.
 
+### 2026-04-24 — sendBeacon mit URL-encoded Form-Body als VAES-Konvention fuer beforeunload-Close
+
+**Kontext:**
+beforeunload-Handler muessen Best-Effort-Close-Requests
+absetzen, ohne auf eine Response zu warten. Synchrones XHR ist
+in modernen Browsern deprecated; navigator.sendBeacon ist die
+Empfehlung. Bei VAES gibt es zwei Anwendungsfaelle: das
+bestehende `entry-lock.js` (Modul 7 I1, Bearbeitungssperren) und
+das neue `edit-session.js` (Modul 6 I7e-C.1, Edit-Session-
+Hinweis).
+
+**Problem:**
+`navigator.sendBeacon` unterstuetzt kein direktes Setzen von
+HTTP-Headern. Der Standard-fetch-Header-Mechanismus
+(`X-CSRF-Token`) ist damit nicht nutzbar. Naive Loesung:
+JSON-Blob mit `csrf_token` im Body — aber das verlangt vom
+Server, JSON-Body fuer CSRF-Pruefung zu parsen und einen
+JSON-Pfad in der CsrfMiddleware.
+
+**Loesung:**
+Pattern aus `entry-lock.js` als VAES-Konvention etabliert:
+- Body-Format `application/x-www-form-urlencoded`.
+- `URLSearchParams` baut den Body, `csrf_token` als Form-Field.
+- `Blob` mit Content-Type aus URLSearchParams.
+- Server-seitig parst `addBodyParsingMiddleware` form-encoded
+  automatisch, `CsrfMiddleware::process` liest
+  `$body['csrf_token']` aus `getParsedBody()`.
+
+**Praevention:**
+Diese VAES-Konvention gilt fuer alle kuenftigen
+beforeunload/pagehide-Close-Patterns. Wenn `sendBeacon` nicht
+verfuegbar ist (alte Browser): `keepalive: true`-fetch als
+Fallback, der dann die normalen JSON-/Header-Pfade nutzt. Der
+2-Minuten-Server-Timeout (Edit-Session) bzw. 5-Minuten-Lock-
+Timeout (entry-lock) faengt den Fall ab, dass weder sendBeacon
+noch keepalive-fetch ankommen.
+
+### 2026-04-24 — sessionStorage vs. localStorage fuer tab-lokale Survivor-State
+
+**Kontext:**
+Der Optimistic-Lock-Reload aus I7e-B (`window.location.reload()`
+nach 409) wirft eine laufende JavaScript-Session weg, wenn sie
+nur im Modul-State lebt. Edit-Session-Tracking aus I7e-C.1 muss
+ueber Reloads hinweg dieselbe Session-ID weiterverwenden, damit
+der Heartbeat-Pfad weiterlaeuft und keine neue DB-Zeile
+entsteht.
+
+**Problem:**
+`localStorage` ueberlebt Reloads, ist aber browser-weit geteilt
+— zwei Tabs desselben Users wuerden dieselbe Session-ID sehen.
+Das bricht die Multi-Device/Multi-Tab-Semantik aus G1 (R2: jede
+Browser-Session bekommt eine eigene `browser_session_id`,
+Anzeige dedupliziert per `user_id`).
+
+**Loesung:**
+`sessionStorage` ist tab-skopiert:
+- Ueberlebt Reloads im selben Tab (gleiches Window, gleicher
+  Browser-Process).
+- Ist eigenstaendig pro Tab — kein Cross-Tab-Leak.
+- Wird beim Schliessen des Tabs geloescht (kein Data-Retention-
+  Problem, DSGVO-freundlich).
+
+Server-seitig deduziert die Anzeige-Logik
+(`EditSessionView::toJsonReadyArray`) per `user_id` — zwei Tabs
+desselben Users erscheinen nur einmal im UI, obwohl in der DB
+zwei `edit_sessions`-Zeilen mit verschiedenen
+`browser_session_id`-Werten liegen.
+
+**Praevention:**
+- Fuer **tab-lokalen** State, der Reloads ueberleben soll:
+  `sessionStorage`.
+- Fuer **geraete-weiten** State (z.B. UI-Theme): `localStorage`.
+- Fuer **Server-seitiges Tracking** von Multi-Tab-Nutzung: eigene
+  `browser_session_id`-Spalte in der Tabelle, JavaScript baut
+  einen client-zufaelligen Identifier.
+
+### 2026-04-24 — Per-Test-Timeout fuer Polling-Tests in Playwright
+
+**Kontext:**
+Spec 17 (Edit-Session-Hinweis) testet ein Polling-Feature mit
+30-Sekunden-Heartbeat-/Refresh-Intervall (`HEARTBEAT_INTERVAL_MS`
+in `edit-session.js`). Ein Cross-User-Sichtbarkeits-Test braucht
+einen vollen Polling-Tick — die assertion ist
+`expect(...).toHaveCount(1, { timeout: 35_000 })`.
+
+**Problem:**
+Playwright's per-test-Default-Timeout ist 30 Sekunden. Die
+35-Sekunden-Wartezeit wird also **nie** evaluiert — Playwright
+killt den Test vor der Assertion. Die Fehlermeldung lautet
+"Test timeout of 30000ms exceeded", was den Code-Pfad auf den
+Wait verweist — aber die eigentliche Ursache ist die zu enge
+Outer-Timeout-Grenze.
+
+**Loesung:**
+Per-Test-Setup: `test.setTimeout(60_000)` als erste Anweisung
+im Test-Body fuer Tests, die Polling-Wartezeiten enthalten.
+
+Zusatzlich: `await page.waitForLoadState('networkidle')`
+funktioniert nicht zuverlaessig bei Polling-Features — wenn der
+Browser permanent Background-Heartbeats absetzt, wird "idle"
+nie erreicht. Stattdessen deterministische `await page
+.waitForTimeout(2000)` verwenden, die das JS-Boot-Intervall
+ueberbrueckt, ohne auf network-idle zu warten.
+
+**Praevention:**
+Kuenftige Polling-Feature-Specs (z.B. Dashboard-Live-
+Aktualisierung, neue Real-Time-Hinweise) brauchen die gleiche
+Test-Infrastruktur:
+- `test.setTimeout(60_000)` fuer alle Tests, die mehr als
+  30 Sekunden Polling-Wait erwarten.
+- Kein `networkidle`-Wait. Stattdessen entweder ein
+  deterministischer `waitForTimeout` oder ein DOM-Signal-Wait
+  (`expect(...).toBeVisible({ timeout: ... })`).
+
+Als Kommentar im Test-Header die Begruendung notieren, damit
+spaetere Editoren die Wartezeiten nicht fragen ("warum 60
+statt 30?").
+

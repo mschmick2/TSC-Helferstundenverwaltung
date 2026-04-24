@@ -118,6 +118,77 @@ Keine Mini-Iteration.
 
 ---
 
+## Offene Follow-ups nach I7e-C.1 (Modul 6, abgeschlossen 2026-04-24)
+
+Aus Sanity-Gate und G4-Security-Review I7e-C.1 ergaben sich vier
+neue Eintraege. Zwei davon (FU-G5-1 DSGVO-Nachweis und FU-G7-1
+Deploy-Reihenfolge) sind G9-Pflicht-Eintraege und mit dem
+G9-Commit dieses Inkrements direkt erledigt — sie sind hier nur
+zur Historie nochmal genannt und nicht mehr offen. Die zwei
+verbleibenden offenen Eintraege empfiehlt der Architect als
+gebuendelte Mini-Iteration nach dem Tag.
+
+- ~~**FU-G5-1**~~ -- erledigt im G9-Commit (PII-Flow in
+  `docs/DSGVO_und_Security_Nachweis.md` ergaenzt).
+- ~~**FU-G7-1**~~ -- erledigt im G9-Commit (Deploy-Reihenfolge im
+  Benutzerhandbuch-Abschnitt "Hinweis auf parallele Editoren"
+  unter "Verfuegbarkeit").
+- **Test-Breite-Buendel** (FU-G6-1 + FU-G6-2): kombinierter
+  `test(edit-sessions)`-Commit, ca. 1 Stunde.
+
+### Follow-up t -- Lock-Reload-E2E-Test in Spec 17
+
+- **Quelle:** Sanity-Gate I7e-C.1 (G6-Tester-Befund).
+- **Status:** offen, Test-Breite.
+
+**Beschreibung:**
+Spec 17 testet den I7e-B-Lock-Reload-Pfad nicht end-zu-end.
+`sessionStorage`-Persistenz ist statisch via
+`EditSessionJsInvariantsTest::test_session_id_uses_sessionStorage_not_localStorage`
+abgesichert. Ein End-zu-End-Beweis wuerde einen Optimistic-Lock-
+Konflikt aus I7e-B aufbauen, dessen automatischen Reload abwarten,
+und danach pruefen, dass die `sessionStorage`-ID erhalten bleibt
+und der Heartbeat ohne neue Session-Anlage 200 liefert.
+
+**Naechster Schritt:**
+Spec 17 um einen Test 4 erweitern: Setup-Event mit mindestens
+einer Aufgabe; ADMIN startet Session und Edit-Modal; ADMIN B
+updated denselben Task mit veralteter Version → ADMIN A bekommt
+409 + Reload; nach Reload erstes Heartbeat-Probe-Request liefert
+200 (gleiche Session-ID). Setup-intensiv.
+
+**Groessenordnung:** ca. 30-45 Min.
+
+### Follow-up u -- Repository-Integration-Tests fuer EditSessionRepository
+
+- **Quelle:** Sanity-Gate I7e-C.1 (G6-Tester-Befund).
+- **Status:** offen, optional.
+
+**Beschreibung:**
+Reine Unit-Suite hat keine Repository-Schreib-Tests gegen Test-DB.
+SQL-Pattern (JOIN auf `users`, Lazy-Cleanup-DELETE, IDOR-Filter im
+UPDATE-WHERE) sind nur statisch ueber die SQL-Strings im
+`EditSessionRepository.php`-File abgesichert. Spec 17 deckt das
+End-zu-End ab, aber langsamer und weniger gezielt.
+
+**Naechster Schritt:**
+Optional: `EditSessionRepositoryIntegrationTest` mit echter
+Test-DB. Sinnvoll erst, wenn andere I7e-Repos (z.B.
+`EventTaskRepository` aus I7e-B) ebenfalls dahin migrieren.
+
+**Groessenordnung:** ca. 1 Stunde, gebuendelt mit FU-t als
+Test-Buendel.
+
+### Geplantes naechstes Inkrement
+
+**I7e-C.2** -- Template-Edit-Sessions als analoges Pattern fuer
+Event-Templates. Eigenes G1-Runde-1 mit Entscheidungen zur
+DB-Schema-Erweiterung und HTTP-/JS-Symmetrie. Geschaetzt
+1-2 Sessions. Wartet auf bewussten Start; nicht blockierend
+fuer den I7e-C.1-Tag.
+
+---
+
 ## Bearbeitungsregel
 
 Wenn ein Inkrement-Coder beim Pre-Flight einen der obigen Follow-ups
