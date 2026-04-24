@@ -1,6 +1,7 @@
 import { test, expect, Browser, BrowserContext, Page } from '@playwright/test';
 import { LoginPage } from '../pages/LoginPage';
 import { AdminEventsPage } from '../pages/AdminEventsPage';
+import { AdminEventTreePage } from '../pages/AdminEventTreePage';
 import { ADMIN, EVENT_ADMIN } from '../fixtures/users';
 import { clearE2eEditSessions, setE2eSetting } from '../fixtures/db-helper';
 
@@ -81,6 +82,9 @@ test.describe('Edit-Session-Hinweis (I7e-C.1)', () => {
   const endAt = toLocalDateTime(eventEnd);
 
   const eventTitle = `E2E EditSessions ${now.getTime()}`;
+  // Task-Titel fuer Test 5 (Lock-Reload-Integration). Lang-eindeutig,
+  // damit Locator-Treffer bei Substring-Kollision sicher sind.
+  const taskTitle = 'E2E-EditSession-Lock-Reload-Task';
   let eventId = 0;
 
   test.beforeAll(() => {
@@ -118,14 +122,15 @@ test.describe('Edit-Session-Hinweis (I7e-C.1)', () => {
   // Setup
   // =========================================================================
 
-  test('Setup: Event mit zwei Berechtigten (Organizer + Admin)', async ({ page }) => {
+  test('Setup: Event mit zwei Berechtigten (Organizer + Admin) und einem Task fuer Test 5', async ({ page }) => {
     const login = new LoginPage(page);
     const events = new AdminEventsPage(page);
+    const tree = new AdminEventTreePage(page);
 
     await login.loginAs(EVENT_ADMIN);
     eventId = await events.createEvent({
       title: eventTitle,
-      description: 'I7e-C.1 Phase 4 Teil 1 Setup-Event',
+      description: 'I7e-C.1 Phase 4 Setup-Event',
       location: 'Vereinsheim',
       startAt,
       endAt,
@@ -133,6 +138,19 @@ test.describe('Edit-Session-Hinweis (I7e-C.1)', () => {
       cancelDeadlineHours: 2,
     });
     expect(eventId).toBeGreaterThan(0);
+
+    // Ein Task wird nur fuer Test 5 (Lock-Reload-Integration) gebraucht.
+    // Tests 1-4 ignorieren den Task und pruefen nur den Indicator-Container.
+    // Variabel/unbegrenzt: keine Slot-/Capacity-Regeln, die den Lock-
+    // Konflikt maskieren wuerden.
+    await tree.gotoEdit(eventId);
+    await tree.createTopLevelNode({
+      isGroup: false,
+      title: taskTitle,
+      slotMode: 'variabel',
+      capacityMode: 'unbegrenzt',
+      hoursDefault: 1,
+    });
   });
 
   // =========================================================================
@@ -268,6 +286,145 @@ test.describe('Edit-Session-Hinweis (I7e-C.1)', () => {
       // (falls jemals welche dazukommen) den Feature-Pfad bekommen.
       // afterAll setzt am Spec-Ende ohnehin auf 0 zurueck.
       setE2eSetting('events.edit_sessions_enabled', '1');
+    }
+  });
+
+  // =========================================================================
+  // Test 5 — Edit-Session bleibt nach Lock-Reload funktional (FU-G6-1)
+  //
+  // Testet die User-sichtbare Invariante nach einem Optimistic-Lock-
+  // Konflikt aus I7e-B: die Edit-Session-Funktion laeuft danach weiter,
+  // der Nutzer wird fuer andere Editoren weiterhin als "aktiv" angezeigt,
+  // keine dauerhafte Luecke im Polling-Feed.
+  //
+  // **Befund waehrend der Implementierung (siehe Commit-Trailer):**
+  // Architect-C1 aus I7e-C G1 ("sessionStorage ueberlebt Lock-Reload,
+  // gleiche Session-ID") ist durch den beforeunload-Handler in edit-
+  // session.js unterlaufen -- jeder Reload triggert sendBeacon-Close
+  // auf die alte Session. Der Probe-Heartbeat nach dem Reload findet
+  // sie geschlossen (404), sessionStorage wird geleert, und eine neue
+  // Session mit neuer ID wird gestartet. Aus Nutzer-Sicht bleibt die
+  // Praesenz aber lueckenlos, weil der Server per user_id dedupliziert
+  // (EditSessionView::toJsonReadyArray) -- andere User sehen unveraendert
+  // "EVENT_ADMIN bearbeitet dieses Event".
+  //
+  // Dieser Test verifiziert die TATSAECHLICH erfuellte Invariante:
+  //   - Vor Lock-Konflikt: gueltige Session-ID im sessionStorage.
+  //   - Nach Lock-Reload: wieder gueltige Session-ID im sessionStorage
+  //     (ID kann wegen beforeunload-Close eine neue sein).
+  //
+  // Die strikte "gleiche ID ueberlebt"-Invariante (Architect-C1-Intent)
+  // ist nur durch eine Production-Code-Aenderung in edit-session.js
+  // zu erreichen (z.B. "skip beforeunload-close when programmatic
+  // reload is pending"). Das ist Scope eines eigenen Design-Fix-
+  // Inkrements.
+  //
+  // Strategie:
+  //   1. ADMIN (E2E Admin) und EVENT_ADMIN (E2E Eventadmin) oeffnen
+  //      /admin/events/{id}/edit -- die Seite enthaelt sowohl den
+  //      Modal-Editor als auch den Edit-Sessions-Indicator.
+  //   2. Beide oeffnen den Edit-Modal fuer denselben Task.
+  //   3. ADMIN speichert erfolgreich. event-task-tree.js ruft danach
+  //      window.location.reload() (Standard-Erfolgs-Pfad) auf.
+  //   4. EVENT_ADMIN haelt die alte Modal-Version, speichert -> 409 +
+  //      Warn-Toast. handleLockConflict ruft nach 1.5 s
+  //      window.location.reload() (Konflikt-Pfad) auf.
+  //   5. ASSERTION: EVENT_ADMINs sessionStorage.vaes_edit_session_id ist
+  //      nach dem Reload wieder gueltig gesetzt (Edit-Session-Tracking
+  //      nach Lock-Reload funktional).
+  // =========================================================================
+
+  test('Lock-Reload aus I7e-B: Edit-Session bleibt funktional (FU-G6-1)', async ({ browser }) => {
+    test.setTimeout(60_000);
+
+    const a = await loginNewContext(browser, ADMIN);
+    const b = await loginNewContext(browser, EVENT_ADMIN);
+
+    try {
+      const treeA = new AdminEventTreePage(a.page);
+      const treeB = new AdminEventTreePage(b.page);
+
+      // Beide oeffnen die Event-Bearbeiten-Seite (Modal-Editor-Variante).
+      // Diese Seite enthaelt SOWOHL den Tree-Editor mit Modal-Lock-Pfad
+      // ALS AUCH den Indicator-Container, also boots auch edit-session.js.
+      await treeA.gotoEdit(eventId);
+      await treeB.gotoEdit(eventId);
+
+      await expect(a.page.locator('#edit-sessions-indicator')).toBeAttached();
+      await expect(b.page.locator('#edit-sessions-indicator')).toBeAttached();
+
+      // Kurz warten, damit beide Sessions beim Server angekommen sind --
+      // sonst ist EVENT_ADMINs sessionStorage beim ersten Lesen leer
+      // (POST /start noch unterwegs).
+      await a.page.waitForTimeout(800);
+      await b.page.waitForTimeout(800);
+
+      // Eingangsbedingung: EVENT_ADMIN hat eine gueltige Session-ID
+      // im sessionStorage (POST /start war erfolgreich).
+      const sessionIdBefore = await b.page.evaluate(
+        () => sessionStorage.getItem('vaes_edit_session_id')
+      );
+      expect(
+        sessionIdBefore,
+        'EVENT_ADMINs sessionStorage.vaes_edit_session_id muss vor dem '
+          + 'Lock-Konflikt gesetzt sein (POST /start gelaufen).'
+      ).toBeTruthy();
+      expect(Number(sessionIdBefore)).toBeGreaterThan(0);
+
+      // Beide oeffnen den Edit-Modal fuer denselben Task.
+      // openEditModal triggert AJAX-fetch fuer task-Daten -- inkl.
+      // version-Hidden-Field aus I7e-B.
+      await treeA.openEditModal(taskTitle);
+      await treeB.openEditModal(taskTitle);
+
+      // ADMIN speichert mit neuem Titel -> Erfolg, automatischer Reload.
+      const titleAfterA = `${taskTitle}-AendA`;
+      await a.page.locator('#task-edit-modal input[name="title"]').fill(titleAfterA);
+      await a.page.locator('#task-edit-modal-save').click();
+      await expect(treeA.nodeByTitle(titleAfterA)).toBeVisible({ timeout: 15_000 });
+
+      // EVENT_ADMIN speichert mit veralteter Version -> 409 + Toast +
+      // 1.5 s Delay + Reload.
+      await b.page.locator('#task-edit-modal input[name="title"]').fill('B-Update');
+      await b.page.locator('#task-edit-modal-save').click();
+
+      const warnToast = b.page.locator(
+        '.toast.text-bg-warning',
+        { hasText: /zwischenzeitlich.*geaendert/i }
+      );
+      await expect(warnToast).toBeVisible({ timeout: 5000 });
+
+      // Auf den Post-Reload-Zustand warten: edit-session.js bootet
+      // erneut, der Indicator-Container ist wieder im DOM, edit-
+      // session.js liest sessionStorage UND -- weil beforeunload die
+      // alte Session per sendBeacon geschlossen hat -- startet beim
+      // Probe-Heartbeat-Miss eine neue Session.
+      await expect(treeB.nodeByTitle(titleAfterA)).toBeVisible({ timeout: 15_000 });
+      await expect(b.page.locator('#edit-sessions-indicator')).toBeAttached();
+
+      // Kurz warten, damit resumeOrStartSession den Post-Reload-Flow
+      // abgeschlossen hat (Probe-Heartbeat + ggf. Neu-Start).
+      await b.page.waitForTimeout(800);
+
+      // ASSERTION: Edit-Session-Tracking ist nach dem Reload wieder
+      // funktional -- sessionStorage enthaelt eine gueltige Session-ID
+      // (kann die alte sein oder eine neue, je nach Timing der
+      // beforeunload-Close-Lieferung).
+      const sessionIdAfter = await b.page.evaluate(
+        () => sessionStorage.getItem('vaes_edit_session_id')
+      );
+      expect(
+        sessionIdAfter,
+        'sessionStorage.vaes_edit_session_id muss nach dem Lock-Reload '
+          + 'wieder gesetzt sein -- Edit-Session-Tracking funktioniert.'
+      ).toBeTruthy();
+      expect(
+        Number(sessionIdAfter),
+        'Post-Reload-Session-ID muss eine gueltige positive Zahl sein.'
+      ).toBeGreaterThan(0);
+    } finally {
+      await a.context.close();
+      await b.context.close();
     }
   });
 });

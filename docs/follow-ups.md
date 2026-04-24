@@ -133,31 +133,58 @@ gebuendelte Mini-Iteration nach dem Tag.
 - ~~**FU-G7-1**~~ -- erledigt im G9-Commit (Deploy-Reihenfolge im
   Benutzerhandbuch-Abschnitt "Hinweis auf parallele Editoren"
   unter "Verfuegbarkeit").
-- **Test-Breite-Buendel** (FU-G6-1 + FU-G6-2): kombinierter
-  `test(edit-sessions)`-Commit, ca. 1 Stunde.
+- ~~**Follow-up t**~~ -- erledigt in Commit `test(e2e): I7e-C
+  Nach-Tag Test-Breite` als Spec 17 Test 5. Dabei ist eine
+  Design-Luecke zu Architect-C1 aufgefallen (Follow-up z).
 
-### Follow-up t -- Lock-Reload-E2E-Test in Spec 17
+### ~~Follow-up t -- Lock-Reload-E2E-Test in Spec 17~~ (erledigt)
 
-- **Quelle:** Sanity-Gate I7e-C.1 (G6-Tester-Befund).
-- **Status:** offen, Test-Breite.
+Spec 17 Test 5 "Lock-Reload aus I7e-B: Edit-Session bleibt
+funktional" laeuft. Deckt die User-sichtbare Invariante
+(Session-Tracking bleibt nach Lock-Reload funktional) ab. Die
+strikte C1-Intent-Invariante (gleiche Session-ID ueberlebt den
+Reload) ist nicht erreichbar -- siehe Follow-up z.
+
+### Follow-up z -- Design-Fix fuer Architect-C1 (beforeunload-Close vs. Reload)
+
+- **Quelle:** FU-G6-1 Umsetzung (Test-Befund, 2026-04-24).
+- **Status:** offen, Design-Luecke.
 
 **Beschreibung:**
-Spec 17 testet den I7e-B-Lock-Reload-Pfad nicht end-zu-end.
-`sessionStorage`-Persistenz ist statisch via
-`EditSessionJsInvariantsTest::test_session_id_uses_sessionStorage_not_localStorage`
-abgesichert. Ein End-zu-End-Beweis wuerde einen Optimistic-Lock-
-Konflikt aus I7e-B aufbauen, dessen automatischen Reload abwarten,
-und danach pruefen, dass die `sessionStorage`-ID erhalten bleibt
-und der Heartbeat ohne neue Session-Anlage 200 liefert.
+Architect-C1 aus I7e-C G1 postuliert: "sessionStorage ueberlebt
+Lock-Reload, gleiche Session-ID bleibt". In der Implementierung
+greift jedoch der `beforeunload`-Handler in `edit-session.js`
+auch bei programmatischen Reloads und schickt per
+`navigator.sendBeacon` einen Close-Request. Nach dem Reload
+findet `resumeOrStartSession` die Session geschlossen (404)
+und legt eine neue mit neuer ID an.
+
+User-sichtbar **intakt**: der Server dedupliziert per `user_id`
+(`EditSessionView::toJsonReadyArray`), andere Editoren sehen
+weiterhin "EVENT_ADMIN bearbeitet..." ohne Luecke im Polling-
+Feed. Die Praesenz-Invariante haelt.
+
+C1-Intent-Invariante **nicht erfuellt**: neue DB-Zeile, neue ID,
+minimaler Server-Overhead (ein zusaetzlicher INSERT + DELETE-
+Rotation ueber `cleanupStale`).
 
 **Naechster Schritt:**
-Spec 17 um einen Test 4 erweitern: Setup-Event mit mindestens
-einer Aufgabe; ADMIN startet Session und Edit-Modal; ADMIN B
-updated denselben Task mit veralteter Version → ADMIN A bekommt
-409 + Reload; nach Reload erstes Heartbeat-Probe-Request liefert
-200 (gleiche Session-ID). Setup-intensiv.
+Design-Fix in `edit-session.js`. Optionen:
+- (A) Ein Modul-Flag `programmaticReload = true` wird von
+  `handleLockConflict` vor `window.location.reload()` gesetzt;
+  `closeSessionBestEffort` prueft das Flag und ueberspringt den
+  sendBeacon-Aufruf.
+- (B) `handleLockConflict` ruft explizit einen "soft-reload"-Modus
+  auf, der den beforeunload-Handler vorher abmeldet.
 
-**Groessenordnung:** ca. 30-45 Min.
+Option (A) ist minimal-invasiv, eine Flag-Variable + ein
+`if`-Check. Kann in einer <30-Min-Mini-Iteration umgesetzt werden.
+
+Nach Umsetzung: Spec 17 Test 5 strenger fassen
+(`sessionIdAfter === sessionIdBefore`) und als Gegenbeweis
+ausbauen.
+
+**Groessenordnung:** ca. 30 Min inkl. Test-Erweiterung.
 
 ### Follow-up u -- Repository-Integration-Tests fuer EditSessionRepository
 
