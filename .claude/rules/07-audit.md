@@ -45,14 +45,16 @@ final class AuditService
 
 ## Action-Katalog (Schema-ENUM)
 
-Das Feld `audit_log.action` ist ein **MySQL-ENUM** mit 12 festen Werten:
+Das Feld `audit_log.action` ist ein **MySQL-ENUM** mit 13 festen Werten
+(seit Migration 011 / Modul 6 I8, 2026-04-24):
 
 ```sql
 action ENUM(
     'create', 'update', 'delete', 'restore',
     'login', 'logout', 'login_failed',
     'status_change', 'export', 'import',
-    'config_change', 'dialog_message'
+    'config_change', 'dialog_message',
+    'access_denied'
 ) NOT NULL
 ```
 
@@ -75,10 +77,30 @@ action ENUM(
 | CSV-Import | `import` | `metadata={file, rows_ok, rows_fail}` |
 | Settings-/Rollen-Aenderung | `config_change` | `table_name='settings'`/`user_roles` |
 | Dialog-Nachricht | `dialog_message` | `record_id=<dialog_id>` |
+| Authorization-Denial | `access_denied` | `metadata={route, method, reason, …}` |
 
 **Hinweis zur Granularitaet:** Feinere Unterscheidungen (z.B.
 `entry_approve` vs. `entry_reject`) landen in `description` und `metadata`,
 nicht als eigenes ENUM-Level.
+
+### Reason-Codes fuer `access_denied` (seit Modul 6 I8)
+
+Der `access_denied`-Wert wird immer mit einem Reason-Code in der Metadata
+kombiniert. Die Codes sind fuer den Auditor maschinen-lesbar und erlauben
+`SELECT`-Filter wie `metadata->>'$.reason' = 'rate_limited'`.
+
+| `metadata.reason` | Wann | Quelle |
+|-------------------|------|--------|
+| `missing_role` | User hat die erforderliche Rolle nicht | `RoleMiddleware` |
+| `csrf_invalid` | CSRF-Token fehlt oder ist abgelaufen | `CsrfMiddleware` |
+| `rate_limited` | Request ueber dem Bucket-Limit (429) | `RateLimitMiddleware` |
+| `ownership_violation` | Resource gehoert anderem User (z.B. IDOR-Check) | `BaseController::assertEventEditPermission` |
+| `resource_not_found` | Ziel-Resource existiert nicht oder ist soft-deleted | Controller-individuell |
+
+Weitere Reason-Codes duerfen ergaenzt werden. Die `AuthorizationException`
+nimmt den Code im zweiten Konstruktor-Parameter entgegen; der
+`handleAuthorizationDenial`-Helper aus `BaseController` oder der Slim-
+ErrorHandler geben den Code an `AuditService::logAccessDenied` weiter.
 
 ---
 

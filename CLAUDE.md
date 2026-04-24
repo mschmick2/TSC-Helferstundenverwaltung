@@ -21,7 +21,7 @@
 | **Tests** | PHPUnit 10.5 (`src/vendor/bin/phpunit`) |
 | **Git-Workflow** | Feature-Branches → main, Conventional Commits Pflicht |
 | **Repo** | https://github.com/mschmick2/TSC-Helferstundenverwaltung |
-| **Version** | 1.4.9 |
+| **Version** | 1.4.10 |
 
 ---
 
@@ -188,7 +188,8 @@ Erlaubte Uebergaenge pro Status siehe `src/app/Services/WorkflowService.php`.
 | 2 | Rate-Limiting fuer Passwort-Reset-Endpunkt pruefen | erledigt 2026-04-21 (Zwei-Bucket-Schutz fuer `/forgot-password`: IP sichtbar, Email silent gegen verteilte Flood-Angriffe; Migration 008 `rate_limits.email`; Config-Keys statt Hardcoded; E2E-Spec 09 als Nachweis) |
 | 3 | CSP-Header pruefen (Strato `.htaccess`) | erledigt 2026-04-21 (Safe-Improvements: `SecurityHeadersMiddleware` setzt CSP/HSTS/Permissions-Policy auch lokal; Policy um `object-src 'none'`, `base-uri`, `form-action`, `frame-ancestors`, `upgrade-insecure-requests` ergaenzt; `.htaccess` parallel gezogen; `'unsafe-inline'` bleibt bis zum Nonce-Rollout als eigene Iteration) |
 | 4 | IDOR in mutierenden Tree-Controller-Actions (fehlender Event-/Template-Scope-Check vor Service-Call) | erledigt 2026-04-24 (Modul 6 I7e-A G4 Dim 3: Controller-seitiger Cross-Check `$task->getEventId() !== $eventId` in 12 Actions auf `OrganizerEventEditController`, `EventAdminController`, `EventTemplateController`. Statische Invarianten in drei Test-Dateien gegen Drift. Commit 2a16823) |
-| 5 | Audit-Log bei fehlgeschlagenen Authorization-Zugriffen (403) | offen — Follow-up v aus I7e-A G4 Dim 7; siehe `docs/follow-ups.md` |
+| 5 | Audit-Log bei fehlgeschlagenen Authorization-Zugriffen (403) | erledigt 2026-04-24 (Modul 6 I8, Tag `v1.4.10-local-i8`: neue `AuditService::logAccessDenied`, action-ENUM um `access_denied` erweitert, Einhaenger in `RoleMiddleware`/`CsrfMiddleware`/`RateLimitMiddleware`/Slim-ErrorHandler plus `BaseController::handleAuthorizationDenial` fuer 16 Controller-Catches. Reason-Codes `missing_role / csrf_invalid / rate_limited / ownership_violation / resource_not_found`. Commits `a2f4695` + `d085676` + `1ffc064` + `eab1c19`) |
+| 6 | Rate-Limit auf mutierende Tree-Actions und Edit-Session-API (aus I7e-B G4 FU-G4-1) | erledigt 2026-04-24 (Modul 6 I8 Phase 2: neue generische `RateLimitMiddleware` mit drei Buckets `tree_action / edit_session_heartbeat / edit_session_other`, Defaults 60/8/10 pro Minute aus `security.*_rate_limit_*`-Settings, per-Route-Bindung auf Admin-/Organizer-/Template-Tree-Routes und Edit-Session-Start/Heartbeat/Close. Commit `d085676`) |
 
 Neue Eintraege bei G4-Findings hier ergaenzen.
 

@@ -121,14 +121,35 @@ Email-Adresse als zweiter Bucket).
 | `POST /forgot-password` pro IP | 5 Versuche | 15 min | sichtbarer HTTP 429 |
 | `POST /forgot-password` pro Email | 3 Versuche | 60 min | stilles Drop (Anti-Flood) |
 | `POST /reset-password` pro IP | 10 Versuche | 15 min | HTTP 429 |
+| Tree-Actions (alle mutierenden Admin/Organizer/Template-Tree-Routes) pro User | 60 Requests | 60 s | HTTP 429 |
+| `POST /api/edit-sessions/{id}/heartbeat` pro User | 8 Requests | 60 s | HTTP 429 |
+| `POST /api/edit-sessions/start` + `/close` pro User | 10 Requests | 60 s | HTTP 429 |
 
 - Zwei-Bucket-Design: IP-Bucket verhindert Bruteforce, Email-Bucket verhindert
   Flooding eines fremden Postfachs mit Reset-Mails. Dokumentiert in
   [`CLAUDE.md`](../CLAUDE.md) §8 Nr. 2, umgesetzt am 2026-04-21.
+- Seit Modul 6 I8 (2026-04-24) drei zusaetzliche User-Buckets gegen Flood auf
+  authentifizierten Endpunkten; umgesetzt als `RateLimitMiddleware` mit drei
+  DI-Factory-Instanzen. Per-User-Rate-Limit nutzt die bestehende
+  `rate_limits.email`-Spalte als generisches Key-Feld im Schema
+  `user:<id>` (bewusste Namensraum-Doppelnutzung, **kein** echter Email-
+  Speicher — die User-ID ist uebrigens im selben `audit_log`-Eintrag
+  bereits separat referenziert, keine PII-Implikation).
 - Automatisches Cleanup veralteter Eintraege in
-  [`RateLimitService.php:122-128`](../src/app/Services/RateLimitService.php#L122-L128).
-- Rueckweisungen mit `429 Too Many Requests` werden im Audit-Log
-  protokolliert.
+  [`RateLimitService::cleanup`](../src/app/Services/RateLimitService.php).
+- Die sechs neuen Grenzen sind als Settings-Keys unter dem Namespace
+  `security.tree_action_rate_limit_*` und
+  `security.edit_session_{heartbeat,other}_rate_limit_*` zur Laufzeit ueber
+  die Admin-Oberflaeche aenderbar; Migration 011 setzt die Defaults.
+- **Rate-Limit- und Audit-Kopplung:** Ein 429-Response aus der
+  `RateLimitMiddleware` schreibt zusaetzlich einen `audit_log`-Eintrag mit
+  `action='access_denied'`, `metadata.reason='rate_limited'`, Bucket-Name,
+  Limit und Fenster. Dieselbe Kopplung greift fuer Rolle-Denial
+  (`missing_role`), CSRF-Fehler (`csrf_invalid`) und Ownership-Verletzungen
+  (`ownership_violation`). Die Metadata ist bewusst **ohne PII** gestaltet
+  (kein Request-Body, kein Query-String, keine E-Mail); die Docblock-
+  Konvention auf `AuthorizationException::__construct` kodifiziert das,
+  ein Regex-Invariants-Test schuetzt gegen Entfernung.
 
 ### 3.5 Transportverschluesselung und HTTP-Sicherheitsheader
 
@@ -281,9 +302,10 @@ Jeder Audit-Eintrag enthaelt:
 - `user_id`, `session_id`, `ip_address`, `user_agent` (User-Agent ist auf 500
   Zeichen begrenzt, siehe
   [`AuditService.php:66`](../src/app/Services/AuditService.php#L66)),
-- `action` — 12 feste Werte als MySQL-ENUM: `create`, `update`, `delete`,
+- `action` — 13 feste Werte als MySQL-ENUM: `create`, `update`, `delete`,
   `restore`, `login`, `logout`, `login_failed`, `status_change`, `export`,
-  `import`, `config_change`, `dialog_message`,
+  `import`, `config_change`, `dialog_message`, `access_denied` (letzterer
+  seit Migration 011 / Modul 6 I8, 2026-04-24),
 - `table_name`, `record_id`, `entry_number` (bei work_entries),
 - `old_values` / `new_values` als JSON (nur geaenderte Felder),
 - `description` (menschlich lesbar),
@@ -303,6 +325,17 @@ Siehe [`AuditService.php:43-76`](../src/app/Services/AuditService.php#L43-L76).
 - **Exporte und Importe:** `export` / `import` mit Metadaten
   (Zeilen-Anzahl, Filter, Zielformat).
 - **Anonymisierung / Soft-Delete:** `delete` mit Beschreibung.
+- **Authorization-Denials (seit Modul 6 I8):** `access_denied` mit
+  `metadata.reason ∈ {missing_role, csrf_invalid, rate_limited,
+  ownership_violation, resource_not_found}`, plus `route` und `method`.
+  Die Erfassung greift in vier Pfaden:
+  `RoleMiddleware` (`missing_role`), `CsrfMiddleware` (`csrf_invalid`),
+  `RateLimitMiddleware` (`rate_limited`), Slim-ErrorHandler +
+  `BaseController::handleAuthorizationDenial` fuer
+  `AuthorizationException`-Werfer (`ownership_violation` u. a.).
+  Dadurch ist jeder 403-/429-Pfad im System audit-sichtbar, unabhaengig
+  davon, ob die Exception bis zum zentralen ErrorHandler durchbubbelt
+  oder im Controller-`catch` verarbeitet wird.
 
 ### 4.4 Transaktionssicherheit
 
@@ -606,8 +639,9 @@ werden bei Aenderungen am Datenmodell automatisch angezogen.
   PDO-Prepared-Statements mit `EMULATE_PREPARES=false` (3.6).
 - Zweistufige Rollenpruefung (HTTP-Middleware + Service-Assertion), technisch
   erzwungene Sperre gegen Selbstgenehmigung (3.7).
-- Revisionssicheres Audit-Log mit DB-Trigger-Schutz, 12-Wert-ENUM fuer
-  Aktionen, Kontextfelder (IP, User-Agent, Session) pro Eintrag (4).
+- Revisionssicheres Audit-Log mit DB-Trigger-Schutz, 13-Wert-ENUM fuer
+  Aktionen (inkl. `access_denied` seit Modul 6 I8), Kontextfelder
+  (IP, User-Agent, Session) pro Eintrag (4).
 - Soft-Delete als Standard fuer Business-Daten, Anonymisierungsskript mit
   Systemaccount-Ausnahme (5.3).
 - Betroffenenrechte (Auskunft, Berichtigung, Loeschung, Uebertragbarkeit)

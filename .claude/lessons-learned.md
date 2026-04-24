@@ -1450,3 +1450,84 @@ Als Kommentar im Test-Header die Begruendung notieren, damit
 spaetere Editoren die Wartezeiten nicht fragen ("warum 60
 statt 30?").
 
+
+---
+
+### 2026-04-24 — Audit-Pipeline bei Authorization-Denial (Modul 6 I8)
+
+**Kontext:**
+I8 sollte systemisch jeden Authorization-Denial ins `audit_log` schreiben
+(Follow-up v aus CLAUDE.md §8 Nr. 5). Der G1-Plan hatte als
+zentralen Einstiegspunkt einen Slim-ErrorHandler vorgesehen, der jede
+`AuthorizationException` faengt und `logAccessDenied` ruft.
+
+**Problem / Ueberraschung:**
+G4 Security-Review fand 16 Controller-catch-Stellen in 3 Controllern
+(WorkEntry 10, Organizer 4, Member 2), die `AuthorizationException`
+laengst vor dem ErrorHandler abfangen und zu Flash+Redirect
+verarbeiten. Fuer diese 16 Pfade wurde nichts auditiert — der Plan
+verfehlte seinen Haupt-Zweck fuer die Mehrzahl der Denial-Pfade. ROT-
+Finding im G4, Tag-Blocker.
+
+Zweite Ueberraschung: MySQL-Default-SQL-Mode akzeptiert den
+ENUM-Rollback in der 011.down.sql klaglos und setzt
+`access_denied`-Zeilen stillschweigend auf Leerstring — der Kommentar
+versprach ein hartes Fail. Verifiziert im G9-Test am 2026-04-24.
+
+**Loesung:**
+- Neuer `BaseController::handleAuthorizationDenial`-Helper plus
+  statischer Bootstrap-Setter (analog zu
+  `RoleMiddleware::setAuditService` aus Phase 1). Die 16 catch-Bloecke
+  auf den Helper umgestellt. Regex-Invariants-Test
+  `AuthorizationCatchBlockInvariants` schuetzt gegen erneutes
+  Auseinanderdriften. Details in Commit `eab1c19`.
+- 011.down.sql um einen expliziten SIGNAL-Guard erweitert, der bei
+  vorhandenen `access_denied`-Zeilen hart abbricht statt
+  stillschweigend zu ueberschreiben. Operator muss vorher bewusst
+  DELETE oder UPDATE ausfuehren.
+
+**Praevention:**
+
+1. **Grep-Validierung bei systemischen Pipeline-Einfuehrungen.**
+   "Der Handler faengt alles" ist eine Hypothese, keine Tatsache.
+   Bei pipeline-orientierten Architect-Plaenen muss eine
+   Bestands-Grep-Checkliste in die G1-Phase aufgenommen werden. Jede
+   Architect-Behauptung der Form "X wird im Bestand Y nirgendwo
+   abgefangen" triggert eine `grep`-Pflicht. → Ergaenzung in
+   `.claude/architect.md` oder `.claude/rules/01-security.md`.
+
+2. **Audit-Pfad-Loop-Verhalten explizit planen.**
+   Jeder neue Audit-Pfad im Architect-Plan bekommt eine Zeile
+   "Loop-Verhalten: was passiert bei 1000 Treffern/Sekunde?"
+   Konkreter Fall: G1-R1 postulierte "Rate-Limit-Overflow wird nach
+   dem ersten Treffer nicht weiter auditiert" — der tatsaechliche
+   Code auditiert jeden blockierten Request (FU-I8-G4-1,
+   Post-Tag-Bundle). Bei TSC-Scale harmlos, aber eine
+   DB-Flood-Flanke. → Standard-Frage im G1-Plan-Template.
+
+3. **DI-Wege-Matrix im G1-Plan vorweg festschreiben.**
+   Wenn ein Inkrement mehrere DI-Strategien braucht (Constructor-
+   Injection, statischer Setter, Factory, Locator), muss der G1-Plan
+   eine tabellarische "Klasse × DI-Weg × Begruendung"-Matrix
+   enthalten, nicht erst in Commit-Messages rekonstruieren lassen.
+   I8 hat vier verschiedene DI-Wege ueber drei Commits verteilt —
+   jeder mit gutem Grund, aber das Gesamtbild ist erst nach dem
+   G8-Report zusammenfuehrbar gewesen.
+
+4. **Bestandsschulden-Buendelung in thematischen Inkrementen.**
+   Verwandte Bestandsschulden aus CLAUDE.md §8 im selben Inkrement
+   abarbeiten, statt jede einzeln mit eigener Gate-Kaskade
+   nachzuziehen. I8 schliesst Nr. 5 (Audit bei 403) und die aus I7e-B
+   entstandene FU-G4-1 (Rate-Limit auf Tree-Actions) in einem
+   Schlag — weniger G1-Overhead, weniger G4-Rundgaenge, kohaerentere
+   Security-Story.
+
+5. **MySQL-ENUM-Rollback ist nicht error-harsh.**
+   Im MySQL-Default-SQL-Mode konvertiert
+   `ALTER TABLE … MODIFY COLUMN action ENUM(…)` Werte, die im neuen
+   ENUM nicht mehr existieren, stillschweigend zu Leerstring — ohne
+   Warning, ohne Fail. Jede Down-Migration, die einen ENUM-Wert
+   entfernt, braucht einen expliziten Pre-Condition-Guard
+   (SIGNAL SQLSTATE '45000' bei vorhandenen Zeilen), sonst verliert
+   man Audit-Daten unbemerkt. → Ergaenzung in
+   `.claude/rules/04-database.md` (Migrations-Regeln).

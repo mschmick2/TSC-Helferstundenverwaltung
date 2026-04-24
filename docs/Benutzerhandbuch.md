@@ -1,7 +1,7 @@
 # VAES Benutzerhandbuch
 
 **Vereins-Arbeitsstunden-Erfassungssystem (VAES)**
-Version 1.4.9
+Version 1.4.10
 Stand: April 2026
 
 ---
@@ -1450,6 +1450,57 @@ Bei einer Aktualisierung der Strato-Produktion mit den Aenderungen aus `v1.4.9-l
    - `events.edit_sessions_enabled = 1`
 
 Ohne Migration und mit Flags `= 0` ist die Deploy-Uebernahme risikolos -- das Feature bleibt inaktiv, bestehende Funktionalitaet bleibt unveraendert.
+
+**Hinweis fuer Administratoren beim Deploy (v1.4.10 / Modul 6 I8 — Audit bei Authorization-Denial und Rate-Limit):**
+
+`v1.4.10-local-i8` bringt zwei systemische Security-Erweiterungen: jede
+verweigerte Aktion (fehlende Rolle, ungueltiges CSRF-Token,
+Rate-Limit-Ueberlauf, Ownership-Verletzung) wird ab sofort im
+Audit-Log festgehalten, und drei authentifizierte Endpunkt-Gruppen
+(Tree-Actions, Edit-Session-Heartbeat, Edit-Session-Start/Close) haben
+einen neuen Pro-User-Rate-Limit bekommen.
+
+Deploy-Reihenfolge fuer die Strato-Produktion:
+
+1. **Zuerst Migration 011 einspielen** (via phpMyAdmin oder mysql-CLI),
+   BEVOR der neue App-Code aktiv wird:
+   - Datei: `scripts/database/migrations/011_audit_denial_and_rate_limits.sql`.
+   - Erweitert die `audit_log.action`-ENUM um `access_denied` und legt
+     sechs neue Settings-Keys unter dem Namespace `security.*` an.
+   - Idempotent via `INFORMATION_SCHEMA`-Check und
+     `ON DUPLICATE KEY UPDATE`.
+2. **Danach** den neuen App-Code per FTP hochladen (inkl. `vendor/` und
+   der neuen Middleware-Dateien unter `src/app/Middleware/`).
+3. **Smoke-Test:** als Mitglied einloggen, versuchen, `/admin/events/1/editor`
+   zu oeffnen. Erwartet: Redirect zur Startseite mit Fehlermeldung und
+   **ein neuer Eintrag in `audit_log` mit `action='access_denied'` und
+   `metadata.reason='missing_role'`**.
+
+**Rollback I8** (falls notwendig):
+
+Die Reihenfolge ist wichtig — bitte Schritt 2 nicht ueberspringen, sonst
+gehen Audit-Zeilen verloren:
+
+1. App-Code auf die vorherige Version zuruecksetzen (FTP-Upload der alten
+   Dateien). Der alte Code schreibt keine `access_denied`-Eintraege mehr.
+2. Entscheiden, was mit den zwischenzeitlich entstandenen
+   `access_denied`-Audit-Zeilen passieren soll:
+   - **Entweder loeschen** (revisions-politisch akzeptabel, wenn diese
+     Zeilen als Test-Artefakte gelten):
+     `DELETE FROM audit_log WHERE action='access_denied';`
+   - **Oder umbiegen** auf einen harmlosen Bestandswert
+     (bewahrt die Audit-Historie):
+     `UPDATE audit_log SET action='config_change' WHERE action='access_denied';`
+3. Down-Migration einspielen:
+   `scripts/database/migrations/011_audit_denial_and_rate_limits.down.sql`.
+   Die Datei enthaelt einen Schutz-Guard, der abbricht, wenn in Schritt 2
+   noch `access_denied`-Zeilen uebrig sind — MySQL wuerde diese sonst
+   stillschweigend auf Leerstring setzen (verifiziert im G9-Test am
+   2026-04-24).
+
+Ohne Migration 011 schlaegt der neue App-Code beim ersten
+Authorization-Denial fehl (unbekannter ENUM-Wert). Deshalb ist die
+Reihenfolge "Migration zuerst, App danach" verbindlich.
 
 ### 12.5 Event-Vorlagen
 

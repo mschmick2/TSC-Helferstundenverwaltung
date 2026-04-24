@@ -228,24 +228,95 @@ fuehrt.
 
 ---
 
-## Offene Follow-ups nach I8 Sanity-Gate (Modul 6, 2026-04-24)
+## Follow-ups aus Modul 6 I8 (Tag v1.4.10-local-i8, 2026-04-24)
 
-Aus dem Sanity-Check-Gate zu den I8-Phasen 1+2 (Commits `a2f4695`
-und `d085676`) ergaben sich acht Follow-ups (FU-1 bis FU-8). Die
-komplette Sammlung wird mit dem I8-G9-Dokumentar-Commit ins Register
-uebernommen. Bereits vorab erledigt ist FU-3, weil der Scope
-(Docblock-Konvention + Invariant-Test) klein genug fuer einen
-Micro-Commit war:
+Modul 6 I8 (Audit bei Authorization-Denial + Rate-Limit) hatte vier
+Commits auf `feature/i8-audit-rate-limit`: `a2f4695` (Phase 1),
+`d085676` (Phase 2), `1ffc064` (FU-3 Docblock), `eab1c19` (G4-ROT-Fix).
+Daraus ergaben sich insgesamt zwoelf Follow-ups — acht aus dem
+Sanity-Check-Gate (FU-1..FU-8) und vier aus dem G4-Security-Review
+(FU-I8-G4-1..-4 plus der als ROT klassifizierte FU-I8-G4-0).
 
-- ~~**FU-3** (G5 DSGVO)~~ -- erledigt. Metadata-PII-Konvention fuer
-  `AuthorizationException`-Werfer im `__construct`-Docblock
-  kodifiziert (keine E-Mail-Adressen, Namen, IP-Adressen,
-  Request-Body-Inhalte in `$metadata`, weil der Slim-ErrorHandler
-  das Array ungefiltert ins `audit_log` weiterreicht).
-  Statischer Invariant-Test `AuthorizationExceptionDocblockTest`
-  schuetzt vor einem spaeteren Ausduennen des Hinweises.
-  Siehe Commit `docs(exceptions): FU-3 - Metadata-PII-Hinweis auf
-  AuthorizationException`.
+### Erledigt im Inkrement (durchgestrichen)
+
+- ~~**FU-3** (Sanity G5 DSGVO)~~ — Metadata-PII-Konvention auf
+  `AuthorizationException::__construct` dokumentiert, Invariant-Test
+  `AuthorizationExceptionDocblockTest`. Siehe Commit `1ffc064`.
+- ~~**FU-I8-G4-0** (G4 ROT, Tag-Blocker)~~ — 16 Controller-catch-Stellen
+  riefen ihn zuvor nicht auf. Neuer Helper
+  `BaseController::handleAuthorizationDenial` + statischer
+  Bootstrap-Setter, Invariants-Tests `AuthorizationCatchBlockInvariants`.
+  Siehe Commit `eab1c19`.
+- ~~**FU-I8-G4-3** (G4 UX)~~ — Heartbeat-Rate-Limit-Default von 4/min
+  auf 8/min angehoben (4x statt 2x Puffer bei 2/min Normal-Polling,
+  Flaky-Reduktion bei Netzwerk-Hiccups). Siehe Commit `eab1c19` +
+  Migration 011 im G9-Commit.
+- ~~**FU-4** (Sanity G5 DSGVO, Pre-Tag)~~ — `docs/DSGVO_und_Security_Nachweis.md`
+  und `.claude/rules/07-audit.md` um den 13. ENUM-Wert `access_denied`
+  und die sechs neuen Settings-Keys ergaenzt. Siehe G9-Commit.
+- ~~**FU-6** (Sanity G7 Integrator, Pre-Tag)~~ — Playwright-Specs 16
+  (5/5 gruen) und 17 (5/5 gruen im Re-Run; erster kombinierter Lauf
+  hatte einen Timeout-Flake in 17.160 bei 35 s Timeout und 30 s
+  Polling-Intervall, keine I8-Regression). G9 dokumentiert.
+- ~~**FU-7** (Sanity G7 Integrator, Pre-Tag)~~ — Migration 011 auf Dev-DB
+  ausgefuehrt: 13 ENUM-Werte, sechs Settings-Zeilen, Heartbeat-Default
+  8/min verifiziert. Rollback-Test in 011.down.sql zusaetzlich um
+  einen SIGNAL-Guard erweitert, weil der MySQL-Default-SQL-Mode den
+  ENUM-Rollback klaglos akzeptiert und `access_denied`-Zeilen
+  stillschweigend auf Leerstring setzt — der neue Guard bricht das
+  jetzt hart ab.
+- ~~**FU-8** (Sanity G7 Integrator, Pre-Tag)~~ — Deploy-Reihenfolge fuer
+  Strato ("Migration 011 vor App-Update") und der verlustsichere
+  Rollback-Pfad (App zurueck → DELETE/UPDATE der `access_denied`-
+  Zeilen → 011.down.sql) im Benutzerhandbuch ergaenzt.
+
+### Offen — Post-Tag-Bundles
+
+**Bundle A — Audit-Hardening (~1 Session):**
+
+- **FU-I8-G4-1** (G4 Dim 5): Deduplication fuer
+  `AuditService::logAccessDenied` bei Rate-Limit-Dauerblock. Aktueller
+  Code schreibt bei jedem blockierten Request einen neuen
+  Audit-Eintrag; ein Angreifer mit validem Session-Cookie kann damit
+  die `audit_log`-Tabelle fluten. Mitigation: "pro (user_id, bucket,
+  window) hoechstens ein `access_denied`-Eintrag" — braucht entweder
+  einen Tracker (Memcache oder DB-Spalte) oder eine zusaetzliche
+  Zeit-Guard-Abfrage vor dem Insert.
+- **FU-I8-G4-4** (G4 Dim 9+10): IP-basierter Rate-Limit-Bucket fuer
+  CSRF-Failures. Aktuell sind CSRF-Fehler (`action='access_denied',
+  reason='csrf_invalid'`) nicht rate-limitiert; ein Angreifer mit
+  Session-Cookie (aber ohne CSRF-Token) kann beliebig viele
+  POST-Requests und damit Audit-Eintraege generieren. Empfohlen:
+  neuer Bucket `csrf_failure` mit 20/min/IP-Grenze, gelesen durch
+  `CsrfMiddleware` (die bereits `RateLimitService` kennt).
+
+**Bundle B — Code-Hygiene (~0.5 Session):**
+
+- **FU-1** (Sanity G3 Reviewer): Konstanten fuer die drei
+  RateLimit-Bucket-Keys (`tree_action`, `edit_session_heartbeat`,
+  `edit_session_other`) einfuehren — aktuell String-Literale in
+  `dependencies.php` und `routes.php`, Tippfehler-Risiko bei Drift.
+- **FU-2** (Sanity G3 Reviewer): `RateLimitService` dedupen — die drei
+  10%-Cleanup-Bloecke und die nahezu identischen SELECT-Strukturen in
+  `isAllowed / isAllowedForEmail / isAllowedForUser` bieten sich fuer
+  einen privaten Helper an. Reines Refactor ohne Verhaltensaenderung.
+
+**Bundle C — DB-Hardening (~15 Min):**
+
+- **FU-I8-G4-2** (G4 Dim 6): Migration 012 mit
+  `CREATE INDEX idx_rate_limits_attempted_at ON rate_limits
+  (attempted_at)`. Der Lazy-Cleanup-DELETE macht aktuell einen
+  Full-Table-Scan, weil beide Composite-Indizes `attempted_at` erst
+  an dritter Position haben. Bei TSC-Scale harmlos, unter Flood
+  teuer.
+
+**Einzeln:**
+
+- **FU-5** (Sanity G6 Tester): MySQL-Integration-Test fuer
+  `RateLimitService::isAllowedForUser` Count-Semantik. Das Verhalten
+  ist aktuell nur statisch per Regex-Invariants auf das SQL-Pattern
+  abgesichert (SQLite kann `DATE_SUB(NOW(), INTERVAL :p SECOND)` nicht
+  parsen). Gehoert in die geplante Modul-8-Integration-Suite.
 
 ---
 
