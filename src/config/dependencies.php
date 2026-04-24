@@ -488,6 +488,44 @@ return [
         return new CsrfMiddleware($c->get(AuditService::class));
     },
 
+    // Modul 6 I8 Phase 2 (FU-G4-1): drei Rate-Limit-Middleware-Instanzen
+    // mit unterschiedlichen Bucket-Konfigurationen. String-Keys, weil
+    // dieselbe Klasse in drei Varianten gebraucht wird. Werte der Limits
+    // werden pro Request aus SettingsService gelesen, so bleibt die
+    // Konfiguration ohne App-Neustart anpassbar.
+    'RateLimitMiddleware.treeAction' => function (ContainerInterface $c): \App\Middleware\RateLimitMiddleware {
+        return new \App\Middleware\RateLimitMiddleware(
+            $c->get(\App\Services\RateLimitService::class),
+            $c->get(\App\Services\SettingsService::class),
+            $c->get(\App\Services\AuditService::class),
+            'tree_action',
+            'security.tree_action_rate_limit_max',
+            'security.tree_action_rate_limit_window'
+        );
+    },
+
+    'RateLimitMiddleware.editSessionHeartbeat' => function (ContainerInterface $c): \App\Middleware\RateLimitMiddleware {
+        return new \App\Middleware\RateLimitMiddleware(
+            $c->get(\App\Services\RateLimitService::class),
+            $c->get(\App\Services\SettingsService::class),
+            $c->get(\App\Services\AuditService::class),
+            'edit_session_heartbeat',
+            'security.edit_session_heartbeat_rate_limit_max',
+            'security.edit_session_heartbeat_rate_limit_window'
+        );
+    },
+
+    'RateLimitMiddleware.editSessionOther' => function (ContainerInterface $c): \App\Middleware\RateLimitMiddleware {
+        return new \App\Middleware\RateLimitMiddleware(
+            $c->get(\App\Services\RateLimitService::class),
+            $c->get(\App\Services\SettingsService::class),
+            $c->get(\App\Services\AuditService::class),
+            'edit_session_other',
+            'security.edit_session_other_rate_limit_max',
+            'security.edit_session_other_rate_limit_window'
+        );
+    },
+
     OpportunisticSchedulerMiddleware::class => function (ContainerInterface $c): OpportunisticSchedulerMiddleware {
         // Default 10% Wahrscheinlichkeit pro Dashboard-Aufruf, max 5 Jobs pro Trigger.
         // Werte koennen spaeter ins settings-System wandern, wenn Bedarf besteht.

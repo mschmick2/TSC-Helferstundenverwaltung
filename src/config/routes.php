@@ -27,6 +27,20 @@ use Slim\App;
 use Slim\Routing\RouteCollectorProxy;
 
 return function (App $app): void {
+    // Container fuer parametrisierte Middleware-Instanzen (Modul 6 I8
+    // Phase 2 / FU-G4-1): Rate-Limit-Middleware gibt es in drei
+    // Bucket-Konfigurationen, je Bucket ein DI-String-Key.
+    $container = $app->getContainer();
+    $rateLimitTreeAction = $container !== null
+        ? $container->get('RateLimitMiddleware.treeAction')
+        : null;
+    $rateLimitHeartbeat = $container !== null
+        ? $container->get('RateLimitMiddleware.editSessionHeartbeat')
+        : null;
+    $rateLimitOther = $container !== null
+        ? $container->get('RateLimitMiddleware.editSessionOther')
+        : null;
+
     // =========================================================================
     // Öffentliche Routen (kein Login erforderlich)
     // =========================================================================
@@ -63,7 +77,7 @@ return function (App $app): void {
     // =========================================================================
     // Geschützte Routen (Login erforderlich)
     // =========================================================================
-    $app->group('', function (RouteCollectorProxy $group) {
+    $app->group('', function (RouteCollectorProxy $group) use ($rateLimitHeartbeat, $rateLimitOther) {
         // Dashboard — opportunistischer Scheduler-Trigger (Cron-Backup)
         $group->get('/', [DashboardController::class, 'index'])
             ->add(OpportunisticSchedulerMiddleware::class);
@@ -78,14 +92,28 @@ return function (App $app): void {
         // canEditEvent). Keine RoleMiddleware hier, weil die Organizer-
         // Rolle reine Event-Mitgliedschaft ist, nicht ein globales
         // Berechtigungs-Flag.
-        $group->post('/api/edit-sessions/start',
+        // Modul 6 I8 Phase 2 / FU-G4-1: Rate-Limit je nach Frequenz-
+        // Charakteristik. Heartbeat polls alle 30 s und hat einen
+        // engeren Bucket (default 4/min), Start/Close sind punktuell
+        // und teilen sich edit_session_other (default 10/min). Das
+        // GET listForEvent bleibt ohne Rate-Limit -- low-volume,
+        // rein lesend, CSRF schuetzt ohnehin nicht den Read-Pfad.
+        $startRoute = $group->post('/api/edit-sessions/start',
             [EditSessionController::class, 'start']);
-        $group->post('/api/edit-sessions/{id:[0-9]+}/heartbeat',
+        $heartbeatRoute = $group->post('/api/edit-sessions/{id:[0-9]+}/heartbeat',
             [EditSessionController::class, 'heartbeat']);
-        $group->post('/api/edit-sessions/{id:[0-9]+}/close',
+        $closeRoute = $group->post('/api/edit-sessions/{id:[0-9]+}/close',
             [EditSessionController::class, 'close']);
         $group->get('/api/edit-sessions',
             [EditSessionController::class, 'listForEvent']);
+
+        if ($rateLimitHeartbeat !== null) {
+            $heartbeatRoute->add($rateLimitHeartbeat);
+        }
+        if ($rateLimitOther !== null) {
+            $startRoute->add($rateLimitOther);
+            $closeRoute->add($rateLimitOther);
+        }
 
         // Logout
         $group->get('/logout', [AuthController::class, 'logout']);
@@ -192,7 +220,7 @@ return function (App $app): void {
     // =========================================================================
     // Event-Admin-Routen (event_admin + administrator, Modul 6 I1)
     // =========================================================================
-    $app->group('/admin', function (RouteCollectorProxy $group) {
+    $app->group('/admin', function (RouteCollectorProxy $group) use ($rateLimitTreeAction) {
         // Events
         $group->get('/events', [EventAdminController::class, 'index']);
         $group->get('/events/create', [EventAdminController::class, 'create']);
@@ -205,11 +233,16 @@ return function (App $app): void {
         $group->post('/events/{id:[0-9]+}/complete', [EventAdminController::class, 'complete']);
         $group->post('/events/{id:[0-9]+}/delete', [EventAdminController::class, 'delete']);
 
-        // Event-Tasks
-        $group->post('/events/{id:[0-9]+}/tasks', [EventAdminController::class, 'addTask']);
-        $group->post('/events/{eventId:[0-9]+}/tasks/{taskId:[0-9]+}/update',
+        // Event-Tasks (Modul 6 I8 Phase 2 / FU-G4-1: Rate-Limit
+        // tree_action je Route). Wir sammeln Route-Objekte und adden die
+        // Rate-Limit-Middleware einmalig am Block-Ende -- das vermeidet
+        // Wiederholung und haelt die Intent (welche Routen sind Tree-
+        // Actions?) klar lesbar.
+        $adminTreeRoutes = [];
+        $adminTreeRoutes[] = $group->post('/events/{id:[0-9]+}/tasks', [EventAdminController::class, 'addTask']);
+        $adminTreeRoutes[] = $group->post('/events/{eventId:[0-9]+}/tasks/{taskId:[0-9]+}/update',
             [EventAdminController::class, 'updateTask']);
-        $group->post('/events/{eventId:[0-9]+}/tasks/{taskId:[0-9]+}/delete',
+        $adminTreeRoutes[] = $group->post('/events/{eventId:[0-9]+}/tasks/{taskId:[0-9]+}/delete',
             [EventAdminController::class, 'deleteTask']);
 
         // Non-modaler Editor (Modul 6 I7e-A Phase 1) — Feature-Parity-Route
@@ -222,21 +255,21 @@ return function (App $app): void {
         // Aufgabenbaum-Editor (Modul 6 I7b1) — hinter Settings-Flag
         // events.tree_editor_enabled. Zugriff zusaetzlich durch
         // assertEventEditPermission pro Action auf Organizer-Ebene gefiltert.
-        $group->get('/events/{eventId:[0-9]+}/tasks/tree',
+        $adminTreeRoutes[] = $group->get('/events/{eventId:[0-9]+}/tasks/tree',
             [EventAdminController::class, 'showTaskTree']);
-        $group->post('/events/{eventId:[0-9]+}/tasks/node',
+        $adminTreeRoutes[] = $group->post('/events/{eventId:[0-9]+}/tasks/node',
             [EventAdminController::class, 'createTaskNode']);
-        $group->post('/events/{eventId:[0-9]+}/tasks/reorder',
+        $adminTreeRoutes[] = $group->post('/events/{eventId:[0-9]+}/tasks/reorder',
             [EventAdminController::class, 'reorderTasks']);
-        $group->post('/events/{eventId:[0-9]+}/tasks/{taskId:[0-9]+}/move',
+        $adminTreeRoutes[] = $group->post('/events/{eventId:[0-9]+}/tasks/{taskId:[0-9]+}/move',
             [EventAdminController::class, 'moveTaskNode']);
-        $group->post('/events/{eventId:[0-9]+}/tasks/{taskId:[0-9]+}/convert',
+        $adminTreeRoutes[] = $group->post('/events/{eventId:[0-9]+}/tasks/{taskId:[0-9]+}/convert',
             [EventAdminController::class, 'convertTaskNode']);
-        $group->post('/events/{eventId:[0-9]+}/tasks/{taskId:[0-9]+}/tree-delete',
+        $adminTreeRoutes[] = $group->post('/events/{eventId:[0-9]+}/tasks/{taskId:[0-9]+}/tree-delete',
             [EventAdminController::class, 'deleteTaskNode']);
-        $group->get('/events/{eventId:[0-9]+}/tasks/{taskId:[0-9]+}/edit',
+        $adminTreeRoutes[] = $group->get('/events/{eventId:[0-9]+}/tasks/{taskId:[0-9]+}/edit',
             [EventAdminController::class, 'editTaskNode']);
-        $group->post('/events/{eventId:[0-9]+}/tasks/{taskId:[0-9]+}',
+        $adminTreeRoutes[] = $group->post('/events/{eventId:[0-9]+}/tasks/{taskId:[0-9]+}',
             [EventAdminController::class, 'updateTaskNode']);
 
         // Sortierbare Task-Liste (Modul 6 I7b4) — read-only chronologische
@@ -264,22 +297,31 @@ return function (App $app): void {
 
         // Template-Aufgabenbaum-Editor (Modul 6 I7c) — hinter Settings-Flag
         // events.tree_editor_enabled. Parallel zu den Event-Tree-Endpunkten.
-        $group->get('/event-templates/{templateId:[0-9]+}/tasks/tree',
+        $adminTreeRoutes[] = $group->get('/event-templates/{templateId:[0-9]+}/tasks/tree',
             [EventTemplateController::class, 'showTaskTree']);
-        $group->post('/event-templates/{templateId:[0-9]+}/tasks/node',
+        $adminTreeRoutes[] = $group->post('/event-templates/{templateId:[0-9]+}/tasks/node',
             [EventTemplateController::class, 'createTaskNode']);
-        $group->post('/event-templates/{templateId:[0-9]+}/tasks/reorder',
+        $adminTreeRoutes[] = $group->post('/event-templates/{templateId:[0-9]+}/tasks/reorder',
             [EventTemplateController::class, 'reorderTasks']);
-        $group->post('/event-templates/{templateId:[0-9]+}/tasks/{taskId:[0-9]+}/move',
+        $adminTreeRoutes[] = $group->post('/event-templates/{templateId:[0-9]+}/tasks/{taskId:[0-9]+}/move',
             [EventTemplateController::class, 'moveTaskNode']);
-        $group->post('/event-templates/{templateId:[0-9]+}/tasks/{taskId:[0-9]+}/convert',
+        $adminTreeRoutes[] = $group->post('/event-templates/{templateId:[0-9]+}/tasks/{taskId:[0-9]+}/convert',
             [EventTemplateController::class, 'convertTaskNode']);
-        $group->post('/event-templates/{templateId:[0-9]+}/tasks/{taskId:[0-9]+}/tree-delete',
+        $adminTreeRoutes[] = $group->post('/event-templates/{templateId:[0-9]+}/tasks/{taskId:[0-9]+}/tree-delete',
             [EventTemplateController::class, 'deleteTaskNode']);
-        $group->get('/event-templates/{templateId:[0-9]+}/tasks/{taskId:[0-9]+}/edit',
+        $adminTreeRoutes[] = $group->get('/event-templates/{templateId:[0-9]+}/tasks/{taskId:[0-9]+}/edit',
             [EventTemplateController::class, 'editTaskNode']);
-        $group->post('/event-templates/{templateId:[0-9]+}/tasks/{taskId:[0-9]+}',
+        $adminTreeRoutes[] = $group->post('/event-templates/{templateId:[0-9]+}/tasks/{taskId:[0-9]+}',
             [EventTemplateController::class, 'updateTaskNode']);
+
+        // Modul 6 I8 Phase 2 / FU-G4-1: Rate-Limit-Middleware an alle
+        // Tree-Action-Routen dieser Admin-Gruppe binden. Greift NACH
+        // Auth/Role/Csrf (Middleware-Reihenfolge Q10).
+        if ($rateLimitTreeAction !== null) {
+            foreach ($adminTreeRoutes as $route) {
+                $route->add($rateLimitTreeAction);
+            }
+        }
     })
         ->add(new RoleMiddleware(['event_admin', 'administrator']))
         ->add(CsrfMiddleware::class)
@@ -328,7 +370,7 @@ return function (App $app): void {
     // Organisator-Routen (Modul 6 I2, jeder angemeldete User kann - Owner-Check
     // erfolgt serverseitig via EventAssignmentService/Guards)
     // =========================================================================
-    $app->group('/organizer', function (RouteCollectorProxy $group) {
+    $app->group('/organizer', function (RouteCollectorProxy $group) use ($rateLimitTreeAction) {
         $group->get('/events', [OrganizerEventController::class, 'index']);
         $group->post(
             '/assignments/{id:[0-9]+}/approve-time',
@@ -362,38 +404,47 @@ return function (App $app): void {
             '/events/{eventId:[0-9]+}/editor',
             [OrganizerEventEditController::class, 'showEditor']
         );
-        $group->get(
+
+        // Modul 6 I8 Phase 2 / FU-G4-1: Tree-Actions auf Organizer-Pfad.
+        $organizerTreeRoutes = [];
+        $organizerTreeRoutes[] = $group->get(
             '/events/{eventId:[0-9]+}/tasks/tree',
             [OrganizerEventEditController::class, 'showTaskTree']
         );
-        $group->post(
+        $organizerTreeRoutes[] = $group->post(
             '/events/{eventId:[0-9]+}/tasks/node',
             [OrganizerEventEditController::class, 'createTaskNode']
         );
-        $group->post(
+        $organizerTreeRoutes[] = $group->post(
             '/events/{eventId:[0-9]+}/tasks/reorder',
             [OrganizerEventEditController::class, 'reorderTasks']
         );
-        $group->post(
+        $organizerTreeRoutes[] = $group->post(
             '/events/{eventId:[0-9]+}/tasks/{taskId:[0-9]+}/move',
             [OrganizerEventEditController::class, 'moveTaskNode']
         );
-        $group->post(
+        $organizerTreeRoutes[] = $group->post(
             '/events/{eventId:[0-9]+}/tasks/{taskId:[0-9]+}/convert',
             [OrganizerEventEditController::class, 'convertTaskNode']
         );
-        $group->post(
+        $organizerTreeRoutes[] = $group->post(
             '/events/{eventId:[0-9]+}/tasks/{taskId:[0-9]+}/tree-delete',
             [OrganizerEventEditController::class, 'deleteTaskNode']
         );
-        $group->get(
+        $organizerTreeRoutes[] = $group->get(
             '/events/{eventId:[0-9]+}/tasks/{taskId:[0-9]+}/edit',
             [OrganizerEventEditController::class, 'editTaskNode']
         );
-        $group->post(
+        $organizerTreeRoutes[] = $group->post(
             '/events/{eventId:[0-9]+}/tasks/{taskId:[0-9]+}',
             [OrganizerEventEditController::class, 'updateTaskNode']
         );
+
+        if ($rateLimitTreeAction !== null) {
+            foreach ($organizerTreeRoutes as $route) {
+                $route->add($rateLimitTreeAction);
+            }
+        }
     })
         ->add(CsrfMiddleware::class)
         ->add(AuthMiddleware::class);

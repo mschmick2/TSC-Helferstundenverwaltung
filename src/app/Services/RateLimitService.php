@@ -117,6 +117,72 @@ class RateLimitService
     }
 
     /**
+     * Prueft ob ein Request erlaubt ist (User-Bucket, Modul 6 I8 Phase 2 / FU-G4-1).
+     *
+     * Zweck: authentifizierte Endpunkte (Tree-Actions, Edit-Session-API) gegen
+     * Massen-Requests eines einzelnen Users schuetzen. Nutzt die email-Spalte
+     * als generisches Key-Feld mit 'user:<id>'-Schema (Architect Q6 aus G1 I8) --
+     * kein Schema-Upgrade noetig.
+     *
+     * @param int    $userId        User-ID des authentifizierten Nutzers
+     * @param string $endpoint      Bucket-Kennung (z.B. 'tree_action')
+     * @param int    $maxAttempts   Maximale Versuche im Zeitfenster
+     * @param int    $windowSeconds Zeitfenster in Sekunden
+     * @return bool true wenn erlaubt, false wenn Rate-Limit erreicht
+     */
+    public function isAllowedForUser(
+        int $userId,
+        string $endpoint,
+        int $maxAttempts,
+        int $windowSeconds
+    ): bool {
+        if (random_int(1, 10) === 1) {
+            $this->cleanup($windowSeconds * 2);
+        }
+
+        $stmt = $this->pdo->prepare(
+            "SELECT COUNT(*) FROM rate_limits
+             WHERE email = :user_key AND endpoint = :endpoint
+             AND attempted_at > DATE_SUB(NOW(), INTERVAL :window SECOND)"
+        );
+        $stmt->execute([
+            'user_key' => 'user:' . $userId,
+            'endpoint' => $endpoint,
+            'window' => $windowSeconds,
+        ]);
+
+        return (int) $stmt->fetchColumn() < $maxAttempts;
+    }
+
+    /**
+     * Einen Request-Versuch eines authentifizierten Users registrieren
+     * (Modul 6 I8 Phase 2 / FU-G4-1).
+     *
+     * Schreibt einen Eintrag mit ip_address (aus dem Request) und
+     * email='user:<id>' als Key. Die IP wird aus forensischen Gruenden
+     * mitgeloggt (zwei-IP-Nutzung desselben Users ist sichtbar), der
+     * Zaehl-Filter laeuft aber ueber die email-Spalte -- ein User wird
+     * nicht ueber mehrere IPs hinweg "aufgeteilt".
+     *
+     * Hinweis zur Abweichung vom G1-Plan-Signatur-Vorschlag: der IP-Parameter
+     * ist Pflicht, weil die rate_limits.ip_address-Spalte im Bestand NOT NULL
+     * ist. Ein Schema-Upgrade zur Entfernung dieser Constraint wuerde
+     * migrationsseitig Bestand-Rate-Limits verschieben. Stattdessen geben wir
+     * die IP einfach mit -- sie ist im Middleware-Kontext ohnehin verfuegbar.
+     */
+    public function recordAttemptForUser(int $userId, string $ipAddress, string $endpoint): void
+    {
+        $stmt = $this->pdo->prepare(
+            "INSERT INTO rate_limits (ip_address, email, endpoint) VALUES (:ip, :user_key, :endpoint)"
+        );
+        $stmt->execute([
+            'ip' => $ipAddress,
+            'user_key' => 'user:' . $userId,
+            'endpoint' => $endpoint,
+        ]);
+    }
+
+    /**
      * Alte Einträge bereinigen
      */
     private function cleanup(int $olderThanSeconds): void
